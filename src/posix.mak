@@ -477,7 +477,7 @@ MAGICPORTSRC = \
 MAGICPORT = $(MAGICPORTDIR)/magicport2
 
 $(MAGICPORT) : $(MAGICPORTSRC)
-	$(DC) -of$(MAGICPORT) $(MAGICPORTSRC)
+	$(DC) $(MODEL_FLAG) -of$(MAGICPORT) $(MAGICPORTSRC)
 
 GENSRC=access.d aggregate.d aliasthis.d apply.d \
 	argtypes.d arrayop.d arraytypes.d \
