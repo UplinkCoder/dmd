@@ -500,10 +500,6 @@ GENSRC=access.d aggregate.d aliasthis.d apply.d \
 
 MANUALSRC= \
 	intrange.d complex.d longdouble.d \
-	libomf.d scanomf.d \
-	libmscoff.d scanmscoff.d \
-	libelf.d scanelf.d \
-	libmach.d scanmach.d \
 	entity.d \
 	$(ROOT)/aav.d $(ROOT)/array.d \
 	$(ROOT)/man.d $(ROOT)/rootobject.d $(ROOT)/outbuffer.d $(ROOT)/port.d \

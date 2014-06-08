@@ -2828,11 +2828,13 @@
             "package" : "",
             "imports" :
             [
-                "mars",
-                "libelf",
-                "libomf",
-                "libmach",
-                "libmscoff"
+                "mars"
+            ],
+            "extra" : [
+                "extern(C++) Library LibOMF_factory();",
+                "extern(C++) Library LibElf_factory();",
+                "extern(C++) Library LibMSCoff_factory();",
+                "extern(C++) Library LibMach_factory();"
             ],
             "members" : [
                 "struct Library"
