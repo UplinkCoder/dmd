@@ -405,8 +405,7 @@
                 "struct StructInitializer",
                 "struct ArrayInitializer",
                 "struct ExpInitializer",
-                "function hasNonConstPointers",
-                "function arrayHasNonConstPointers"
+                "version function hasNonConstPointers"
             ]
         },
         {
@@ -628,7 +627,11 @@
                 "function toCBufferType*OutBuffer*Identifier*HdrGenState*",
                 "function toBufferShort",
                 "function trustToBuffer",
+                "function trustToChars",
                 "function linkageToBuffer",
+                "function linkageToChars",
+                "function protectionToBuffer",
+                "function protectionToChars",
                 "struct PostAppendStrings",
                 "function functionToBufferFull",
                 "function functionToBufferWithIdent",
@@ -1111,6 +1114,7 @@
                 "dsymbol",
                 "dtemplate",
                 "func",
+                "hdrgen",
                 "id",
                 "identifier",
                 "mars",
@@ -1382,6 +1386,7 @@
                 "identifier",
                 "init",
                 "inline",
+                "intrange",
                 "dinterpret",
                 "lexer",
                 "mars",
@@ -1442,7 +1447,6 @@
                 "variable STCnodefaultctor",
                 "variable STCtemp",
                 "variable STCrvalue",
-                "variable STCvirtual",
                 "variable STCnogc",
                 "variable STCStorageClass",
                 "struct Match",
@@ -1532,6 +1536,7 @@
             ],
             "members" :
             [
+                "function isTrivialExp",
                 "function hasSideEffect",
                 "function callSideEffectLevelFuncDeclaration*",
                 "function callSideEffectLevelType*",
@@ -1755,7 +1760,6 @@
             ],
             "members" :
             [
-                "variable Pprotectionnames",
                 "function symbol_search_fp",
                 "function dimDgvoid*size_tDsymbol*",
                 "struct GetNthSymbolCtx",
@@ -1851,6 +1855,7 @@
                 "dtemplate",
                 "expression",
                 "func",
+                "hdrgen",
                 "id",
                 "identifier",
                 "lexer",
@@ -2079,6 +2084,7 @@
                 "dversion",
                 "expression",
                 "func",
+                "hdrgen",
                 "id",
                 "identifier",
                 "init",
@@ -2086,6 +2092,7 @@
                 "mars",
                 "mtype",
                 "nspace",
+                "root.outbuffer",
                 "root.rmem",
                 "root.rootobject",
                 "statement",
@@ -2100,6 +2107,7 @@
                 "variable precedence",
                 "function initPrecedence",
                 "enum ParseStatementFlags",
+                "struct PrefixAttributes",
                 "struct Parser",
                 "enum PREC"
             ]
@@ -2763,6 +2771,7 @@
                 "function gendocfile",
                 "function escapeDdocString",
                 "function escapeStrayParenthesis",
+                "function skipNonQualScopes",
                 "function emitAnchorName",
                 "function emitAnchor",
                 "function getCodeIndent",

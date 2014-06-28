@@ -192,7 +192,7 @@ class DPrinter : Visitor
             return;
         }
         if (!P && !ast.hasbody && ast.skip) return;
-        auto dropdefaultctor = ["Loc", "Token", "HdrGenState", "CtfeStack", "InterState", "BaseClass", "Mem", "StringValue", "OutBuffer", "Scope", "DocComment"];
+        auto dropdefaultctor = ["Loc", "Token", "HdrGenState", "CtfeStack", "InterState", "BaseClass", "Mem", "StringValue", "OutBuffer", "Scope", "DocComment", "PrefixAttributes"];
         if (ast.type.id == ast.id && ast.params.length == 0 && dropdefaultctor.canFind(ast.id))
             return; // Can't have no-args ctor, and Loc/Token doesn't need one
         if (ast.comment)
@@ -215,8 +215,8 @@ class DPrinter : Visitor
             }
         }
         auto nonfinalclass = P && nonFinalClasses.canFind(P.id);
-        if (ast.stc & STCvirtual)
-            print("virtual ");
+        // if (ast.stc & STCvirtual)
+            // print("virtual ");
         if (!isvirtual && !(ast.stc & STCabstract) && nonfinalclass)
             print("final ");
         if (!inexternc && (!P || !classTypes.lookup(P.id)) && ast.type.id != ast.id)
