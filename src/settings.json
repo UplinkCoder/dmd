@@ -2906,13 +2906,17 @@
             "package" : "",
             "imports" : [
                 "core.stdc.stdio",
-                "core.sys.windows.windows"
+                "core.stdc.stdlib",
+                "core.stdc.string",
+                "core.sys.posix.unistd",
+                "core.sys.windows.windows",
+                "mars"
             ],
             "extra" :
             [
-                "extern(C) int isatty(int);",
-                "alias _isatty = isatty;",
-                "int _fileno(FILE* f) { return f._file; }"
+                "version(Windows) extern(C) int isatty(int);",
+                "version(Windows) alias _isatty = isatty;",
+                "version(Windows) int _fileno(FILE* f) { return f._file; }"
             ],
             "members" : [
                 "version function consoleAttributes",
