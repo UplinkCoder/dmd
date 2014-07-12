@@ -17,6 +17,7 @@
         "unittests.c", "imphint.c", "argtypes.c", "apply.c", "sapply.c", "sideeffect.c",
         "ctfe.h", "canthrow.c", "target.c", "target.h", "id.c", "id.h",
         "impcnvtab.c", "visitor.h", "lib.h", "nogc.c", "nspace.h", "nspace.c",
+        "color.c", "color.h",
         "root/filename.h", "root/filename.c",
         "root/file.h", "root/file.c",
         "root/speller.h", "root/speller.c"
@@ -161,6 +162,7 @@
                 "root.outbuffer",
                 "root.port",
                 "root.rmem",
+                "target",
                 "visitor"
             ],
             "members" :
@@ -190,8 +192,6 @@
                 "function pointerDifference",
                 "function pointerArithmetic",
                 "function comparePointers",
-                "struct UnionFloatInt",
-                "struct UnionDoubleLong",
                 "function isFloatIntPaint",
                 "function paintFloatInt",
                 "function intUnary",
@@ -253,7 +253,6 @@
             ],
             "members" :
             [
-                "function search_toHash",
                 "function search_toString",
                 "function semanticTypeInfo",
                 "struct StructFlags",
@@ -346,7 +345,9 @@
             "package" : "",
             "imports" :
             [
+                "expression",
                 "lexer",
+                "longdouble",
                 "mars",
                 "mtype"
             ],
@@ -442,6 +443,8 @@
                 "function buildOpEquals",
                 "function buildXopEquals",
                 "function buildXopCmp",
+                "function needToHash",
+                "function buildXtoHash",
                 "function buildCpCtor",
                 "function buildPostBlit",
                 "function buildDtor",
@@ -922,6 +925,7 @@
                 "function MODtoDecoBuffer",
                 "function MODtoBuffer",
                 "function MODtoChars",
+                "function ModToStc",
                 "function stripDefaultArgs",
                 "variable TFLAGSintegral",
                 "variable TFLAGSfloating",
@@ -2012,7 +2016,8 @@
                 "function mangleDecl",
                 "struct Mangler",
                 "function mangle",
-                "function mangleExact"
+                "function mangleExact",
+                "function toBuffer"
             ]
         },
         {
@@ -2103,7 +2108,6 @@
                 "variable CDECLSYNTAX",
                 "variable CCASTSYNTAX",
                 "variable CARRAYDECL",
-                "variable D1INOUT",
                 "variable precedence",
                 "function initPrecedence",
                 "enum ParseStatementFlags",
@@ -2275,6 +2279,7 @@
             [
                 "arraytypes",
                 "builtin",
+                "color",
                 "cond",
                 "core.stdc.ctype",
                 "core.stdc.errno",
@@ -2895,6 +2900,27 @@
             "members" : [
                 "struct Nspace"
             ]
+        },
+        {
+            "module" : "color",
+            "package" : "",
+            "imports" : [
+                "core.stdc.stdio",
+                "core.sys.windows.windows"
+            ],
+            "extra" :
+            [
+                "extern(C) int isatty(int);",
+                "alias _isatty = isatty;",
+                "int _fileno(FILE* f) { return f._file; }"
+            ],
+            "members" : [
+                "version function consoleAttributes",
+                "function isConsoleColorSupported",
+                "function setConsoleColorBright",
+                "function setConsoleColorError",
+                "function resetConsoleColor"
+            ]
         }
     ],
     "basicTypes" :
@@ -3000,17 +3026,15 @@
         "TYPE",
         "FILE",
         "structalign_t",
-        "UnionFloatInt",
-        "UnionDoubleLong",
         "Ctxt",
         "WIN32_FIND_DATAA",
         "utimbuf",
         "Symbol",
         "Classsym",
-        "ptrdiff_t",
         "StructFlags",
         "ClassFlags",
         "FILE",
+        "CONSOLE_SCREEN_BUFFER_INFO",
 
         "Strings",
         "Sections"
