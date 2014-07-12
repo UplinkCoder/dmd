@@ -415,7 +415,7 @@ struct IntRange
                             SignExtendedNumber(0));
         }
     }
-    IntRange unionWidth(const ref IntRange other) const
+    IntRange unionWith(const ref IntRange other) const
     {
         return IntRange(imin < other.imin ? imin : other.imin,
                         imax > other.imax ? imax : other.imax);
