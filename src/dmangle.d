@@ -25,11 +25,17 @@ import ddmd.expression;
 import ddmd.func;
 import ddmd.globals;
 import ddmd.id;
+import ddmd.identifier;
 import ddmd.mtype;
 import ddmd.root.outbuffer;
 import ddmd.root.port;
+import ddmd.root.array;
+import ddmd.tokens;
 import ddmd.utf;
 import ddmd.visitor;
+
+version = useBackref;
+version = useBackref2;
 
 private immutable char[TMAX] mangleChar =
 [
@@ -88,6 +94,9 @@ private immutable char[TMAX] mangleChar =
     //              X   // variadic T t...)
     //              Y   // variadic T t,...)
     //              Z   // not variadic, end of parameters
+    //              #   // Type backward reference
+    //              $   // symbol backward reference
+    //              @   // identifier backward reference
 
     // '@' shouldn't appear anywhere in the deco'd names
     Tinstance    : '@',
@@ -163,12 +172,93 @@ private void MODtoDecoBuffer(OutBuffer* buf, MOD mod)
 extern (C++) final class Mangler : Visitor
 {
     alias visit = super.visit;
+
 public:
+    version(useBackref)
+    {
+        // cannot put C++ classes into a hash table, tries to call toHash
+        size_t[void*] types;
+        size_t[void*] symbols;
+        size_t[void*] idents;
+    }
     OutBuffer* buf;
 
     extern (D) this(OutBuffer* buf)
     {
         this.buf = buf;
+    }
+
+    final bool backrefType(Type t)
+    {
+        version(useBackref)
+        {
+            if (!t.isTypeBasic())
+            {
+                if (auto p = cast(void*)t in types)
+                {
+                    buf.printf("#%d", cast(int)*p);
+                    return true;
+                }
+                types[cast(void*)t] = types.length;
+            }
+        }
+        return false;
+    }
+
+    final bool backrefSymbol(Dsymbol s)
+    {
+        version(useBackref)
+        {
+            if (auto p = cast(void*)s in symbols)
+            {
+                buf.printf("$%d", cast(int)*p);
+                return true;
+            }
+            symbols[cast(void*)s] = symbols.length;
+        }
+        return false;
+    }
+
+    final bool backrefIdentifier(Identifier id)
+    {
+        version(useBackref)
+        {
+            if (auto p = cast(void*)id in idents)
+            {
+                buf.printf("@%d", cast(int)*p);
+                return true;
+            }
+            idents[cast(void*)id] = idents.length;
+        }
+        return false;
+    }
+
+    final void mangle(Dsymbol s)
+    {
+        if (!backrefSymbol(s))
+            s.accept(this);
+    }
+
+    final void mangle(Type t)
+    {
+        if (!backrefType(t))
+            t.accept(this);
+    }
+
+    final void mangleIdentifier(Identifier id, Dsymbol s)
+    {
+        if (!backrefIdentifier(id))
+            toBuffer(id.toChars(), s);
+    }
+
+    final void mangle(Expression e)
+    {
+        e.accept(this);
+    }
+
+    final void mangle(Parameter p)
+    {
+        p.accept(this);
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -179,14 +269,15 @@ public:
     {
         if (t.deco && modMask == 0)
         {
-            buf.writestring(t.deco);    // don't need to recreate it
+            if (!backrefType(t))
+                buf.writestring(t.deco);    // don't need to recreate it
             return;
         }
         if (modMask != t.mod)
         {
             MODtoDecoBuffer(buf, t.mod);
         }
-        t.accept(this);
+        mangle(t);
     }
 
     override void visit(Type t)
@@ -318,34 +409,42 @@ public:
     override void visit(TypeEnum t)
     {
         visit(cast(Type)t);
-        t.sym.accept(this);
+        mangle(t.sym);
     }
 
     override void visit(TypeStruct t)
     {
         //printf("TypeStruct.toDecoBuffer('%s') = '%s'\n", t.toChars(), name);
         visit(cast(Type)t);
-        t.sym.accept(this);
+        mangle(t.sym);
     }
 
     override void visit(TypeClass t)
     {
         //printf("TypeClass.toDecoBuffer('%s' mod=%x) = '%s'\n", t.toChars(), mod, name);
         visit(cast(Type)t);
-        t.sym.accept(this);
+        mangle(t.sym);
     }
 
     override void visit(TypeTuple t)
     {
         //printf("TypeTuple.toDecoBuffer() t = %p, %s\n", t, t.toChars());
         visit(cast(Type)t);
-        OutBuffer buf2;
-        buf2.reserve(32);
-        scope Mangler v = new Mangler(&buf2);
-        v.paramsToDecoBuffer(t.arguments);
-        auto s = buf2.peekSlice();
-        int len = cast(int)s.length;
-        buf.printf("%d%.*s", len, len, s.ptr);
+        version(useBackref)
+        {
+            paramsToDecoBuffer(t.arguments);
+            buf.writeByte('Z');
+        }
+        else
+        {
+            OutBuffer buf2;
+            buf2.reserve(32);
+            scope Mangler v = new Mangler(&buf2);
+            v.paramsToDecoBuffer(t.arguments);
+            auto s = buf2.peekSlice();
+            int len = cast(int)s.length;
+            buf.printf("%d%.*s", len, len, s.ptr);
+        }
     }
 
     override void visit(TypeNull t)
@@ -358,8 +457,7 @@ public:
     {
         mangleParent(sthis);
         assert(sthis.ident);
-        const(char)* id = sthis.ident.toChars();
-        toBuffer(id, sthis);
+        mangleIdentifier(sthis.ident, sthis);
         if (FuncDeclaration fd = sthis.isFuncDeclaration())
         {
             mangleFunc(fd, false);
@@ -382,10 +480,11 @@ public:
         if (p)
         {
             mangleParent(p);
-            if (p.getIdent())
+            if (auto ti = p.isTemplateInstance())
+                mangleTemplateInstance(ti);
+            else if (p.getIdent())
             {
-                const(char)* id = p.ident.toChars();
-                toBuffer(id, s);
+                mangleIdentifier(p.ident, s);
                 if (FuncDeclaration f = p.isFuncDeclaration())
                     mangleFunc(f, true);
             }
@@ -468,7 +567,7 @@ public:
             assert(slice.length);
             foreach (const char c; slice)
             {
-                assert(c == '_' || c == '@' || c == '?' || c == '$' || isalnum(c) || c & 0x80);
+                assert(c == '_' || c == '@' || c == '?' || c == '$' || c == '#' || isalnum(c) || c & 0x80);
             }
         }
     }
@@ -516,7 +615,7 @@ public:
         }
         if (fa)
         {
-            fa.accept(this);
+            mangle(fa);
             return;
         }
         visit(cast(Dsymbol)fd);
@@ -541,7 +640,7 @@ public:
         {
             if (!od.hasOverloads || td.overnext is null)
             {
-                td.accept(this);
+                mangle(td);
                 return;
             }
         }
@@ -598,6 +697,53 @@ public:
         ad.parent = parentsave;
     }
 
+    void mangleTemplateInstance(TemplateInstance ti)
+    {
+        version(useBackref2)
+        {
+
+        // similar to TemplateInstance.genIdent
+        TemplateDeclaration tempdecl = ti.tempdecl.isTemplateDeclaration();
+        assert(tempdecl);
+
+        const id = tempdecl.ident.toString();
+        // Use "__U" for the symbols declared inside template constraint.
+        const char T = ti.members ? 'T' : 'U';
+        buf.printf("__%c%u%.*s", T, cast(int)id.length, cast(int)id.length, id.ptr);
+
+        size_t nparams = tempdecl.parameters.dim - (tempdecl.isVariadic() ? 1 : 0);
+        for (size_t i = 0; i < ti.tiargs.dim; i++)
+        {
+            auto o = (*ti.tiargs)[i];
+            if (i < nparams && (*tempdecl.parameters)[i].specialization())
+                buf.writeByte('H'); // Bugzilla 6574
+            if (Type ta = isType(o))
+            {
+                buf.writeByte('T');
+                mangle(ta);
+            }
+            else if (Expression ea = isExpression(o))
+            {
+                buf.writeByte('V');
+                mangle(ea);
+            }
+            else if (Dsymbol sa = isDsymbol(o))
+            {
+                buf.writeByte('S');
+                mangle(sa);
+            }
+            else
+                assert(false);
+        }
+        buf.writeByte('Z');
+        //printf("TemplateInstance.mangle() %s = %s\n", ti.toChars(), ti.id);
+        }
+        else
+        {
+            mangleIdentifer(ti.getIdent(), ti);
+        }
+    }
+
     override void visit(TemplateInstance ti)
     {
         version (none)
@@ -611,10 +757,8 @@ public:
             ti.error("is not defined");
         else
             mangleParent(ti);
-        ti.getIdent();
-        const(char)* id = ti.ident ? ti.ident.toChars() : ti.toChars();
-        toBuffer(id, ti);
-        //printf("TemplateInstance.mangle() %s = %s\n", ti.toChars(), ti.id);
+
+        mangleTemplateInstance(ti);
     }
 
     override void visit(Dsymbol s)
@@ -627,15 +771,31 @@ public:
             printf("\n");
         }
         mangleParent(s);
-        auto id = s.ident ? s.ident.toChars() : s.toChars();
-        toBuffer(id, s);
+        if (s.ident)
+            mangleIdentifier(s.ident, s);
+        else
+            toBuffer(s.toChars(), s);
         //printf("Dsymbol.mangle() %s = %s\n", s.toChars(), id);
     }
 
     ////////////////////////////////////////////////////////////////////////////
     override void visit(Expression e)
     {
-        e.error("expression %s is not a valid template value argument", e.toChars());
+        auto ea = e.optimize(WANTvalue);
+        if (ea.op == e.op)
+        {
+            // Now that we know it is not an alias, we MUST obtain a value
+            uint olderr = global.errors;
+            ea = ea.ctfeInterpret();
+            if (ea.op == TOKerror || olderr != global.errors)
+                return; // error already shown
+            if (ea.op == e.op)
+            {
+                e.error("expression %s is not a valid template value argument", e.toChars());
+                return;
+            }
+        }
+        ea.accept(this);
     }
 
     override void visit(IntegerExp e)
@@ -650,6 +810,21 @@ public:
     {
         buf.writeByte('e');
         realToMangleBuffer(e.value);
+    }
+
+    override void visit(VarExp e)
+    {
+        mangle(e.var);
+    }
+
+    override void visit(ThisExp e)
+    {
+        mangle(e.var);
+    }
+
+    override void visit(FuncExp e)
+    {
+        mangle(e.td ? e.td : e.fd);
     }
 
     void realToMangleBuffer(real_t value)
@@ -772,7 +947,7 @@ public:
         buf.printf("A%u", cast(uint)dim);
         for (size_t i = 0; i < dim; i++)
         {
-            e.getElement(i).accept(this);
+            mangle(e.getElement(i));
         }
     }
 
@@ -782,8 +957,8 @@ public:
         buf.printf("A%u", cast(uint)dim);
         for (size_t i = 0; i < dim; i++)
         {
-            (*e.keys)[i].accept(this);
-            (*e.values)[i].accept(this);
+            mangle((*e.keys)[i]);
+            mangle((*e.values)[i]);
         }
     }
 
@@ -795,7 +970,7 @@ public:
         {
             Expression ex = (*e.elements)[i];
             if (ex)
-                ex.accept(this);
+                mangle(ex);
             else
                 buf.writeByte('v'); // 'v' for void
         }
@@ -808,7 +983,7 @@ public:
 
         int paramsToDecoBufferDg(size_t n, Parameter p)
         {
-            p.accept(this);
+            mangle(p);
             return 0;
         }
 
@@ -877,12 +1052,18 @@ extern (C++) void mangleToBuffer(Type t, OutBuffer* buf)
 extern (C++) void mangleToBuffer(Expression e, OutBuffer* buf)
 {
     scope Mangler v = new Mangler(buf);
-    e.accept(v);
+    v.mangle(e);
 }
 
 extern (C++) void mangleToBuffer(Dsymbol s, OutBuffer* buf)
 {
     scope Mangler v = new Mangler(buf);
-    s.accept(v);
+    v.mangle(s);
+}
+
+extern (C++) void mangleToBuffer(TemplateInstance ti, OutBuffer* buf)
+{
+    scope Mangler v = new Mangler(buf);
+    v.mangleTemplateInstance(ti);
 }
 

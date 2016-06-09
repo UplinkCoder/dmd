@@ -39,6 +39,8 @@ import ddmd.visitor;
 
 private enum LOG = false;
 
+version = useBackref;
+
 enum IDX_NOTFOUND = 0x12345678;
 
 /********************************************
@@ -8056,7 +8058,11 @@ extern (C++) class TemplateInstance : ScopeDsymbol
         //printf("TemplateInstance::genIdent('%s')\n", tempdecl->ident->toChars());
         OutBuffer buf;
 
-        const id = tempdecl.ident.toString();
+        version(useBackref)
+            mangleToBuffer(this, &buf);
+        else
+        {
+            const id = tempdecl.ident.toString();
         // Use "__U" for the symbols declared inside template constraint.
         const char T = members ? 'T' : 'U';
         buf.printf("__%c%u%.*s", T, cast(int)id.length, cast(int)id.length, id.ptr);
@@ -8165,6 +8171,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
         }
         buf.writeByte('Z');
         //printf("\tgenIdent = %s\n", buf.peekString());
+        }
         return Identifier.idPool(buf.peekSlice());
     }
 
