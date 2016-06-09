@@ -39,7 +39,7 @@ import ddmd.visitor;
 
 private enum LOG = false;
 
-//version = useBackref;
+version = useBackref;
 
 enum IDX_NOTFOUND = 0x12345678;
 

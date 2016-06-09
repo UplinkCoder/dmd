@@ -25,6 +25,7 @@ import ddmd.expression;
 import ddmd.func;
 import ddmd.globals;
 import ddmd.id;
+import ddmd.identifier;
 import ddmd.mtype;
 import ddmd.root.outbuffer;
 import ddmd.root.port;
@@ -33,8 +34,8 @@ import ddmd.tokens;
 import ddmd.utf;
 import ddmd.visitor;
 
-//version = useBackref;
-//version = useBackref2;
+version = useBackref;
+version = useBackref2;
 
 private immutable char[TMAX] mangleChar =
 [
@@ -93,6 +94,9 @@ private immutable char[TMAX] mangleChar =
     //              X   // variadic T t...)
     //              Y   // variadic T t,...)
     //              Z   // not variadic, end of parameters
+    //              #   // Type backward reference
+    //              $   // symbol backward reference
+    //              @   // identifier backward reference
 
     // '@' shouldn't appear anywhere in the deco'd names
     Tinstance    : '@',
@@ -170,7 +174,13 @@ extern (C++) final class Mangler : Visitor
     alias visit = super.visit;
 
 public:
-    Array!Type types;
+    version(useBackref)
+    {
+        // cannot put C++ classes into a hash table, tries to call toHash
+        size_t[void*] types;
+        size_t[void*] symbols;
+        size_t[void*] idents;
+    }
     OutBuffer* buf;
 
     extern (D) this(OutBuffer* buf)
@@ -181,29 +191,64 @@ public:
     final bool backrefType(Type t)
     {
         version(useBackref)
-        if (!t.isTypeBasic())
         {
-            for (uint i = 0; i < types.dim; i++)
+            if (!t.isTypeBasic())
             {
-                if (types[i] is t)
+                if (auto p = cast(void*)t in types)
                 {
-                    buf.printf("#%d", i);
+                    buf.printf("#%d", cast(int)*p);
                     return true;
                 }
+                types[cast(void*)t] = types.length;
             }
-            types.push(t);
+        }
+        return false;
+    }
+
+    final bool backrefSymbol(Dsymbol s)
+    {
+        version(useBackref)
+        {
+            if (auto p = cast(void*)s in symbols)
+            {
+                buf.printf("$%d", cast(int)*p);
+                return true;
+            }
+            symbols[cast(void*)s] = symbols.length;
+        }
+        return false;
+    }
+
+    final bool backrefIdentifier(Identifier id)
+    {
+        version(useBackref)
+        {
+            if (auto p = cast(void*)id in idents)
+            {
+                buf.printf("@%d", cast(int)*p);
+                return true;
+            }
+            idents[cast(void*)id] = idents.length;
         }
         return false;
     }
 
     final void mangle(Dsymbol s)
     {
-        s.accept(this);
+        if (!backrefSymbol(s))
+            s.accept(this);
     }
+
     final void mangle(Type t)
     {
         if (!backrefType(t))
             t.accept(this);
+    }
+
+    final void mangleIdentifier(Identifier id, Dsymbol s)
+    {
+        if (!backrefIdentifier(id))
+            toBuffer(id.toChars(), s);
     }
 
     final void mangle(Expression e)
@@ -412,8 +457,7 @@ public:
     {
         mangleParent(sthis);
         assert(sthis.ident);
-        const(char)* id = sthis.ident.toChars();
-        toBuffer(id, sthis);
+        mangleIdentifier(sthis.ident, sthis);
         if (FuncDeclaration fd = sthis.isFuncDeclaration())
         {
             mangleFunc(fd, false);
@@ -440,8 +484,7 @@ public:
                 mangleTemplateInstance(ti);
             else if (p.getIdent())
             {
-                const(char)* id = p.ident.toChars();
-                toBuffer(id, s);
+                mangleIdentifier(p.ident, s);
                 if (FuncDeclaration f = p.isFuncDeclaration())
                     mangleFunc(f, true);
             }
@@ -697,8 +740,7 @@ public:
         }
         else
         {
-            const(char)* id = ti.getIdent().toChars();
-            toBuffer(id, ti);
+            mangleIdentifer(ti.getIdent(), ti);
         }
     }
 
@@ -729,8 +771,10 @@ public:
             printf("\n");
         }
         mangleParent(s);
-        auto id = s.ident ? s.ident.toChars() : s.toChars();
-        toBuffer(id, s);
+        if (s.ident)
+            mangleIdentifier(s.ident, s);
+        else
+            toBuffer(s.toChars(), s);
         //printf("Dsymbol.mangle() %s = %s\n", s.toChars(), id);
     }
 
