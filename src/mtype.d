@@ -3037,7 +3037,7 @@ public:
     }
 
     // For eliminating dynamic_cast
-    TypeBasic isTypeBasic()
+    TypeBasic isTypeBasic() pure
     {
         return null;
     }
@@ -4288,7 +4288,7 @@ public:
     }
 
     // For eliminating dynamic_cast
-    override TypeBasic isTypeBasic()
+    override TypeBasic isTypeBasic() pure
     {
         return this;
     }
