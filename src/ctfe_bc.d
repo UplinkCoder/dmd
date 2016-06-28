@@ -21,7 +21,8 @@ struct CtfeStack {
 }
 struct StackRef {}
 auto evaluateFunction(FuncDeclaration fd, StackRef[] args, ThisExp _this = null) {
-	BCV bcv;
+	BCV bcv = new BCV();
+//	bcv.setThis(bcv);
 	/*	if (fd.ctfeCode) {
 		return executeFun(fd.ctfeCode, args);
 	} else {
@@ -41,6 +42,8 @@ string toString(T)(T value) if(is(T:Statement) || is(T:Declaration) || is(T:Expr
 	const (char)* cPtr = value.toChars();
 	return cast(string) cPtr[0 .. strlen(cPtr)];
 }
+
+
 extern(C++) final class BCV : Visitor {
 	alias visit = super.visit;
 
@@ -152,6 +155,8 @@ extern(C++) final class BCV : Visitor {
 	}
 
 public :
+
+	this() {}
 //
 //	void integralOp(CTInt a, CTInt b, Tok op) {
 //		switch (op) {
@@ -241,7 +246,7 @@ public :
 		BCBlock* result = new BCBlock();
 
 		result.begin = BCLabel(ip);
-		visit(stmt);
+		stmt.accept(this);
 		result.end = BCLabel(ip);
 
 		return result;
@@ -330,26 +335,32 @@ public :
 		genExpr(es.exp);
 	}
 
-/*	override void visit(Statement s) {
+	override void visit(Statement s) {
 		debug {
 			import std.stdio;
 			writefln("Statement %s", s.toString);
 		}
 
 	}
-*/
+
+//	override void visit(Assign) {
+//		super.visit();
+//	}
+
 	override void visit(CompoundStatement cs) {
 		debug {
 			import std.stdio;
 			writefln("CompundStatement %s", cs.toString);
 		}
+
+//		BCV thisbcv = new BCV();
 		foreach(stmt; cs.statements.opSlice()) {
 //			auto stmt = (*cs.statements)[i];
-			if(auto _cs = stmt.isCompoundStatement()) {visit(_cs);}
+/*			if(auto _cs = stmt.isCompoundStatement()) {visit(_cs);}
 			else if (auto es = stmt.isExpStatement()) {visit(es);}
 			else if (auto rs = stmt.isReturnStatement()) {visit(rs);}
 			else if (auto fs = stmt.isForStatement()) {visit(fs);}
-			else {stmt.accept(this);}
+			else */{stmt.accept(this);}
 		}
 	}
 
