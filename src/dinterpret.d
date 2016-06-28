@@ -36,6 +36,8 @@ import ddmd.tokens;
 import ddmd.utf;
 import ddmd.visitor;
 
+import ctfe_bc;
+
 enum CtfeGoal : int
 {
     ctfeNeedRvalue,     // Must return an Rvalue (== CTFE value)
@@ -812,6 +814,9 @@ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expres
     // CTFE-compile the function
     if (!fd.ctfeCode)
         ctfeCompile(fd);
+
+	if (auto r = evaluateFunction(fd, []))
+		return r;
 
     Type tb = fd.type.toBasetype();
     assert(tb.ty == Tfunction);
