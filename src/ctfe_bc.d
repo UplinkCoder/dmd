@@ -34,11 +34,11 @@ auto evaluateFunction(FuncDeclaration fd, Expression[] args, ThisExp _this = nul
 		fd.ctfeCode = compile(fd);
 		return executeFun(fd.ctfeCode, args);
 	} */
-
+//	foreach(a;fd.v_arguments)
 	if (auto fbody = fd.fbody.isCompoundStatement) {
 		bcv.visit(fbody);
 		debug { import std.stdio;
-			writeln(bcv.byteCodeArray[0 .. bcv.ip+3]);
+			writeln(cast(ushort[])bcv.byteCodeArray[0 .. bcv.ip*2+3]);
 		}
 
 	}
@@ -90,9 +90,14 @@ extern(C++) final class BCV : Visitor {
 
 	this(LongInst i, uint imm) {
 			lw = 0b10 | i << 2 ;
-			hi = imm; 
-		}
+			hi = imm;
 	}
+
+	this(LongInst i, short stackAddr, uint imm) {
+		lw = 0b10 | i << 2 | stackAddr << 16;
+		hi = imm; 
+	}
+}
 
 	static assert(ShortInst.max < 64);
 
@@ -436,12 +441,23 @@ public :
 			writefln("DeclarationExp %s discardValue %d", de.toString, discardValue);
 			writefln("DeclarationExp.declaration: %x", cast(void*)de.declaration.isVarDeclaration);
 		}
+		auto var = BCValue(StackRef(sp, vd.type));
 
-		vars[cast(void*)vd] = BCValue(StackRef(sp, vd.type));
+		if (auto ci = vd.getConstInitializer) {
+			auto oldRetVal = retval;
+			ci.accept(this);
+			if(retval.vType == BCValueType.Immidiate && retval.type == BCType.i32) {
+				//TODO SetStackValue Instruction
+				//emitSet(var, retval);
+			}
+			retval = oldRetVal;
+		}
+		vars[cast(void*)vd] = var;
 		sp += align4(cast(uint)vd.type.size);
 
 		assert(sp < ushort.max, "StackOverflow Stack is currently constrained to 64K");
 		writeln(vd.type.size);
+
 		//de.declaration.accept(this);
 	
 	}
@@ -516,7 +532,12 @@ public :
 	 	debug {
 			import std.stdio;
 			writefln("AssignExp %s", ae.toString);
+
+			ae.e1.toString().writeln;
+			ae.e2.toString().writeln;
+
 		}
+
 	}
 
 	override void visit(ReturnStatement rs) {
