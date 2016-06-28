@@ -3048,7 +3048,7 @@ extern (C++) abstract class Type : RootObject
     }
 
     // For eliminating dynamic_cast
-    TypeBasic isTypeBasic()
+    TypeBasic isTypeBasic() pure
     {
         return null;
     }
@@ -4296,7 +4296,7 @@ extern (C++) final class TypeBasic : Type
     }
 
     // For eliminating dynamic_cast
-    override TypeBasic isTypeBasic()
+    override TypeBasic isTypeBasic() pure
     {
         return this;
     }
