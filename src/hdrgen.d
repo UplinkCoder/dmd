@@ -242,7 +242,7 @@ public:
 
     override void visit(ForeachStatement s)
     {
-        buf.writestring(Token.toChars(s.op));
+        buf.writestring(Token.toString(s.op));
         buf.writestring(" (");
         foreach (i, p; *s.parameters)
         {
@@ -271,7 +271,7 @@ public:
 
     override void visit(ForeachRangeStatement s)
     {
-        buf.writestring(Token.toChars(s.op));
+        buf.writestring(Token.toString(s.op));
         buf.writestring(" (");
         if (s.prm.type)
             typeToBuffer(s.prm.type, s.prm.ident);
@@ -559,7 +559,7 @@ public:
 
     override void visit(OnScopeStatement s)
     {
-        buf.writestring(Token.toChars(s.tok));
+        buf.writestring(Token.toString(s.tok));
         buf.writeByte(' ');
         s.statement.accept(this);
     }
@@ -1192,6 +1192,26 @@ public:
         visit(cast(AttribDeclaration)d);
     }
 
+    override void visit(CPPMangleDeclaration d)
+    {
+        const(char)* p;
+        switch (d.cppmangle)
+        {
+        case CPPMANGLE.asClass:
+            p = "class";
+            break;
+        case CPPMANGLE.asStruct:
+            p = "struct";
+            break;
+        default:
+            assert(0);
+        }
+        buf.writestring("extern (C++, ");
+        buf.writestring(p);
+        buf.writestring(") ");
+        visit(cast(AttribDeclaration)d);
+    }
+
     override void visit(ProtDeclaration d)
     {
         protectionToBuffer(buf, d.protection);
@@ -1201,10 +1221,10 @@ public:
 
     override void visit(AlignDeclaration d)
     {
-        if (d.salign == STRUCTALIGN_DEFAULT)
-            buf.printf("align");
+        if (!d.ealign)
+            buf.printf("align ");
         else
-            buf.printf("align (%d)", d.salign);
+            buf.printf("align (%s) ", d.ealign.toChars());
         visit(cast(AttribDeclaration)d);
     }
 
@@ -2038,7 +2058,7 @@ public:
         debug
         {
             if (precedence[e.op] == PREC.zero)
-                printf("precedence not defined for token '%s'\n", Token.tochars[e.op]);
+                printf("precedence not defined for token '%s'\n", Token.toChars(e.op));
         }
         assert(precedence[e.op] != PREC.zero);
         assert(pr != PREC.zero);
@@ -2058,7 +2078,7 @@ public:
 
     override void visit(Expression e)
     {
-        buf.writestring(Token.toChars(e.op));
+        buf.writestring(Token.toString(e.op));
     }
 
     override void visit(IntegerExp e)
@@ -2527,7 +2547,7 @@ public:
 
     override void visit(UnaExp e)
     {
-        buf.writestring(Token.toChars(e.op));
+        buf.writestring(Token.toString(e.op));
         expToBuffer(e.e1, precedence[e.op]);
     }
 
@@ -2535,7 +2555,7 @@ public:
     {
         expToBuffer(e.e1, precedence[e.op]);
         buf.writeByte(' ');
-        buf.writestring(Token.toChars(e.op));
+        buf.writestring(Token.toString(e.op));
         buf.writeByte(' ');
         expToBuffer(e.e2, cast(PREC)(precedence[e.op] + 1));
     }
@@ -2733,12 +2753,12 @@ public:
     override void visit(PostExp e)
     {
         expToBuffer(e.e1, precedence[e.op]);
-        buf.writestring(Token.toChars(e.op));
+        buf.writestring(Token.toString(e.op));
     }
 
     override void visit(PreExp e)
     {
-        buf.writestring(Token.toChars(e.op));
+        buf.writestring(Token.toString(e.op));
         expToBuffer(e.e1, precedence[e.op]);
     }
 
@@ -2761,7 +2781,7 @@ public:
 
     override void visit(DefaultInitExp e)
     {
-        buf.writestring(Token.toChars(e.subop));
+        buf.writestring(Token.toString(e.subop));
     }
 
     override void visit(ClassReferenceExp e)

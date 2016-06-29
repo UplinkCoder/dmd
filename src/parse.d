@@ -226,7 +226,8 @@ struct PrefixAttributes
     Expression depmsg;
     LINK link;
     Prot protection;
-    uint alignment;
+    bool setAlignment;
+    Expression ealign;
     Expressions* udas;
     const(char)* comment;
 }
@@ -249,10 +250,10 @@ private StorageClass getStorageClass(PrefixAttributes* pAttrs)
  */
 final class Parser : Lexer
 {
-public:
     Module mod;
     ModuleDeclaration* md;
     LINK linkage;
+    CPPMANGLE cppmangle;
     Loc endloc; // set to location of last right curly
     int inBrackets; // inside [] of array index or slice
     Loc lookingForElse; // location of lonely if looking for an else
@@ -877,7 +878,8 @@ public:
 
                     const linkLoc = token.loc;
                     Identifiers* idents = null;
-                    const link = parseLinkage(&idents);
+                    CPPMANGLE cppmangle;
+                    const link = parseLinkage(&idents, cppmangle);
                     if (pAttrs.link != LINKdefault)
                     {
                         if (pAttrs.link != link)
@@ -912,6 +914,11 @@ public:
                             s = new Nspace(linkLoc, id, a);
                         }
                         pAttrs.link = LINKdefault;
+                    }
+                    else if (cppmangle != CPPMANGLE.def)
+                    {
+                        assert(link == LINKcpp);
+                        s = new CPPMangleDeclaration(cppmangle, a);
                     }
                     else if (pAttrs.link != LINKdefault)
                     {
@@ -985,59 +992,34 @@ public:
                 }
             case TOKalign:
                 {
+                    const attrLoc = token.loc;
+
                     nextToken();
 
-                    uint n;
+                    Expression e = null; // default
                     if (token.value == TOKlparen)
                     {
                         nextToken();
-                        if (token.value == TOKint32v && token.uns64value > 0)
-                        {
-                            if (token.uns64value & (token.uns64value - 1))
-                                error("align(%s) must be a power of 2", token.toChars());
-                            n = cast(uint)token.uns64value;
-                        }
-                        else
-                        {
-                            error("positive integer expected, not %s", token.toChars());
-                            n = 1;
-                        }
-                        nextToken();
+                        e = parseAssignExp();
                         check(TOKrparen);
                     }
-                    else
-                        n = STRUCTALIGN_DEFAULT; // default
 
-                    if (pAttrs.alignment != 0)
+                    if (pAttrs.setAlignment)
                     {
-                        const(char)* s1 = "";
-                        OutBuffer buf1;
-                        if (n != STRUCTALIGN_DEFAULT)
-                        {
-                            buf1.printf("(%d)", n);
-                            s1 = buf1.peekString();
-                        }
-                        if (pAttrs.alignment != n)
-                        {
-                            OutBuffer buf2;
-                            const(char)* s2 = "";
-                            if (pAttrs.alignment != STRUCTALIGN_DEFAULT)
-                            {
-                                buf2.printf("(%d)", pAttrs.alignment);
-                                s2 = buf2.peekString();
-                            }
-                            error("conflicting alignment attribute align%s and align%s", s2, s1);
-                        }
+                        if (e)
+                            error("redundant alignment attribute align(%s)", e.toChars());
                         else
-                            error("redundant alignment attribute align%s", s1);
+                            error("redundant alignment attribute align");
                     }
 
-                    pAttrs.alignment = n;
+                    pAttrs.setAlignment = true;
+                    pAttrs.ealign = e;
                     a = parseBlock(pLastDecl, pAttrs);
-                    if (pAttrs.alignment != 0)
+                    if (pAttrs.setAlignment)
                     {
-                        s = new AlignDeclaration(pAttrs.alignment, a);
-                        pAttrs.alignment = 0;
+                        s = new AlignDeclaration(attrLoc, pAttrs.ealign, a);
+                        pAttrs.setAlignment = false;
+                        pAttrs.ealign = null;
                     }
                     break;
                 }
@@ -2152,9 +2134,10 @@ public:
      *      extern (C++, namespaces)
      * The parser is on the 'extern' token.
      */
-    LINK parseLinkage(Identifiers** pidents)
+    LINK parseLinkage(Identifiers** pidents, out CPPMANGLE cppmangle)
     {
         Identifiers* idents = null;
+        cppmangle = CPPMANGLE.def;
         LINK link = LINKdefault;
         nextToken();
         assert(token.value == TOKlparen);
@@ -2176,26 +2159,34 @@ public:
                 {
                     link = LINKcpp;
                     nextToken();
-                    if (token.value == TOKcomma) // , namespaces
+                    if (token.value == TOKcomma) // , namespaces or class or struct
                     {
-                        idents = new Identifiers();
                         nextToken();
-                        while (1)
+                        if (token.value == TOKclass || token.value == TOKstruct)
                         {
-                            if (token.value == TOKidentifier)
+                            cppmangle = token.value == TOKclass ? CPPMANGLE.asClass : CPPMANGLE.asStruct;
+                            nextToken();
+                        }
+                        else
+                        {
+                            idents = new Identifiers();
+                            while (1)
                             {
-                                Identifier idn = token.ident;
-                                idents.push(idn);
-                                nextToken();
-                                if (token.value == TOKdot)
+                                if (token.value == TOKidentifier)
                                 {
+                                    Identifier idn = token.ident;
+                                    idents.push(idn);
                                     nextToken();
-                                    continue;
+                                    if (token.value == TOKdot)
+                                    {
+                                        nextToken();
+                                        continue;
+                                    }
                                 }
+                                else
+                                    error("identifier expected for C++ namespace");
+                                break;
                             }
-                            else
-                                error("identifier expected for C++ namespace");
-                            break;
                         }
                     }
                 }
@@ -2316,9 +2307,9 @@ public:
             else if (token.value == TOKint32v || token.value == TOKint64v)
                 level = cast(uint)token.uns64value;
             else if (token.value == TOKunittest)
-                id = Identifier.idPool(Token.toChars(TOKunittest), strlen(Token.toChars(TOKunittest)));
+                id = Identifier.idPool(Token.toString(TOKunittest));
             else if (token.value == TOKassert)
-                id = Identifier.idPool(Token.toChars(TOKassert), strlen(Token.toChars(TOKassert)));
+                id = Identifier.idPool(Token.toString(TOKassert));
             else
                 error("identifier or integer expected inside version(...), not %s", token.toChars());
             nextToken();
@@ -3049,16 +3040,14 @@ public:
      */
     Dsymbol parseAggregate()
     {
-        AggregateDeclaration a = null;
-        int anon = 0;
-        Identifier id;
         TemplateParameters* tpl = null;
-        Expression constraint = null;
+        Expression constraint;
         const loc = token.loc;
         TOK tok = token.value;
 
         //printf("Parser::parseAggregate()\n");
         nextToken();
+        Identifier id;
         if (token.value != TOKidentifier)
         {
             id = null;
@@ -3070,97 +3059,113 @@ public:
 
             if (token.value == TOKlparen)
             {
-                // Class template declaration.
-                // Gather template parameter list
+                // struct/class template declaration.
                 tpl = parseTemplateParameterList();
                 constraint = parseConstraint();
             }
         }
 
-        switch (tok)
+        // Collect base class(es)
+        BaseClasses* baseclasses = null;
+        if (token.value == TOKcolon)
         {
-        case TOKclass:
-        case TOKinterface:
-            {
-                if (!id)
-                    error(loc, "anonymous classes not allowed");
-
-                // Collect base class(es)
-                BaseClasses* baseclasses = null;
-                if (token.value == TOKcolon)
-                {
-                    nextToken();
-                    baseclasses = parseBaseClasses();
-                    if (tpl)
-                    {
-                        Expression tempCons = parseConstraint();
-                        if (tempCons)
-                        {
-                            if (constraint)
-                                error("members expected");
-                            else
-                                constraint = tempCons;
-                        }
-                    }
-                    if (token.value != TOKlcurly)
-                        error("members expected");
-                }
-
-                if (tok == TOKclass)
-                {
-                    bool inObject = md && !md.packages && md.id == Id.object;
-                    a = new ClassDeclaration(loc, id, baseclasses, inObject);
-                }
-                else
-                    a = new InterfaceDeclaration(loc, id, baseclasses);
-                break;
-            }
-        case TOKstruct:
-            if (id)
-                a = new StructDeclaration(loc, id);
-            else
-                anon = 1;
-            break;
-
-        case TOKunion:
-            if (id)
-                a = new UnionDeclaration(loc, id);
-            else
-                anon = 2;
-            break;
-
-        default:
-            assert(0);
-        }
-        if (a && token.value == TOKsemicolon)
-        {
+            if (tok != TOKinterface && tok != TOKclass)
+                error("base classes are not allowed for %s, did you mean ';'?", Token.toChars(tok));
             nextToken();
+            baseclasses = parseBaseClasses();
         }
-        else if (token.value == TOKlcurly)
+
+        if (token.value == TOKif)
         {
+            if (constraint)
+                error("template constraints appear both before and after BaseClassList, put them before");
+            constraint = parseConstraint();
+        }
+        if (constraint)
+        {
+            if (!id)
+                error("template constraints not allowed for anonymous %s", Token.toChars(tok));
+            if (!tpl)
+                error("template constraints only allowed for templates");
+        }
+
+        Dsymbols* members = null;
+        if (token.value == TOKlcurly)
+        {
+            //printf("aggregate definition\n");
             const lookingForElseSave = lookingForElse;
             lookingForElse = Loc();
-            //printf("aggregate definition\n");
             nextToken();
-            Dsymbols* decl = parseDeclDefs(0);
+            members = parseDeclDefs(0);
             lookingForElse = lookingForElseSave;
             if (token.value != TOKrcurly)
+            {
+                /* { */
                 error("} expected following members in %s declaration at %s",
                     Token.toChars(tok), loc.toChars());
-            nextToken();
-            if (anon)
-            {
-                /* Anonymous structs/unions are more like attributes.
-                 */
-                return new AnonDeclaration(loc, anon == 2, decl);
             }
-            else
-                a.members = decl;
+            nextToken();
+        }
+        else if (token.value == TOKsemicolon && id)
+        {
+            if (baseclasses || constraint)
+                error("members expected");
+            nextToken();
         }
         else
         {
             error("{ } expected following %s declaration", Token.toChars(tok));
-            a = new StructDeclaration(loc, null);
+        }
+
+        AggregateDeclaration a;
+        switch (tok)
+        {
+        case TOKinterface:
+            if (!id)
+                error(loc, "anonymous interfaces not allowed");
+            a = new InterfaceDeclaration(loc, id, baseclasses);
+            a.members = members;
+            break;
+
+        case TOKclass:
+            if (!id)
+                error(loc, "anonymous classes not allowed");
+            bool inObject = md && !md.packages && md.id == Id.object;
+            a = new ClassDeclaration(loc, id, baseclasses, members, inObject);
+            break;
+
+        case TOKstruct:
+            if (id)
+            {
+                a = new StructDeclaration(loc, id);
+                a.members = members;
+            }
+            else
+            {
+                /* Anonymous structs/unions are more like attributes.
+                 */
+                assert(!tpl);
+                return new AnonDeclaration(loc, false, members);
+            }
+            break;
+
+        case TOKunion:
+            if (id)
+            {
+                a = new UnionDeclaration(loc, id);
+                a.members = members;
+            }
+            else
+            {
+                /* Anonymous structs/unions are more like attributes.
+                 */
+                assert(!tpl);
+                return new AnonDeclaration(loc, true, members);
+            }
+            break;
+
+        default:
+            assert(0);
         }
 
         if (tpl)
@@ -3932,7 +3937,8 @@ public:
         return ts;
     }
 
-    void parseStorageClasses(ref StorageClass storage_class, ref LINK link, ref uint structalign, ref Expressions* udas)
+    void parseStorageClasses(ref StorageClass storage_class, ref LINK link,
+        ref bool setAlignment, ref Expression ealign, ref Expressions* udas)
     {
         StorageClass stc;
         bool sawLinkage = false; // seen a linkage declaration
@@ -4041,31 +4047,28 @@ public:
                         error("redundant linkage declaration");
                     sawLinkage = true;
                     Identifiers* idents = null;
-                    link = parseLinkage(&idents);
+                    CPPMANGLE cppmangle;
+                    link = parseLinkage(&idents, cppmangle);
                     if (idents)
                     {
                         error("C++ name spaces not allowed here");
+                    }
+                    if (cppmangle != CPPMANGLE.def)
+                    {
+                        error("C++ mangle declaration not allowed here");
                     }
                     continue;
                 }
             case TOKalign:
                 {
                     nextToken();
+                    setAlignment = true;
                     if (token.value == TOKlparen)
                     {
                         nextToken();
-                        if (token.value == TOKint32v && token.uns64value > 0)
-                            structalign = cast(uint)token.uns64value;
-                        else
-                        {
-                            error("positive integer expected, not %s", token.toChars());
-                            structalign = 1;
-                        }
-                        nextToken();
+                        ealign = parseExpression();
                         check(TOKrparen);
                     }
-                    else
-                        structalign = STRUCTALIGN_DEFAULT; // default
                     continue;
                 }
             default:
@@ -4091,7 +4094,8 @@ public:
         Identifier ident;
         TOK tok = TOKreserved;
         LINK link = linkage;
-        uint structalign = 0;
+        bool setAlignment = false;
+        Expression ealign;
         auto loc = token.loc;
         Expressions* udas = null;
         Token* tk;
@@ -4185,9 +4189,10 @@ public:
 
                         storage_class = STCundefined;
                         link = linkage;
-                        structalign = 0;
+                        setAlignment = false;
+                        ealign = null;
                         udas = null;
-                        parseStorageClasses(storage_class, link, structalign, udas);
+                        parseStorageClasses(storage_class, link, setAlignment, ealign, udas);
 
                         if (udas)
                             error("user defined attributes not allowed for %s declarations", Token.toChars(tok));
@@ -4248,9 +4253,12 @@ public:
             // alias StorageClasses type ident;
         }
 
-        parseStorageClasses(storage_class, link, structalign, udas);
+        parseStorageClasses(storage_class, link, setAlignment, ealign, udas);
 
-        if (token.value == TOKstruct || token.value == TOKunion || token.value == TOKclass || token.value == TOKinterface)
+        if (token.value == TOKstruct ||
+            token.value == TOKunion ||
+            token.value == TOKclass ||
+            token.value == TOKinterface)
         {
             Dsymbol s = parseAggregate();
             auto a = new Dsymbols();
@@ -4262,9 +4270,9 @@ public:
                 a = new Dsymbols();
                 a.push(s);
             }
-            if (structalign != 0)
+            if (setAlignment)
             {
-                s = new AlignDeclaration(structalign, a);
+                s = new AlignDeclaration(s.loc, ealign, a);
                 a = new Dsymbols();
                 a.push(s);
             }
@@ -4490,11 +4498,11 @@ public:
                     auto tempdecl = new TemplateDeclaration(loc, ident, tpl, null, a2, 0);
                     s = tempdecl;
                 }
-                if (structalign != 0)
+                if (setAlignment)
                 {
                     auto ax = new Dsymbols();
                     ax.push(s);
-                    s = new AlignDeclaration(structalign, ax);
+                    s = new AlignDeclaration(v.loc, ealign, ax);
                 }
                 if (link != linkage)
                 {
@@ -4785,7 +4793,7 @@ public:
      * Input:
      *      flags   PSxxxx
      * Output:
-     *      pEndloc if { ... statements ... }, store location of closing brace
+     *      pEndloc if { ... statements ... }, store location of closing brace, otherwise loc of first token of next statement
      */
     Statement parseStatement(int flags, const(char)** endPtr = null, Loc* pEndloc = null)
     {
@@ -4917,7 +4925,7 @@ public:
                     Dsymbols* imports = parseImport();
                     s = new ImportStatement(loc, imports);
                     if (flags & PSscope)
-                        s = new ScopeStatement(loc, s);
+                        s = new ScopeStatement(loc, s, token.loc);
                     break;
                 }
                 goto Ldeclaration;
@@ -5004,7 +5012,7 @@ public:
                 else
                     s = new ExpStatement(loc, cast(Expression)null);
                 if (flags & PSscope)
-                    s = new ScopeStatement(loc, s);
+                    s = new ScopeStatement(loc, s, token.loc);
                 break;
             }
         case TOKenum:
@@ -5028,7 +5036,7 @@ public:
                 }
                 s = new ExpStatement(loc, d);
                 if (flags & PSscope)
-                    s = new ScopeStatement(loc, s);
+                    s = new ScopeStatement(loc, s, token.loc);
                 break;
             }
         case TOKmixin:
@@ -5053,7 +5061,7 @@ public:
                 Dsymbol d = parseMixin();
                 s = new ExpStatement(loc, d);
                 if (flags & PSscope)
-                    s = new ScopeStatement(loc, s);
+                    s = new ScopeStatement(loc, s, token.loc);
                 break;
             }
         case TOKlcurly:
@@ -5073,10 +5081,13 @@ public:
                     *endPtr = token.ptr;
                 endloc = token.loc;
                 if (pEndloc)
+                {
                     *pEndloc = token.loc;
+                    pEndloc = null; // don't set it again
+                }
                 s = new CompoundStatement(loc, statements);
                 if (flags & (PSscope | PScurlyscope))
-                    s = new ScopeStatement(loc, s);
+                    s = new ScopeStatement(loc, s, token.loc);
                 check(TOKrcurly, "compound statement");
                 lookingForElse = lookingForElseSave;
                 break;
@@ -5122,7 +5133,7 @@ public:
                     nextToken();
                 else
                     error("terminating ';' required after do-while statement");
-                s = new DoStatement(loc, _body, condition);
+                s = new DoStatement(loc, _body, condition, token.loc);
                 break;
             }
         case TOKfor:
@@ -5374,7 +5385,7 @@ public:
                 else
                     elsebody = null;
                 if (condition && ifbody)
-                    s = new IfStatement(loc, param, condition, ifbody, elsebody);
+                    s = new IfStatement(loc, param, condition, ifbody, elsebody, token.loc);
                 else
                     s = null; // don't propagate parsing errors
                 break;
@@ -5449,7 +5460,7 @@ public:
             }
             s = new ConditionalStatement(loc, cond, ifbody, elsebody);
             if (flags & PSscope)
-                s = new ScopeStatement(loc, s);
+                s = new ScopeStatement(loc, s, token.loc);
             break;
 
         case TOKpragma:
@@ -5534,7 +5545,7 @@ public:
                 }
                 else
                     s = parseStatement(PSsemi | PScurlyscope);
-                s = new ScopeStatement(loc, s);
+                s = new ScopeStatement(loc, s, token.loc);
 
                 if (last)
                 {
@@ -5567,7 +5578,7 @@ public:
                 }
                 else
                     s = parseStatement(PSsemi | PScurlyscope);
-                s = new ScopeStatement(loc, s);
+                s = new ScopeStatement(loc, s, token.loc);
                 s = new DefaultStatement(loc, s);
                 break;
             }
@@ -5673,13 +5684,14 @@ public:
             {
                 Expression exp;
                 Statement _body;
+                Loc endloc = loc;
 
                 nextToken();
                 check(TOKlparen);
                 exp = parseExpression();
                 check(TOKrparen);
-                _body = parseStatement(PSscope);
-                s = new WithStatement(loc, exp, _body);
+                _body = parseStatement(PSscope, null, &endloc);
+                s = new WithStatement(loc, exp, _body, endloc);
                 break;
             }
         case TOKtry:
@@ -5852,7 +5864,7 @@ public:
                 Dsymbols* imports = parseImport();
                 s = new ImportStatement(loc, imports);
                 if (flags & PSscope)
-                    s = new ScopeStatement(loc, s);
+                    s = new ScopeStatement(loc, s, token.loc);
                 break;
             }
         case TOKtemplate:
@@ -5873,6 +5885,8 @@ public:
             s = null;
             break;
         }
+        if (pEndloc)
+            *pEndloc = token.loc;
         return s;
     }
 
@@ -6971,7 +6985,7 @@ public:
         {
             nextToken();
             auto e2 = parseAssignExp();
-            e = new CommaExp(loc, e, e2);
+            e = new CommaExp(loc, e, e2, false);
             loc = token.loc;
         }
         return e;
@@ -8328,23 +8342,22 @@ public:
                 baseclasses = parseBaseClasses();
 
             Identifier id = null;
-            auto cd = new ClassDeclaration(loc, id, baseclasses);
+            Dsymbols* members = null;
 
             if (token.value != TOKlcurly)
             {
                 error("{ members } expected for anonymous class");
-                cd.members = null;
             }
             else
             {
                 nextToken();
-                Dsymbols* decl = parseDeclDefs(0);
+                members = parseDeclDefs(0);
                 if (token.value != TOKrcurly)
                     error("class member expected");
                 nextToken();
-                cd.members = decl;
             }
 
+            auto cd = new ClassDeclaration(loc, id, baseclasses, members, false);
             auto e = new NewAnonClassExp(loc, thisexp, newargs, cd, arguments);
             return e;
         }

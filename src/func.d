@@ -38,6 +38,7 @@ import ddmd.opover;
 import ddmd.root.filename;
 import ddmd.root.outbuffer;
 import ddmd.root.rootobject;
+import ddmd.statementsem;
 import ddmd.statement;
 import ddmd.target;
 import ddmd.tokens;
@@ -398,7 +399,6 @@ enum FUNCFLAGinlineScanned    = 0x20;   // function has been scanned for inline 
  */
 extern (C++) class FuncDeclaration : Declaration
 {
-public:
     Types* fthrows;                     // Array of Type's of exceptions (not used)
     Statement frequire;
     Statement fensure;
@@ -604,21 +604,6 @@ public:
             TypeFunction tf = cast(TypeFunction)type;
             if (sc.func)
             {
-                /* If the parent is @safe, then this function defaults to safe too.
-                 */
-                if (tf.trust == TRUSTdefault)
-                {
-                    FuncDeclaration fd = sc.func;
-
-                    /* If the parent's @safe-ty is inferred, then this function's @safe-ty needs
-                     * to be inferred first.
-                     * If this function's @safe-ty is inferred, then it needs to be infeerd first.
-                     * (local template function inside @safe function can be inferred to @system).
-                     */
-                    if (fd.isSafeBypassingInference() && !isInstantiated())
-                        tf.trust = TRUSTsafe; // default to @safe
-                }
-
                 /* If the nesting parent is pure without inference,
                  * then this function defaults to pure too.
                  *
@@ -1275,8 +1260,11 @@ public:
          * the function body.
          */
         TemplateInstance ti;
-        if (fbody &&
-            (isFuncLiteralDeclaration() || (storage_class & STCinference) || (inferRetType && !isCtorDeclaration()) || isInstantiated() && !isVirtualMethod() &&
+        if (fbody && !isVirtualMethod() &&
+                        /********** this is for backwards compatibility for the moment ********/
+            (sc.func && (!isMember() || sc.func.isSafeBypassingInference() && !isInstantiated()) ||
+             isFuncLiteralDeclaration() || (storage_class & STCinference) || (inferRetType && !isCtorDeclaration()) ||
+             isInstantiated() &&
              ((ti = parent.isTemplateInstance()) is null || ti.isTemplateMixin() || ti.tempdecl.ident == ident)))
         {
             if (f.purity == PUREimpure) // purity not specified
@@ -1430,6 +1418,8 @@ public:
             // Establish function scope
             auto ss = new ScopeDsymbol();
             ss.parent = sc.scopesym;
+            ss.loc = loc;
+            ss.endlinnum = endloc.linnum;
             Scope* sc2 = sc.push(ss);
             sc2.func = this;
             sc2.parent = this;
@@ -1442,7 +1432,7 @@ public:
             sc2.stc &= ~(STCauto | STCscope | STCstatic | STCabstract | STCdeprecated | STCoverride | STC_TYPECTOR | STCfinal | STCtls | STCgshared | STCref | STCreturn | STCproperty | STCnothrow | STCpure | STCsafe | STCtrusted | STCsystem);
             sc2.protection = Prot(PROTpublic);
             sc2.explicitProtection = 0;
-            sc2.structalign = STRUCTALIGN_DEFAULT;
+            sc2.aligndecl = null;
             if (this.ident != Id.require && this.ident != Id.ensure)
                 sc2.flags = sc.flags & ~SCOPEcontract;
             sc2.flags &= ~SCOPEcompile;
@@ -1636,6 +1626,8 @@ public:
                 // scope of out contract (need for vresult->semantic)
                 auto sym = new ScopeDsymbol();
                 sym.parent = sc2.scopesym;
+                sym.loc = loc;
+                sym.endlinnum = endloc.linnum;
                 scout = sc2.push(sym);
             }
 
@@ -1643,6 +1635,8 @@ public:
             {
                 auto sym = new ScopeDsymbol();
                 sym.parent = sc2.scopesym;
+                sym.loc = loc;
+                sym.endlinnum = endloc.linnum;
                 sc2 = sc2.push(sym);
 
                 auto ad2 = isMember2();
@@ -1801,7 +1795,7 @@ public:
                     uint nothrowErrors = global.errors;
                     blockexit = fbody.blockExit(this, f.isnothrow);
                     if (f.isnothrow && (global.errors != nothrowErrors))
-                        .error(loc, "%s '%s' is nothrow yet may throw", kind(), toPrettyChars());
+                        .error(loc, "nothrow %s '%s' may throw", kind(), toPrettyChars());
                     if (flags & FUNCFLAGnothrowInprocess)
                     {
                         if (type == f)
@@ -1958,6 +1952,8 @@ public:
                  */
                 auto sym = new ScopeDsymbol();
                 sym.parent = sc2.scopesym;
+                sym.loc = loc;
+                sym.endlinnum = endloc.linnum;
                 sc2 = sc2.push(sym);
                 sc2.flags = (sc2.flags & ~SCOPEcontract) | SCOPErequire;
 
@@ -2099,15 +2095,14 @@ public:
                         {
                             // same with ExpStatement.scopeCode()
                             Statement s = new DtorExpStatement(Loc(), v.edtor, v);
-                            v.noscope = true;
+                            v.storage_class |= STCnodtor;
 
                             s = s.semantic(sc2);
 
-                            uint nothrowErrors = global.errors;
                             bool isnothrow = f.isnothrow & !(flags & FUNCFLAGnothrowInprocess);
                             int blockexit = s.blockExit(this, isnothrow);
-                            if (f.isnothrow && (global.errors != nothrowErrors))
-                                .error(loc, "%s '%s' is nothrow yet may throw", kind(), toPrettyChars());
+                            if (f.isnothrow && isnothrow && blockexit & BEthrow)
+                                .error(loc, "nothrow %s '%s' may throw", kind(), toPrettyChars());
                             if (flags & FUNCFLAGnothrowInprocess && blockexit & BEthrow)
                                 f.isnothrow = false;
 
@@ -3661,7 +3656,7 @@ public:
              * fbody->semantic() running, vresult->type might be modified.
              */
             vresult = new VarDeclaration(loc, tret, outId ? outId : Id.result, null);
-            vresult.noscope = true;
+            vresult.storage_class |= STCnodtor;
 
             if (outId == Id.result)
                 vresult.storage_class |= STCtemp;
@@ -4454,7 +4449,6 @@ extern (C++) bool checkEscapingSiblings(FuncDeclaration f, FuncDeclaration outer
  */
 extern (C++) final class FuncAliasDeclaration : FuncDeclaration
 {
-public:
     FuncDeclaration funcalias;
     bool hasOverloads;
 
@@ -4504,7 +4498,6 @@ public:
  */
 extern (C++) final class FuncLiteralDeclaration : FuncDeclaration
 {
-public:
     TOK tok;        // TOKfunction or TOKdelegate
     Type treq;      // target of return type inference
 
@@ -4637,7 +4630,6 @@ public:
  */
 extern (C++) final class CtorDeclaration : FuncDeclaration
 {
-public:
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Type type)
     {
         super(loc, endloc, Id.ctor, stc, type);
@@ -4771,7 +4763,6 @@ public:
  */
 extern (C++) final class PostBlitDeclaration : FuncDeclaration
 {
-public:
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Identifier id)
     {
         super(loc, endloc, id, stc, null);
@@ -4856,7 +4847,6 @@ public:
  */
 extern (C++) final class DtorDeclaration : FuncDeclaration
 {
-public:
     extern (D) this(Loc loc, Loc endloc)
     {
         super(loc, endloc, Id.dtor, STCundefined, null);
@@ -4957,7 +4947,6 @@ public:
  */
 extern (C++) class StaticCtorDeclaration : FuncDeclaration
 {
-public:
     final extern (D) this(Loc loc, Loc endloc, StorageClass stc)
     {
         super(loc, endloc, Identifier.generateId("_staticCtor"), STCstatic | stc, null);
@@ -5021,7 +5010,7 @@ public:
             Expression e = new IdentifierExp(Loc(), v.ident);
             e = new AddAssignExp(Loc(), e, new IntegerExp(1));
             e = new EqualExp(TOKnotequal, Loc(), e, new IntegerExp(1));
-            s = new IfStatement(Loc(), null, e, new ReturnStatement(Loc(), null), null);
+            s = new IfStatement(Loc(), null, e, new ReturnStatement(Loc(), null), null, Loc());
 
             sa.push(s);
             if (fbody)
@@ -5083,7 +5072,6 @@ public:
  */
 extern (C++) final class SharedStaticCtorDeclaration : StaticCtorDeclaration
 {
-public:
     extern (D) this(Loc loc, Loc endloc, StorageClass stc)
     {
         super(loc, endloc, "_sharedStaticCtor", stc);
@@ -5111,7 +5099,6 @@ public:
  */
 extern (C++) class StaticDtorDeclaration : FuncDeclaration
 {
-public:
     VarDeclaration vgate; // 'gate' variable
 
     final extern (D) this(Loc loc, Loc endloc, StorageClass stc)
@@ -5177,7 +5164,7 @@ public:
             Expression e = new IdentifierExp(Loc(), v.ident);
             e = new AddAssignExp(Loc(), e, new IntegerExp(-1));
             e = new EqualExp(TOKnotequal, Loc(), e, new IntegerExp(0));
-            s = new IfStatement(Loc(), null, e, new ReturnStatement(Loc(), null), null);
+            s = new IfStatement(Loc(), null, e, new ReturnStatement(Loc(), null), null, Loc());
 
             sa.push(s);
             if (fbody)
@@ -5241,7 +5228,6 @@ public:
  */
 extern (C++) final class SharedStaticDtorDeclaration : StaticDtorDeclaration
 {
-public:
     extern (D) this(Loc loc, Loc endloc, StorageClass stc)
     {
         super(loc, endloc, "_sharedStaticDtor", stc);
@@ -5269,7 +5255,6 @@ public:
  */
 extern (C++) final class InvariantDeclaration : FuncDeclaration
 {
-public:
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Identifier id, Statement fbody)
     {
         super(loc, endloc, id ? id : Identifier.generateId("__invariant"), stc, null);
@@ -5303,7 +5288,10 @@ public:
             errors = true;
             return;
         }
-        if (ident != Id.classInvariant && semanticRun < PASSsemantic)
+        if (ident != Id.classInvariant &&
+             semanticRun < PASSsemantic &&
+             !ad.isUnionDeclaration()           // users are on their own with union fields
+           )
             ad.invs.push(this);
         if (!type)
             type = new TypeFunction(null, Type.tvoid, false, LINKd, storage_class);
@@ -5360,7 +5348,6 @@ extern (C++) static Identifier unitTestId(Loc loc)
  */
 extern (C++) final class UnitTestDeclaration : FuncDeclaration
 {
-public:
     char* codedoc;      // for documented unittest
 
     // toObjFile() these nested functions after this one
@@ -5463,7 +5450,6 @@ public:
  */
 extern (C++) final class NewDeclaration : FuncDeclaration
 {
-public:
     Parameters* parameters;
     int varargs;
 
@@ -5559,7 +5545,6 @@ public:
  */
 extern (C++) final class DeleteDeclaration : FuncDeclaration
 {
-public:
     Parameters* parameters;
 
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Parameters* fparams)

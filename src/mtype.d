@@ -166,37 +166,37 @@ extern (C++) void MODtoBuffer(OutBuffer* buf, MOD mod)
         break;
 
     case MODimmutable:
-        buf.writestring(Token.tochars[TOKimmutable]);
+        buf.writestring(Token.toString(TOKimmutable));
         break;
 
     case MODshared:
-        buf.writestring(Token.tochars[TOKshared]);
+        buf.writestring(Token.toString(TOKshared));
         break;
 
     case MODshared | MODconst:
-        buf.writestring(Token.tochars[TOKshared]);
+        buf.writestring(Token.toString(TOKshared));
         buf.writeByte(' ');
         goto case; /+ fall through +/
     case MODconst:
-        buf.writestring(Token.tochars[TOKconst]);
+        buf.writestring(Token.toString(TOKconst));
         break;
 
     case MODshared | MODwild:
-        buf.writestring(Token.tochars[TOKshared]);
+        buf.writestring(Token.toString(TOKshared));
         buf.writeByte(' ');
         goto case; /+ fall through +/
     case MODwild:
-        buf.writestring(Token.tochars[TOKwild]);
+        buf.writestring(Token.toString(TOKwild));
         break;
 
     case MODshared | MODwildconst:
-        buf.writestring(Token.tochars[TOKshared]);
+        buf.writestring(Token.toString(TOKshared));
         buf.writeByte(' ');
         goto case; /+ fall through +/
     case MODwildconst:
-        buf.writestring(Token.tochars[TOKwild]);
+        buf.writestring(Token.toString(TOKwild));
         buf.writeByte(' ');
-        buf.writestring(Token.tochars[TOKconst]);
+        buf.writestring(Token.toString(TOKconst));
         break;
 
     default:
@@ -478,7 +478,6 @@ alias MOD = ubyte;
  */
 extern (C++) abstract class Type : RootObject
 {
-public:
     TY ty;
     MOD mod; // modifiers MODxxxx
     char* deco;
@@ -2903,6 +2902,18 @@ public:
     }
 
     /*************************************
+     * Detect if type has pointer fields that are initialized to void.
+     * Local stack variables with such void fields can remain uninitialized,
+     * leading to pointer bugs.
+     * Returns:
+     *  true if so
+     */
+    bool hasVoidInitPointers()
+    {
+        return false;
+    }
+
+    /*************************************
      * If this is a type of something, return that something.
      */
     Type nextOf()
@@ -3052,7 +3063,6 @@ public:
  */
 extern (C++) final class TypeError : Type
 {
-public:
     extern (D) this()
     {
         super(Terror);
@@ -3099,7 +3109,6 @@ public:
  */
 extern (C++) abstract class TypeNext : Type
 {
-public:
     Type next;
 
     final extern (D) this(TY ty, Type next)
@@ -3399,7 +3408,6 @@ public:
  */
 extern (C++) final class TypeBasic : Type
 {
-public:
     const(char)* dstring;
     uint flags;
 
@@ -4307,7 +4315,6 @@ public:
  */
 extern (C++) final class TypeVector : Type
 {
-public:
     Type basetype;
 
     extern (D) this(Loc loc, Type basetype)
@@ -4484,7 +4491,6 @@ public:
  */
 extern (C++) class TypeArray : TypeNext
 {
-public:
     final extern (D) this(TY ty, Type next)
     {
         super(ty, next);
@@ -4636,7 +4642,6 @@ public:
  */
 extern (C++) final class TypeSArray : TypeArray
 {
-public:
     Expression dim;
 
     extern (D) this(Type t, Expression dim)
@@ -5085,7 +5090,6 @@ public:
  */
 extern (C++) final class TypeDArray : TypeArray
 {
-public:
     extern (D) this(Type t)
     {
         super(Tarray, t);
@@ -5289,7 +5293,6 @@ public:
  */
 extern (C++) final class TypeAArray : TypeArray
 {
-public:
     Type index;     // key type
     Loc loc;
     Scope* sc;
@@ -5663,7 +5666,6 @@ public:
  */
 extern (C++) final class TypePointer : TypeNext
 {
-public:
     extern (D) this(Type t)
     {
         super(Tpointer, t);
@@ -5847,7 +5849,6 @@ public:
  */
 extern (C++) final class TypeReference : TypeNext
 {
-public:
     extern (D) this(Type t)
     {
         super(Treference, t);
@@ -5968,7 +5969,6 @@ alias PUREstrong = PURE.PUREstrong;
  */
 extern (C++) final class TypeFunction : TypeNext
 {
-public:
     // .next is the return type
 
     Parameters* parameters;     // function parameters
@@ -6086,12 +6086,15 @@ public:
         if (sc.stc & STCreturn)
             tf.isreturn = true;
 
-        if (sc.stc & STCsafe)
-            tf.trust = TRUSTsafe;
-        if (sc.stc & STCsystem)
-            tf.trust = TRUSTsystem;
-        if (sc.stc & STCtrusted)
-            tf.trust = TRUSTtrusted;
+        if (tf.trust == TRUSTdefault)
+        {
+            if (sc.stc & STCsafe)
+                tf.trust = TRUSTsafe;
+            else if (sc.stc & STCsystem)
+                tf.trust = TRUSTsystem;
+            else if (sc.stc & STCtrusted)
+                tf.trust = TRUSTtrusted;
+        }
 
         if (sc.stc & STCproperty)
             tf.isproperty = true;
@@ -6964,7 +6967,6 @@ public:
  */
 extern (C++) final class TypeDelegate : TypeNext
 {
-public:
     // .next is a TypeFunction
 
     extern (D) this(Type t)
@@ -7121,7 +7123,6 @@ public:
  */
 extern (C++) abstract class TypeQualified : Type
 {
-public:
     Loc loc;
 
     // array of Identifier and TypeInstance,
@@ -7540,7 +7541,6 @@ public:
  */
 extern (C++) final class TypeIdentifier : TypeQualified
 {
-public:
     Identifier ident;
 
     // The symbol representing this identifier, before alias resolution
@@ -7677,7 +7677,6 @@ public:
  */
 extern (C++) final class TypeInstance : TypeQualified
 {
-public:
     TemplateInstance tempinst;
 
     extern (D) this(Loc loc, TemplateInstance tempinst)
@@ -7778,7 +7777,6 @@ public:
  */
 extern (C++) final class TypeTypeof : TypeQualified
 {
-public:
     Expression exp;
     int inuse;
 
@@ -7938,7 +7936,6 @@ public:
  */
 extern (C++) final class TypeReturn : TypeQualified
 {
-public:
     extern (D) this(Loc loc)
     {
         super(Treturn, loc);
@@ -8057,9 +8054,9 @@ alias RECtracingDT = AliasThisRec.RECtracingDT;
  */
 extern (C++) final class TypeStruct : Type
 {
-public:
     StructDeclaration sym;
     AliasThisRec att = RECfwdref;
+    CPPMANGLE cppmangle = CPPMANGLE.def;
 
     extern (D) this(StructDeclaration sym)
     {
@@ -8090,7 +8087,18 @@ public:
 
     override Type semantic(Loc loc, Scope* sc)
     {
-        //printf("TypeStruct::semantic('%s')\n", sym->toChars());
+        //printf("TypeStruct::semantic('%s')\n", sym.toChars());
+        if (deco)
+        {
+            if (sc.cppmangle != CPPMANGLE.def)
+            {
+                if (this.cppmangle == CPPMANGLE.def)
+                    this.cppmangle = sc.cppmangle;
+                else
+                    assert(this.cppmangle == sc.cppmangle);
+            }
+            return this;
+        }
 
         /* Don't semantic for sym because it should be deferred until
          * sizeof needed or its members accessed.
@@ -8100,6 +8108,7 @@ public:
 
         if (sym.type.ty == Terror)
             return Type.terror;
+        this.cppmangle = sc.cppmangle;
         return merge();
     }
 
@@ -8511,10 +8520,25 @@ public:
         StructDeclaration s = sym;
 
         sym.size(Loc()); // give error for forward references
-        for (size_t i = 0; i < s.fields.dim; i++)
+        foreach (VarDeclaration v; s.fields)
         {
-            Declaration d = s.fields[i];
-            if (d.storage_class & STCref || d.hasPointers())
+            if (v.storage_class & STCref || v.hasPointers())
+                return true;
+        }
+        return false;
+    }
+
+    override bool hasVoidInitPointers()
+    {
+        // Probably should cache this information in sym rather than recompute
+        StructDeclaration s = sym;
+
+        sym.size(Loc()); // give error for forward references
+        foreach (VarDeclaration v; s.fields)
+        {
+            if (v._init && v._init.isVoidInitializer() && v.type.hasPointers())
+                return true;
+            if (!v._init && v.type.hasVoidInitPointers())
                 return true;
         }
         return false;
@@ -8628,7 +8652,6 @@ public:
  */
 extern (C++) final class TypeEnum : Type
 {
-public:
     EnumDeclaration sym;
 
     extern (D) this(EnumDeclaration sym)
@@ -8838,7 +8861,8 @@ public:
     {
         if (!sym.members && !sym.memtype)
             return this;
-        return sym.getMemtype(Loc()).toBasetype();
+        auto tb = sym.getMemtype(Loc()).toBasetype();
+        return tb.castMod(mod);         // retain modifier bits from 'this'
     }
 
     override Expression defaultInit(Loc loc)
@@ -8865,6 +8889,11 @@ public:
         return sym.getMemtype(Loc()).hasPointers();
     }
 
+    override bool hasVoidInitPointers()
+    {
+        return sym.getMemtype(Loc()).hasVoidInitPointers();
+    }
+
     override Type nextOf()
     {
         return sym.getMemtype(Loc()).nextOf();
@@ -8880,9 +8909,9 @@ public:
  */
 extern (C++) final class TypeClass : Type
 {
-public:
     ClassDeclaration sym;
     AliasThisRec att = RECfwdref;
+    CPPMANGLE cppmangle = CPPMANGLE.def;
 
     extern (D) this(ClassDeclaration sym)
     {
@@ -8907,7 +8936,18 @@ public:
 
     override Type semantic(Loc loc, Scope* sc)
     {
-        //printf("TypeClass::semantic(%s)\n", sym->toChars());
+        //printf("TypeClass::semantic(%s)\n", sym.toChars());
+        if (deco)
+        {
+            if (sc.cppmangle != CPPMANGLE.def)
+            {
+                if (this.cppmangle == CPPMANGLE.def)
+                    this.cppmangle = sc.cppmangle;
+                else
+                    assert(this.cppmangle == sc.cppmangle);
+            }
+            return this;
+        }
 
         /* Don't semantic for sym because it should be deferred until
          * sizeof needed or its members accessed.
@@ -8917,6 +8957,7 @@ public:
 
         if (sym.type.ty == Terror)
             return Type.terror;
+        this.cppmangle = sc.cppmangle;
         return merge();
     }
 
@@ -9520,7 +9561,6 @@ public:
  */
 extern (C++) final class TypeTuple : Type
 {
-public:
     Parameters* arguments;  // types making up the tuple
 
     extern (D) this(Parameters* arguments)
@@ -9699,7 +9739,6 @@ public:
  */
 extern (C++) final class TypeSlice : TypeNext
 {
-public:
     Expression lwr;
     Expression upr;
 
@@ -9844,7 +9883,6 @@ public:
  */
 extern (C++) final class TypeNull : Type
 {
-public:
     extern (D) this()
     {
         super(Tnull);
@@ -9906,7 +9944,6 @@ public:
  */
 extern (C++) final class Parameter : RootObject
 {
-public:
     StorageClass storageClass;
     Type type;
     Identifier ident;

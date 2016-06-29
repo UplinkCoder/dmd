@@ -6,13 +6,28 @@ import ddmd.mtype;
 import ddmd.declaration : FuncDeclaration;
 import ddmd.statement;
 import ddmd.visitor;
+/**
+	Something about the instruction set :
+	The instruction set is designed to be fast to interpret. 
+	Therefore it is subject to uncommen restrictions and features uncommen ideoms.
+	
+	It is one of the few VM instruction sets that do have SIMD-Instructions.
+	
+	Example include The multiple increment which can increment 2 diffrent stack locations at once.
+	(By either 1,4,8, or 16)
+	
+	The operation-combine marker which allows to execute the same chain of operations on an abitary number of StackLocations.
+	
+	
+*/
+
 
 struct ByteCode {
 //	ubyte[] _data;
 }
 enum internalPotion = 4096;
 struct CtfeStack {
-	StackRef[size_t/*VariableDeclaration*/] refs;
+	StackRef[void*/*VariableDeclaration*/] refs;
 	ubyte[internalPotion] internalStackMem;
 
 	T getVar(T)(StackRef s) {

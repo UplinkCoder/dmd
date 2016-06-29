@@ -152,7 +152,7 @@ FRONT_SRCS=access.d aggregate.d aliasthis.d apply.d argtypes.d arrayop.d	\
 	mars.d mtype.d nogc.d nspace.d objc_stubs.d opover.d optimize.d parse.d	\
 	sapply.d sideeffect.d statement.d staticassert.d target.d tokens.d	\
 	traits.d utf.d utils.d visitor.d libomf.d scanomf.d typinf.d \
-	libmscoff.d scanmscoff.d
+	libmscoff.d scanmscoff.d statementsem.d
 
 GLUE_SRCS=irstate.d toctype.d backend.d gluelayer.d todt.d
 
@@ -172,7 +172,7 @@ BACKOBJ= go.obj gdag.obj gother.obj gflow.obj gloop.obj var.obj el.obj \
 	cgcod.obj cod1.obj cod2.obj cod3.obj cod4.obj cod5.obj outbuf.obj \
 	bcomplex.obj ptrntab.obj aa.obj ti_achar.obj md5.obj \
 	ti_pvoid.obj mscoffobj.obj pdata.obj cv8.obj backconfig.obj \
-	divcoeff.obj dwarf.obj compress.obj \
+	divcoeff.obj dwarf.obj compress.obj varstats.obj \
 	ph2.obj util2.obj eh.obj tk.obj \
 
 # Root package
@@ -218,7 +218,7 @@ BACKSRC= $C\cdef.h $C\cc.h $C\oper.h $C\ty.h $C\optabgen.c \
 	$C\strtold.c $C\aa.h $C\aa.c $C\tinfo.h $C\ti_achar.c \
 	$C\md5.h $C\md5.c $C\ti_pvoid.c $C\xmm.h $C\ph2.c $C\util2.c \
 	$C\mscoffobj.c $C\obj.h $C\pdata.c $C\cv8.c $C\backconfig.c \
-	$C\divcoeff.c $C\dwarfeh.c \
+	$C\divcoeff.c $C\dwarfeh.c $C\varstats.c $C\varstats.h \
 	$C\backend.txt
 
 # Toolkit
@@ -579,6 +579,9 @@ util2.obj : $C\util2.c
 
 var.obj : $C\var.c optab.c
 	$(CC) -c $(MFLAGS) -I. $C\var
+
+varstats.obj : $C\varstats.c
+	$(CC) -c $(MFLAGS) -I. $C\varstats
 
 
 tk.obj : tk.c

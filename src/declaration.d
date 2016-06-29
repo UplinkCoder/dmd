@@ -146,7 +146,6 @@ struct Match
  */
 extern (C++) abstract class Declaration : Dsymbol
 {
-public:
     Type type;
     Type originalType;  // before semantic analysis
     StorageClass storage_class;
@@ -356,7 +355,6 @@ public:
  */
 extern (C++) final class TupleDeclaration : Declaration
 {
-public:
     Objects* objects;
     bool isexp;             // true: expression tuple
     TypeTuple tupletype;    // !=null if this is a type tuple
@@ -488,7 +486,6 @@ public:
  */
 extern (C++) final class AliasDeclaration : Declaration
 {
-public:
     Dsymbol aliassym;
     Dsymbol overnext;   // next in overload list
     Dsymbol _import;    // !=null if unresolved internal alias for selective import
@@ -852,7 +849,6 @@ public:
  */
 extern (C++) final class OverDeclaration : Declaration
 {
-public:
     Dsymbol overnext;   // next in overload list
     Dsymbol aliassym;
     bool hasOverloads;
@@ -967,10 +963,8 @@ public:
  */
 extern (C++) class VarDeclaration : Declaration
 {
-public:
     Initializer _init;
     uint offset;
-    bool noscope;                   // if scope destruction is disabled
     FuncDeclarations nestedrefs;    // referenced by these lexically nested functions
     bool isargptr;                  // if parameter that _argptr points to
     structalign_t alignment;
@@ -982,8 +976,10 @@ public:
 
     int canassign;                  // it can be assigned to
     bool overlapped;                // if it is a field and has overlapping
+    ubyte isdataseg;                // private data for isDataseg 0 unset, 1 true, 2 false
     Dsymbol aliassym;               // if redone as alias to another symbol
     VarDeclaration lastVar;         // Linked list of variables for goto-skips-init detection
+    uint endlinnum;                 // line number of end of scope that this var lives in
 
     // When interpreting, these point to the value (NULL if value not determinable)
     // The index of this variable on the CTFE stack, -1 if not allocated
@@ -1120,7 +1116,7 @@ public:
         /* If scope's alignment is the default, use the type's alignment,
          * otherwise the scope overrrides.
          */
-        alignment = sc.structalign;
+        alignment = sc.alignment();
         if (alignment == STRUCTALIGN_DEFAULT)
             alignment = type.alignment(); // use type's alignment
 
@@ -1131,17 +1127,12 @@ public:
             type.checkComplexTransition(loc);
 
         // Calculate type size + safety checks
-        if (sc.func && !sc.intypeof && !isMember())
+        if (sc.func && !sc.intypeof)
         {
-            if (storage_class & STCgshared)
+            if (storage_class & STCgshared && !isMember())
             {
                 if (sc.func.setUnsafe())
                     error("__gshared not allowed in safe functions; use shared");
-            }
-            if (_init && _init.isVoidInitializer() && type.hasPointers()) // get type size
-            {
-                if (sc.func.setUnsafe())
-                    error("void initializers for pointers not allowed in safe functions");
             }
         }
 
@@ -1471,7 +1462,7 @@ public:
         }
 
         FuncDeclaration fd = parent.isFuncDeclaration();
-        if (type.isscope() && !noscope)
+        if (type.isscope() && !(storage_class & STCnodtor))
         {
             if (storage_class & (STCfield | STCout | STCref | STCstatic | STCmanifest | STCtls | STCgshared) || !fd)
             {
@@ -1481,6 +1472,23 @@ public:
             {
                 if (!(storage_class & STCparameter) && ident != Id.withSym)
                     error("reference to scope class must be scope");
+            }
+        }
+
+        // Calculate type size + safety checks
+        if (sc.func && !sc.intypeof)
+        {
+            if (_init && _init.isVoidInitializer() && type.hasPointers()) // get type size
+            {
+                if (sc.func.setUnsafe())
+                    error("void initializers for pointers not allowed in safe functions");
+            }
+            else if (!_init &&
+                     !(storage_class & (STCstatic | STCextern | STCtls | STCgshared | STCmanifest | STCfield | STCparameter)) &&
+                     type.hasVoidInitPointers())
+            {
+                if (sc.func.setUnsafe())
+                    error("void initializers for pointers not allowed in safe functions");
             }
         }
 
@@ -1741,6 +1749,13 @@ public:
 
         if (type.toBasetype().ty == Terror)
             errors = true;
+
+        if(sc.scopesym && !sc.scopesym.isAggregateDeclaration())
+        {
+            for (ScopeDsymbol sym = sc.scopesym; sym && endlinnum == 0;
+                 sym = sym.parent ? sym.parent.isScopeDsymbol() : null)
+                endlinnum = sym.endlinnum;
+        }
     }
 
     override final void setFieldOffset(AggregateDeclaration ad, uint* poffset, bool isunion)
@@ -1958,18 +1973,31 @@ public:
             printf("%llx, isModule: %p, isTemplateInstance: %p\n", storage_class & (STCstatic | STCconst), parent.isModule(), parent.isTemplateInstance());
             printf("parent = '%s'\n", parent.toChars());
         }
-        if (!canTakeAddressOf())
-            return false;
-        Dsymbol parent = toParent();
-        if (!parent && !(storage_class & STCstatic))
-        {
-            error("forward referenced");
-            type = Type.terror;
-            return false;
-        }
-        return (storage_class & (STCstatic | STCextern | STCtls | STCgshared) || parent.isModule() || parent.isTemplateInstance());
-    }
 
+        if (isdataseg == 0) // the value is not cached
+        {
+            isdataseg = 2; // The Variables does not go into the datasegment
+
+            if (!canTakeAddressOf())
+            {
+                return false;
+            }
+
+            Dsymbol parent = toParent();
+            if (!parent && !(storage_class & STCstatic))
+            {
+                error("forward referenced");
+                type = Type.terror;
+            }
+            else if (storage_class & (STCstatic | STCextern | STCtls | STCgshared) ||
+                parent.isModule() || parent.isTemplateInstance())
+            {
+                isdataseg = 1; // It is in the DataSegment
+            }
+        }
+
+        return (isdataseg == 1);
+    }
     /************************************
      * Does symbol go into thread local storage?
      */
@@ -2018,7 +2046,7 @@ public:
     final bool needsScopeDtor()
     {
         //printf("VarDeclaration::needsScopeDtor() %s\n", toChars());
-        return edtor && !noscope;
+        return edtor && !(storage_class & STCnodtor);
     }
 
     /******************************************
@@ -2030,7 +2058,7 @@ public:
         //printf("VarDeclaration::callScopeDtor() %s\n", toChars());
 
         // Destruction of STCfield's is handled by buildDtor()
-        if (noscope || storage_class & (STCnodtor | STCref | STCout | STCfield))
+        if (storage_class & (STCnodtor | STCref | STCout | STCfield))
         {
             return null;
         }
@@ -2286,7 +2314,6 @@ public:
  */
 extern (C++) final class SymbolDeclaration : Declaration
 {
-public:
     StructDeclaration dsym;
 
     extern (D) this(Loc loc, StructDeclaration dsym)
@@ -2313,7 +2340,6 @@ public:
  */
 extern (C++) class TypeInfoDeclaration : VarDeclaration
 {
-public:
     Type tinfo;
 
     final extern (D) this(Type tinfo)
@@ -2365,7 +2391,6 @@ public:
  */
 extern (C++) final class TypeInfoStructDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2391,7 +2416,6 @@ public:
  */
 extern (C++) final class TypeInfoClassDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2417,7 +2441,6 @@ public:
  */
 extern (C++) final class TypeInfoInterfaceDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2443,7 +2466,6 @@ public:
  */
 extern (C++) final class TypeInfoPointerDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2469,7 +2491,6 @@ public:
  */
 extern (C++) final class TypeInfoArrayDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2495,7 +2516,6 @@ public:
  */
 extern (C++) final class TypeInfoStaticArrayDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2521,7 +2541,6 @@ public:
  */
 extern (C++) final class TypeInfoAssociativeArrayDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2547,7 +2566,6 @@ public:
  */
 extern (C++) final class TypeInfoEnumDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2573,7 +2591,6 @@ public:
  */
 extern (C++) final class TypeInfoFunctionDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2599,7 +2616,6 @@ public:
  */
 extern (C++) final class TypeInfoDelegateDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2625,7 +2641,6 @@ public:
  */
 extern (C++) final class TypeInfoTupleDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2651,7 +2666,6 @@ public:
  */
 extern (C++) final class TypeInfoConstDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2677,7 +2691,6 @@ public:
  */
 extern (C++) final class TypeInfoInvariantDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2703,7 +2716,6 @@ public:
  */
 extern (C++) final class TypeInfoSharedDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2729,7 +2741,6 @@ public:
  */
 extern (C++) final class TypeInfoWildDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2755,7 +2766,6 @@ public:
  */
 extern (C++) final class TypeInfoVectorDeclaration : TypeInfoDeclaration
 {
-public:
     extern (D) this(Type tinfo)
     {
         super(tinfo);
@@ -2782,11 +2792,10 @@ public:
  */
 extern (C++) final class ThisDeclaration : VarDeclaration
 {
-public:
     extern (D) this(Loc loc, Type t)
     {
         super(loc, t, Id.This, null);
-        noscope = true;
+        storage_class |= STCnodtor;
     }
 
     override Dsymbol syntaxCopy(Dsymbol s)

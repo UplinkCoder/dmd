@@ -8,6 +8,8 @@
 
 module ddmd.init;
 
+import core.stdc.stdio;
+
 import ddmd.aggregate;
 import ddmd.arraytypes;
 import ddmd.dcast;
@@ -43,7 +45,6 @@ alias INITinterpret = NeedInterpret.INITinterpret;
  */
 extern (C++) class Initializer : RootObject
 {
-public:
     Loc loc;
 
     final extern (D) this(Loc loc)
@@ -119,7 +120,6 @@ public:
  */
 extern (C++) final class VoidInitializer : Initializer
 {
-public:
     Type type;      // type that this will initialize to
 
     extern (D) this(Loc loc)
@@ -165,7 +165,6 @@ public:
  */
 extern (C++) final class ErrorInitializer : Initializer
 {
-public:
     extern (D) this()
     {
         super(Loc());
@@ -207,7 +206,6 @@ public:
  */
 extern (C++) final class StructInitializer : Initializer
 {
-public:
     Identifiers field;      // of Identifier *'s
     Initializers value;     // parallel array of Initializer *'s
 
@@ -384,7 +382,6 @@ public:
  */
 extern (C++) final class ArrayInitializer : Initializer
 {
-public:
     Expressions index;      // indices
     Initializers value;     // of Initializer *'s
     size_t dim;             // length of array being initialized
@@ -499,7 +496,7 @@ public:
         size_t length;
         const(uint) amax = 0x80000000;
         bool errors = false;
-        //printf("ArrayInitializer::semantic(%s)\n", t->toChars());
+        //printf("ArrayInitializer::semantic(%s)\n", t.toChars());
         if (sem) // if semantic() already run
             return this;
         sem = true;
@@ -677,9 +674,9 @@ public:
             }
             (*elements)[j] = ex;
         }
-        /* Fill in any missing elements with the default initializer
-         */
         {
+            /* Fill in any missing elements with the default initializer
+             */
             Expression _init = null;
             for (size_t i = 0; i < edim; i++)
             {
@@ -692,12 +689,41 @@ public:
                     (*elements)[i] = _init;
                 }
             }
+
+            /* Expand any static array initializers that are a single expression
+             * into an array of them
+             */
+            if (t)
+            {
+                Type tn = t.nextOf().toBasetype();
+                if (tn.ty == Tsarray)
+                {
+                    const dim = cast(size_t)(cast(TypeSArray)tn).dim.toInteger();
+                    Type te = tn.nextOf().toBasetype();
+                    foreach (ref e; *elements)
+                    {
+                        if (te.equals(e.type))
+                        {
+                            auto elements2 = new Expressions();
+                            elements2.setDim(dim);
+                            foreach (ref e2; *elements2)
+                                e2 = e;
+                            e = new ArrayLiteralExp(e.loc, elements2);
+                            e.type = tn;
+                        }
+                    }
+                }
+            }
+
+            /* If any elements are errors, then the whole thing is an error
+             */
             for (size_t i = 0; i < edim; i++)
             {
                 Expression e = (*elements)[i];
                 if (e.op == TOKerror)
                     return e;
             }
+
             Expression e = new ArrayLiteralExp(loc, elements);
             e.type = type;
             return e;
@@ -754,7 +780,6 @@ public:
  */
 extern (C++) final class ExpInitializer : Initializer
 {
-public:
     Expression exp;
     bool expandTuples;
 

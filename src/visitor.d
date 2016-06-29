@@ -32,7 +32,6 @@ import ddmd.staticassert;
 
 extern (C++) class Visitor
 {
-public:
     void visit(Statement)
     {
         assert(0);
@@ -419,6 +418,11 @@ public:
     }
 
     void visit(LinkDeclaration s)
+    {
+        visit(cast(AttribDeclaration)s);
+    }
+
+    void visit(CPPMangleDeclaration s)
     {
         visit(cast(AttribDeclaration)s);
     }

@@ -30,7 +30,6 @@ import ddmd.visitor;
  */
 extern (C++) final class EnumDeclaration : ScopeDsymbol
 {
-public:
     /* The separate, and distinct, cases are:
      *  1. enum { ... }
      *  2. enum : memtype { ... }
@@ -500,7 +499,6 @@ public:
  */
 extern (C++) final class EnumMember : VarDeclaration
 {
-public:
     /* Can take the following forms:
      *  1. id
      *  2. id = value
@@ -630,7 +628,10 @@ public:
                 origValue = e;
 
                 if (!ed.isAnonymous())
+                {
                     e = e.castTo(sc, ed.type);
+                    e = e.ctfeInterpret();
+                }
             }
             else if (origType)
             {
@@ -662,7 +663,10 @@ public:
             origValue = e;
 
             if (!ed.isAnonymous())
+            {
                 e = e.castTo(sc, ed.type);
+                e = e.ctfeInterpret();
+            }
             value = e;
         }
         else

@@ -56,7 +56,6 @@ alias BASEOKsemanticdone = Baseok.BASEOKsemanticdone;
  */
 extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
 {
-public:
     Type type;
     StorageClass storage_class;
     Prot protection;
@@ -120,7 +119,7 @@ public:
             sc2.inunion = 1;
         sc2.protection = Prot(PROTpublic);
         sc2.explicitProtection = 0;
-        sc2.structalign = STRUCTALIGN_DEFAULT;
+        sc2.aligndecl = null;
         sc2.userAttribDecl = null;
         return sc2;
     }
@@ -376,25 +375,9 @@ public:
                 if (!vd.isOverlappedWith(v2))
                     continue;
 
-                // vd and v2 are overlapping. If either has destructors, postblits, etc., then error
-                //printf("overlapping fields %s and %s\n", vd->toChars(), v2->toChars());
-                foreach (k; 0 .. 2)
-                {
-                    auto v = k == 0 ? vd : v2;
-                    Type tv = v.type.baseElemOf();
-                    Dsymbol sv = tv.toDsymbol(null);
-                    if (!sv || errors)
-                        continue;
-                    StructDeclaration sd = sv.isStructDeclaration();
-                    if (sd && (sd.dtor || sd.inv || sd.postblit))
-                    {
-                        error("destructors, postblits and invariants are not allowed in overlapping fields %s and %s",
-                            vd.toChars(), v2.toChars());
-                        errors = true;
-                        break;
-                    }
-                }
+                // vd and v2 are overlapping.
                 vd.overlapped = true;
+                v2.overlapped = true;
 
                 if (!vx)
                     continue;

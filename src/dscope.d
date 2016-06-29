@@ -143,10 +143,13 @@ struct Scope
     size_t fieldinit_dim;
 
     // alignment for struct members
-    structalign_t structalign = STRUCTALIGN_DEFAULT;
+    AlignDeclaration aligndecl;
 
     // linkage for external functions
     LINK linkage = LINKd;
+
+    // mangle type
+    CPPMANGLE cppmangle = CPPMANGLE.def;
 
     // inlining strategy for functions
     PINLINE inlining = PINLINEdefault;
@@ -722,10 +725,11 @@ struct Scope
         this.scontinue = sc.scontinue;
         this.fes = sc.fes;
         this.callsc = sc.callsc;
-        this.structalign = sc.structalign;
+        this.aligndecl = sc.aligndecl;
         this.func = sc.func;
         this.slabel = sc.slabel;
         this.linkage = sc.linkage;
+        this.cppmangle = sc.cppmangle;
         this.inlining = sc.inlining;
         this.protection = sc.protection;
         this.explicitProtection = sc.explicitProtection;
@@ -744,5 +748,13 @@ struct Scope
         this.anchorCounts = sc.anchorCounts;
         this.prevAnchor = sc.prevAnchor;
         this.userAttribDecl = sc.userAttribDecl;
+    }
+
+    structalign_t alignment()
+    {
+        if (aligndecl)
+            return aligndecl.getAlignment();
+        else
+            return STRUCTALIGN_DEFAULT;
     }
 }

@@ -24,26 +24,13 @@ import ddmd.root.outbuffer;
 import ddmd.tokens;
 import ddmd.utils;
 import ddmd.visitor;
+import ddmd.id;
 
-private __gshared Identifier idUnitTest;
-private __gshared Identifier idAssert;
-
-static this()
-{
-    const(char)* s;
-
-    s = Token.toChars(TOKunittest);
-    idUnitTest = Identifier.idPool(s, strlen(s));
-
-    s = Token.toChars(TOKassert);
-    idAssert   = Identifier.idPool(s, strlen(s));
-}
 
 /***********************************************************
  */
 extern (C++) abstract class Condition
 {
-public:
     Loc loc;
     // 0: not computed yet
     // 1: include
@@ -74,7 +61,6 @@ public:
  */
 extern (C++) class DVCondition : Condition
 {
-public:
     uint level;
     Identifier ident;
     Module mod;
@@ -102,7 +88,6 @@ public:
  */
 extern (C++) final class DebugCondition : DVCondition
 {
-public:
     static void setGlobalLevel(uint level)
     {
         global.params.debuglevel = level;
@@ -166,7 +151,6 @@ public:
  */
 extern (C++) final class VersionCondition : DVCondition
 {
-public:
     static void setGlobalLevel(uint level)
     {
         global.params.versionlevel = level;
@@ -202,6 +186,8 @@ public:
             "SysV4",
             "Hurd",
             "Android",
+            "PlayStation",
+            "PlayStation4",
             "Cygwin",
             "MinGW",
             "FreeStanding",
@@ -332,7 +318,7 @@ public:
             else if (level <= global.params.versionlevel || level <= mod.versionlevel)
                 inc = 1;
             if (!definedInModule &&
-                (!ident || (!isPredefined(ident.toChars()) && ident != idUnitTest && ident != idAssert)))
+                (!ident || (!isPredefined(ident.toChars()) && ident != Id._unittest && ident != Id._assert)))
             {
                 printDepsConditional(sc, this, "depsVersion ");
             }
@@ -350,7 +336,6 @@ public:
  */
 extern (C++) final class StaticIfCondition : Condition
 {
-public:
     Expression exp;
     int nest;           // limit circular dependencies
 

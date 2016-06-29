@@ -187,7 +187,6 @@ struct ClassFlags
  */
 extern (C++) class ClassDeclaration : AggregateDeclaration
 {
-public:
     extern (C++) __gshared
     {
         // Names found by reading object.d in druntime
@@ -228,7 +227,7 @@ public:
 
     Symbol* cpp_type_info_ptr_sym;      // cached instance of class Id.cpp_type_info_ptr
 
-    final extern (D) this(Loc loc, Identifier id, BaseClasses* baseclasses, bool inObject = false)
+    final extern (D) this(Loc loc, Identifier id, BaseClasses* baseclasses, Dsymbols* members, bool inObject)
     {
         if (!id)
             id = Identifier.generateId("__anonclass");
@@ -245,6 +244,8 @@ public:
         }
         else
             this.baseclasses = new BaseClasses();
+
+        this.members = members;
 
         //printf("ClassDeclaration(%s), dim = %d\n", id.toChars(), this.baseclasses.dim);
 
@@ -404,7 +405,7 @@ public:
         //printf("ClassDeclaration.syntaxCopy('%s')\n", toChars());
         ClassDeclaration cd =
             s ? cast(ClassDeclaration)s
-              : new ClassDeclaration(loc, ident, null);
+              : new ClassDeclaration(loc, ident, null, null, false);
 
         cd.storage_class |= storage_class;
 
@@ -1509,10 +1510,9 @@ public:
  */
 extern (C++) final class InterfaceDeclaration : ClassDeclaration
 {
-public:
     extern (D) this(Loc loc, Identifier id, BaseClasses* baseclasses)
     {
-        super(loc, id, baseclasses);
+        super(loc, id, baseclasses, null, false);
         if (id == Id.IUnknown) // IUnknown is the root of all COM interfaces
         {
             com = true;
