@@ -108,7 +108,7 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 	bool cond;
 	while(true) {
 		debug { import std.stdio; writeln("ip : ", ip);
-			writeln ("StackValues :", (stack[0 .. 9]));
+		//	writeln ("StackValues :", (stack[0 .. 9]));
 		}
 
 
@@ -121,15 +121,15 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 			switch(cast(LongInst)(lw & InstMask)) {
 				case LongInst.ImmAdd : {
 					*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16))) += hi;
-					writeln("Add SP[" ~ to!string(lw >> 16) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16)))).to!string ~ "), #" ~ to!string(hi)); 
+				//	writeln("Add SP[" ~ to!string(lw >> 16) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16)))).to!string ~ "), #" ~ to!string(hi)); 
 				} break;
 				case LongInst.Lt : {
-					auto lhsOffset = hi & 0xFFFF;
-					auto rhsOffset = (hi >> 16);
+					auto rhsOffset = hi & 0xFFFF;
+					auto lhsOffset = (hi >> 16);
 					uint lhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
 					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
 					cond = lhs < rhs;
-					writeln(lhs.to!string, "<" ,rhs.to!string);
+				//	writeln(lhs.to!string, "<" ,rhs.to!string);
 				//	writeln("Lt SP[" ~ to!string(rhsOffset) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset))).to!string ~", SP[" ~ to!string(lhsOffset)  ~ "]"); 
 				} break;
 				case LongInst.Jmp : {
