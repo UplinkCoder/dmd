@@ -7,6 +7,11 @@ import ddmd.declaration : FuncDeclaration;
 import ddmd.statement;
 import ddmd.visitor;
 /**
+ * Written By Stefan Koch in 2016
+ * All Rights Reserved.
+ *? 
+
+/**
 	Something about the instruction set :
 	The instruction set is designed to be fast to interpret. 
 	Therefore it is subject to uncommen restrictions and features uncommen ideoms.
