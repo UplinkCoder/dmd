@@ -56,9 +56,6 @@ template isIncluded(ThisEnum, ThatEnum) {
 	static assert(is(ThisEnum == enum) && is(ThatEnum == enum),
 		"IsIncluded works only for enums"
 	);
-//	foreach(m;EnumMembers!ThisEnum) {
-
-//	}
 
 	enum isIncluded =  emThisEnum.length <= emThatEnum.length && 
 		hasMembers();
