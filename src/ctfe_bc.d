@@ -336,17 +336,39 @@ extern(C++) final class BCV : Visitor {
 		Jmp,
 		Inc2,
 
-
-		ImmAdd,
-		ImmEq,
-		ImmLt,
-		ImmSet,
-
-
 		// 2 StackOperands
 		Lt,
 		TJmp,
 		Add,
+	}
+
+
+	/**
+	 * Layaout : 
+	 * [0-6] Instruction
+	 * [6-8] Flags
+	 * -----------------
+	 * [8-16] Padding
+	 * [16-32] StackOffset (lhs)
+	 * [32-64] Imm32 (rhs)
+	 */ 
+	struct LongInstImm32 {
+		uint lw;
+		uint hi;
+
+		this(LongInst i, short stackAddr, Imm32 imm) pure const {
+			lw = i | 1 << 5 | stackAddr << 16;
+			hi = imm.imm32; 
+		}
+
+	}
+
+	enum LongInstImm {
+		// Immidiate operations on one StackValue
+		ImmAdd,
+		ImmEq,
+		ImmLt,
+		ImmSet,
 	}
 
 	struct LongInst64 {
@@ -358,10 +380,7 @@ extern(C++) final class BCV : Visitor {
 			hi = addr.addr;
 		}
 
-		this(LongInst i, short stackAddr, Imm32 imm) {
-			lw = i | 1 << 5 | stackAddr << 16;
-			hi = imm.imm32; 
-		}
+
 
 		this(LongInst i, short stackAddrLhs, short stackAddrRhs) {
 			lw = i | 1 << 5;
