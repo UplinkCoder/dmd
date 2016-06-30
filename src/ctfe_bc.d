@@ -129,7 +129,7 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 					uint lhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
 					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
 					cond = lhs < rhs;
-				//	writeln(lhs.to!string, "<" ,rhs.to!string);
+					writeln(lhs.to!string, "<" ,rhs.to!string);
 				//	writeln("Lt SP[" ~ to!string(rhsOffset) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset))).to!string ~", SP[" ~ to!string(lhsOffset)  ~ "]"); 
 				} break;
 				case LongInst.Jmp : {
@@ -137,7 +137,7 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 				//	result ~= "Jmp &" ~ to!string(hi) ~ "\n"; 
 				} break;
 				case LongInst.TJmp : {
-					if (cond) {
+					if (!cond) {
 						ip = (hi >> 16);
 					}
 				//	result ~= "TJmp !SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(hi >> 16)  ~ "\n"; 
