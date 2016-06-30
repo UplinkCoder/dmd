@@ -150,16 +150,16 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 				} break;
 
 				case LongInst.Add : {
-					auto lhsOffset = hi & 0xFFFF;
-					auto rhsOffset = (hi >> 16);
+					auto lhsOffset = (hi >> 16);
+					auto rhsOffset = hi & 0xFFFF;
 					uint* lhsRef = (cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
 					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
 					writeln("Add SP[", lhsOffset, "](", *lhsRef, "), ", "SP[", rhsOffset, "](",rhs,")");
 					(*lhsRef) += rhs;
 				} break;
 				case LongInst.Lt : {
-					auto lhsOffset = hi & 0xFFFF;
-					auto rhsOffset = (hi >> 16);
+					auto lhsOffset = (hi >> 16);
+					auto rhsOffset = hi & 0xFFFF;
 					uint lhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
 					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
 					cond = lhs < rhs;
