@@ -199,6 +199,16 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 					writeln("Add SP[", lhsOffset, "](", *lhsRef, "), ", "SP[", rhsOffset, "](",rhs,")");
 					(*lhsRef) += rhs;
 				} break;
+
+				case LongInst.Set : {
+					auto lhsOffset = hi & 0xFFFF;
+					auto rhsOffset = (hi >> 16);
+					uint* lhsRef = (cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
+					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
+					writeln("Set SP[", lhsOffset, "](", *lhsRef, "), ", "SP[", rhsOffset, "](",rhs,")");
+					(*lhsRef) = rhs;
+				} break;
+
 				case LongInst.Lt : {
 					auto lhsOffset = (hi >> 16);
 					auto rhsOffset = hi & 0xFFFF;
@@ -326,7 +336,10 @@ extern(C++) final class BCV : Visitor {
 					case LongInst.Add : {
 						result ~= "Add SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16)  ~ "]\n";
 					} break;
-					
+					case LongInst.Set : {
+						result ~= "Set SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16)  ~ "]\n";
+					} break;
+
 					case LongInst.Lt : {
 						result ~= "Lt SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16)  ~ "]\n"; 
 					} break;
@@ -388,6 +401,7 @@ extern(C++) final class BCV : Visitor {
 		Lt,
 		TJmp,
 		Add,
+		Set,
 	}
 
 
@@ -450,11 +464,11 @@ extern(C++) final class BCV : Visitor {
 
 	static assert(ShortInst.max < 64);
 
-	uint ShortInst16(ShortInst i, short imm) {
-		return i | imm << 16; 
+	uint ShortInst16(const ShortInst i, const short imm) pure {
+		return i | imm << 16;
 	}
 
-	uint ShortInst24(ShortInst i, uint imm) {
+	uint ShortInst24(const ShortInst i, const uint imm) pure {
 		assert(imm == (imm & 0x0FFF));
 		return i | imm << 8; 
 	}
@@ -757,12 +771,38 @@ public :
 			//	assert(0, "for new we only handle basicTypes :-)");
 			//}
 		}
+
+		//auto oldRetval = retval;
+
 		switch (e.op) {
 			case TOK.TOKequal : {
 				retval = genEq(e.e1, e.e2).value;
 			} break;
-
-			default : break ;
+			case TOK.TOKplusplus : {
+				auto expr = genExpr(e.e1);
+				retval = pushOntoStack(expr.value);
+				if (expr.value.vType == BCValueType.StackValue) {
+					const oldDiscardValue = discardValue;
+					discardValue = false;
+					emitAdd(expr.value, BCValue(Imm32(1)));
+					discardValue = oldDiscardValue;
+				}
+			} break;
+			case TOK.TOKadd : {
+				auto oldRetval = retval;
+				auto oldDiscardValue = discardValue;
+				discardValue = false;
+				auto lhs = genExpr(e.e1);
+				auto rhs = genExpr(e.e2);
+				discardValue = false;
+				assert(!discardValue, "A lone add discarding the value is strange");
+				auto result = pushOntoStack(lhs.value);
+				sp -= 4;
+				retval = Add3(result, lhs.value, rhs.value);
+				 // TOOD use sizeof(retval);
+				discardValue = oldDiscardValue;
+			} break;
+			default : assert(0, "BinExp.Op " ~ to!string(e.op) ~ " not handeled") ;
 		}
 
 
@@ -948,10 +988,13 @@ public :
 			import std.stdio;
 			writefln("BinAssignExp %s discardValue %d", e.toString, discardValue);
 		}
+		auto oldDiscardValue = discardValue;
 		auto oldRetval = retval;
+		discardValue = false;
 		e.e1.accept(this);
 		auto lhs = retval;
 		//assert(lhs.vType == BCValueType.StackValue);
+		discardValue = false;
 		e.e2.accept(this);
 		auto rhs = retval;
 		//assert(rhs.vType == BCValueType.Immidiate);
@@ -961,7 +1004,7 @@ public :
 		switch (e.op) {
 
 			case TOK.TOKaddass : {
-				emitAdd(lhs, rhs);  
+				emitAdd(lhs, rhs);
 			}
 			break;
 			default : {
@@ -971,6 +1014,7 @@ public :
 		//assert(discardValue);
 
 		retval = oldRetval;
+		discardValue = oldDiscardValue;
 	}
 
 	void emitLongInst(LongInst64 i) {
@@ -1010,7 +1054,7 @@ public :
 			rhs.vType == BCValueType.StackValue) {
 			
 			emitLongInst(LongInst64(LongInst.Set, lhs.stackAddr, rhs.stackAddr));
-		}*/ else {
+		}*/  else {
 			assert(0, "Set flavour unsupported");
 		}
 	}
@@ -1023,17 +1067,41 @@ public :
 			emitLongInst(LongInstImm32(LongInstImm32.ImmAdd, lhs.stackAddr, rhs.imm32));
 		} else if (lhs.vType == BCValueType.StackValue &&
 			rhs.vType == BCValueType.StackValue) {
-
 			emitLongInst(LongInst64(LongInst.Add, lhs.stackAddr, rhs.stackAddr));
 		} else {
 			assert(0, "Add flavour unsupported");
 		}
 	}
 
+	BCValue Add3(BCValue result, BCValue lhs, BCValue rhs) {
+		assert(result.vType == BCValueType.StackValue);
+		if (lhs.type != BCValueType.StackValue || lhs.stackAddr != result.stackAddr) {
+			emitSet(result, lhs);
+		}
+		emitAdd(result, rhs);
+		return result;
+	}
+
+	BCValue pushOntoStack(BCValue val) {
+		assert(val.type == BCType.i32);
+
+		auto stackref = BCValue(null, sp, val.type);
+		emitSet(stackref, val);
+		
+		sp += align4(4); //size(imm.type);
+		return stackref;
+	}
+
 	void emitReturn(BCValue val) {
-		assert(val.vType == BCValueType.StackValue);
-		byteCodeArray[ip] = ShortInst.Ret | val.stackAddr << 16;
-		ip += 1;
+		if(val.vType == BCValueType.StackValue) {
+			byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr);
+			ip += 2;
+		} else if (val.vType == BCValueType.Immidiate) {
+			auto sv = pushOntoStack(val);
+			assert(sv.vType == BCValueType.StackValue);
+			byteCodeArray[ip] = ShortInst16(ShortInst.Ret, sv.stackAddr);
+			ip += 2;
+		}
 	}
 
 	override void visit(IntegerExp ie) {
