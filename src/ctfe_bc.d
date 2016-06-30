@@ -69,14 +69,14 @@ auto evaluateFunction(FuncDeclaration fd, Expression[] args, ThisExp _this = nul
 			bcv.vars.writeln;
 			writeln(" stackUsage = ", (bcv.sp-4).to!string ~ " byte");
 		}
-		foreach(_;0 .. 64) {
+	//	foreach(_;0 .. 64) {
 		import std.datetime : StopWatch;
 		StopWatch sw;
 		sw.start;
-		writeln("Calling " ~ fd.toString ~" with(100_0000_000) == ", interpret!int(bcv.byteCodeArray[0 .. bcv.ip+1], [BCV.BCValue(100_000_000, BCV.BCType.i32)]));
+		writeln("Calling " ~ fd.toString ~" with(100) == ", interpret!int(bcv.byteCodeArray[0 .. bcv.ip], [BCV.BCValue(100, BCV.BCType.i32)]));
 		sw.stop;
 		writeln("It took " ~ sw.peek.msecs.to!string ~ "msecs");
-		}
+	//	}
 	}
 	return null;
 }
@@ -112,6 +112,10 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 
 	uint ip = 4;
 	bool cond;
+	// debug { import std.stdio; writeln("BC.len = ", byteCode.length); } 
+	if(byteCode.length == 5)
+		return typeof(return).init;
+
 	while(true) {
 	
 		const lw = byteCode[ip++];  
@@ -123,11 +127,34 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 			switch(cast(LongInst)(lw & InstMask)) {
 				case LongInst.ImmAdd : {
 					*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16))) += hi;
-				//	writeln("Add SP[" ~ to!string(lw >> 16) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16)))).to!string ~ "), #" ~ to!string(hi)); 
+					//	writeln("Add SP[" ~ to!string(lw >> 16) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16)))).to!string ~ "), #" ~ to!string(hi)); 
+				} break;
+				case LongInst.ImmSet : {
+					*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16))) = hi;
+					//	writeln("Add SP[" ~ to!string(lw >> 16) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16)))).to!string ~ "), #" ~ to!string(hi)); 
+				} break;
+				case LongInst.ImmEq : {
+					cond = *(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16))) == hi;
+						writeln("Eq SP[" ~ to!string(lw >> 16) ~ "]("~ cond.to!string ~ "), #" ~ to!string(hi)); 
+				} break;
+				case LongInst.ImmLt : {
+					uint lhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + (lw >> 16)));
+					uint rhs = hi;
+					cond =  lhs < rhs;
+					writeln("Lt SP[" ~ to!string(lw >> 16) ~ "]("~ lhs.to!string ~ "), #" ~ to!string(hi)); 
+				} break;
+
+				case LongInst.Add : {
+					auto lhsOffset = hi & 0xFFFF;
+					auto rhsOffset = (hi >> 16);
+					uint* lhsRef = (cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
+					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
+					writeln("Add SP[", lhsOffset, "](", *lhsRef, "), ", "SP[", rhsOffset, "](",rhs,")");
+					(*lhsRef) += rhs;
 				} break;
 				case LongInst.Lt : {
-					auto rhsOffset = hi & 0xFFFF;
-					auto lhsOffset = (hi >> 16);
+					auto lhsOffset = hi & 0xFFFF;
+					auto rhsOffset = (hi >> 16);
 					uint lhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
 					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
 					cond = lhs < rhs;
@@ -145,7 +172,7 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 				//	result ~= "TJmp !SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(hi >> 16)  ~ "\n"; 
 				} break;
 				default : {
-					assert(0, "Unkown LongInst \n");
+					assert(0, "Unkown LongInst." ~ to!string(cast(LongInst)(lw & InstMask))~" \n");
 				} 
 			}
 		} else {
@@ -153,8 +180,10 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 			
 			switch(cast(ShortInst)(lw & InstMask)) {
 				case ShortInst.Ret : {
-					return *(cast(T*)((cast(ubyte*) stack.ptr) + (lw >> 16)));
-				//	result ~= "Ret SP[" ~ to!string(lw >> 16) ~ "] \n"; 
+					auto retval = *(cast(T*)((cast(ubyte*) stack.ptr) + (lw >> 16)));
+					writeln("RET: ",retval);
+					return retval;
+
 				}
 
 				case ShortInst.Jmp : {
@@ -232,11 +261,25 @@ extern(C++) final class BCV : Visitor {
 
 				--length;
 				uint hi = arr[pos++];
-			//	LongInst instValue = );  
+
 				switch(cast(LongInst)(lw & InstMask)) {
+					case LongInst.ImmSet : {
+						result ~= "Set SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n"; 
+					} break;
 					case LongInst.ImmAdd : {
 						result ~= "Add SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n"; 
 					} break;
+					case LongInst.ImmEq : {
+						result ~= "Eq SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n"; 
+					} break;
+					case LongInst.ImmLt : {
+						result ~= "Lt SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n"; 
+					} break;
+					
+					case LongInst.Add : {
+						result ~= "Add SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16)  ~ "]\n";
+					} break;
+					
 					case LongInst.Lt : {
 						result ~= "Lt SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16)  ~ "]\n"; 
 					} break;
@@ -246,8 +289,9 @@ extern(C++) final class BCV : Visitor {
 					case LongInst.TJmp : {
 						result ~= "TJmp !SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(hi >> 16)  ~ "\n"; 
 					} break;
+
 					default : {
-						result ~= "Unkown LongInst \n";
+						result ~= "Unkown LongInst \n" ~ to!string(cast(LongInst)(lw & InstMask));
 					} break;
 				}
 			} else {
@@ -286,23 +330,30 @@ extern(C++) final class BCV : Visitor {
 
 		Jmp,
 		Inc2,
+
+
 		ImmAdd,
+		ImmEq,
+		ImmLt,
+		ImmSet,
+
 
 		// 2 StackOperands
 		Lt,
 		TJmp,
+		Add,
 	}
 
 	struct LongInst64 {
 		uint lw;
 		uint hi;
 
-		this(LongInst i, uint imm) {
+		this(LongInst i, BCAddr addr) {
 			lw = i | 1 << 5;
-			hi = imm;
+			hi = addr.addr;
 		}
 
-		this(LongInst i, short stackAddr, BCValue imm) {
+		this(LongInst i, short stackAddr, Imm32 imm) {
 			lw = i | 1 << 5 | stackAddr << 16;
 			hi = imm.imm32; 
 		}
@@ -333,8 +384,10 @@ extern(C++) final class BCV : Visitor {
 		undef,
 
 		Void,
-	
+		
 		Slice,
+
+		String,
 		i1,
 
 		i8,
@@ -344,22 +397,30 @@ extern(C++) final class BCV : Visitor {
 	}
 
 	static const(BCType) toBCType(Type t) /*pure*/ {
-		switch(t.isTypeBasic.ty) {
-			case ENUMTY.Tint8 :
-			case ENUMTY.Tuns8 :
-			case ENUMTY.Tchar :
+		TypeBasic bt = t.isTypeBasic;
+		if (bt) {
+			switch(bt.ty) {
+				case ENUMTY.Tint8 :
+				case ENUMTY.Tuns8 :
+				case ENUMTY.Tchar :
 				return BCType.i8;
-			case ENUMTY.Tint16 :
-			case ENUMTY.Tuns16 :
-				return BCType.i16;
-			case ENUMTY.Tint32 :
-			case ENUMTY.Tuns32 :
-				return BCType.i32;
-			case ENUMTY.Tint64 :
-			case ENUMTY.Tuns64 :
-				return BCType.i64;
-			default :
+				case ENUMTY.Tint16 :
+				case ENUMTY.Tuns16 :
+					return BCType.i16;
+				case ENUMTY.Tint32 :
+				case ENUMTY.Tuns32 :
+					return BCType.i32;
+				case ENUMTY.Tint64 :
+				case ENUMTY.Tuns64 :
+					return BCType.i64;
+				default :
 				assert(0, "Type unsupported " ~ (cast(Type)(t)).toString());
+			}
+		} else {
+			if(t.isString) {
+				return BCType.String;
+			}
+			assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
 		}
 	}
 
@@ -390,7 +451,13 @@ extern(C++) final class BCV : Visitor {
 			ulong* i64;
 
 			ulong imm64;
-			uint imm32;
+			Imm32 imm32;
+		}
+
+		this(Imm32 imm32) pure {
+			this.type = BCType.i32;
+			this.vType = BCValueType.Immidiate;
+			this.imm32 = imm32;
 		}
 
 		this(ulong value, BCType type) pure {
@@ -434,6 +501,11 @@ extern(C++) final class BCV : Visitor {
 	struct BCBlock {
 		BCLabel begin;
 		BCLabel end;
+	}
+
+	struct Imm32 {
+		uint imm32;
+		alias imm32 this;
 	}
 
 	struct Branch {
@@ -551,6 +623,44 @@ public :
 			debug {import std.stdio; writeln("resultSp++:", sp);}
 
 			return result;
+		} else if (_lhs.value.vType == BCValueType.StackValue &&
+			_rhs.value.vType == BCValueType.Immidiate) {
+
+			emitLongInst(LongInst64(LongInst.ImmLt, _lhs.value.stackAddr, _rhs.value.imm32));
+			result.evalBlock.end = genLabel();
+			
+			auto resultSp = sp;
+			debug {import std.stdio; writeln("resultSp:", resultSp);}
+			result.value = BCValue(null, resultSp, BCType.i1);
+			retval = result.value;
+			sp += align4(1); // sizeof (i1) == 1;
+			debug {import std.stdio; writeln("resultSp++:", sp);}
+			
+			return result;
+		} else {
+			assert(0, "only StackValue comparisons are supported at this point");
+		}
+	}
+
+	BCExpr* genEq(Expression lhs, Expression rhs) {
+		auto result = new BCExpr();
+		result.evalBlock.begin = genLabel();
+		auto _lhs = genExpr(lhs);
+		auto _rhs = genExpr(rhs);
+		
+		if (_lhs.value.vType == BCValueType.StackValue &&
+			_rhs.value.vType == BCValueType.Immidiate) {
+			emitEq(_lhs.value, _rhs.value);
+			result.evalBlock.end = genLabel();
+			
+			auto resultSp = sp;
+			debug {import std.stdio; writeln("resultSp:", resultSp);}
+			result.value = BCValue(null, resultSp, BCType.i1);
+			retval = result.value;
+			sp += align4(1); // sizeof (i1) == 1;
+			debug {import std.stdio; writeln("resultSp++:", sp);}
+			
+			return result;
 		} else {
 			assert(0, "only StackValue comparisons are supported at this point");
 		}
@@ -560,13 +670,32 @@ public :
 		debug {
 			import std.stdio;
 			writefln("Called visit(BinExp) %s ... \n\tdiscardReturnValue %d", e.toString, discardValue);
+			writefln("(BinExp).Op: %s", e.op.to!string);
 			//if (auto bt = e.type.isTypeBasic()) {
-				e.e1.accept(this);
+		//		e.e1.accept(this);
 				//assert(isIntegral(bt));
 			//} else {
 			//	assert(0, "for new we only handle basicTypes :-)");
 			//}
 		}
+		switch (e.op) {
+			case TOK.TOKequal : {
+				retval = genEq(e.e1, e.e2).value;
+			} break;
+
+			default : break ;
+		}
+
+
+	}
+
+	override void visit(IndexExp ie) {
+		debug {
+			import std.stdio;
+			writefln("IndexExpression %s ... \n\tdiscardReturnValue %d", ie.toString, discardValue);
+			writefln("ie.type : %s ", ie.type.toString);
+		}
+
 
 	}
 
@@ -658,6 +787,13 @@ public :
 		
 	}
 
+	override void visit(ForeachStatement fs) {
+		debug {
+			import std.stdio;
+			writefln("ForeachStatement %s", fs.toString);
+		}
+	}
+
 	override void visit(Expression e) {
 		debug {
 			import std.stdio;
@@ -705,11 +841,10 @@ public :
 			ci.accept(this);
 			if(retval.vType == BCValueType.Immidiate && retval.type == BCType.i32) {
 				//TODO SetStackValue Instruction
-				//emitSet(var, retval);
+				emitSet(var, retval);
 			}
 			retval = oldRetVal;
 		}
-	
 		assert(sp < ushort.max, "StackOverflow Stack is currently constrained to 64K");
 
 		//de.declaration.accept(this);
@@ -724,6 +859,8 @@ public :
 		auto var = BCValue(StackRef(sp, vd.type));
 		vars[cast(void*)vd] = var;
 		sp += cast(short) align4(cast(uint)vd.type.size);
+		debug { import std.stdio; writeln("StackPointer after push: ", sp); }
+
 		writeln(vd.type.size);
 	}
 
@@ -735,10 +872,10 @@ public :
 		auto oldRetval = retval;
 		e.e1.accept(this);
 		auto lhs = retval;
-		assert(lhs.vType == BCValueType.StackValue);
+		//assert(lhs.vType == BCValueType.StackValue);
 		e.e2.accept(this);
 		auto rhs = retval;
-		assert(rhs.vType == BCValueType.Immidiate);
+		//assert(rhs.vType == BCValueType.Immidiate);
 
 		assert(rhs.type == BCType.i32 && lhs.type == BCType.i32); 
 
@@ -752,7 +889,7 @@ public :
 				assert(0, "Unsupported for now");
 			}
 		}
-		assert(discardValue);
+		//assert(discardValue);
 
 		retval = oldRetval;
 	}
@@ -763,17 +900,47 @@ public :
 		ip += 2;
 	}
 
-	void emitAdd(BCValue lhs, BCValue rhs) {
+	void emitEq(BCValue lhs, BCValue rhs) {
 		assert(lhs.vType == BCValueType.StackValue);
 		assert(rhs.vType == BCValueType.Immidiate);
 		assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
-
+		
 		debug {
 			import std.stdio;
-			writeln("emitAdd("~ ip.to!string ~ "|" ~  lhs.to!string ~ ", " ~ rhs.to!string ~ ")");
+			writeln("emitEq("~ ip.to!string ~ "|" ~  lhs.to!string ~ ", " ~ rhs.to!string ~ ")");
 		}
+		
+		emitLongInst(LongInst64(LongInst.ImmEq, lhs.stackAddr, rhs.imm32));
+	}
 
-		emitLongInst(LongInst64(LongInst.ImmAdd, lhs.stackAddr, rhs));
+	void emitSet(BCValue lhs, BCValue rhs) {
+		assert(rhs.type == BCType.i32 && lhs.type == BCType.i32, "for now only 32bit set is supported");
+		if (lhs.vType == BCValueType.StackValue &&
+			rhs.vType == BCValueType.Immidiate) {
+			
+			emitLongInst(LongInst64(LongInst.ImmSet, lhs.stackAddr, rhs.imm32));
+		} /*else if (lhs.vType == BCValueType.StackValue &&
+			rhs.vType == BCValueType.StackValue) {
+			
+			emitLongInst(LongInst64(LongInst.Set, lhs.stackAddr, rhs.stackAddr));
+		}*/ else {
+			assert(0, "Set flavour unsupported");
+		}
+	}
+
+	void emitAdd(BCValue lhs, BCValue rhs) {
+		assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+		if (lhs.vType == BCValueType.StackValue &&
+			rhs.vType == BCValueType.Immidiate) {
+
+			emitLongInst(LongInst64(LongInst.ImmAdd, lhs.stackAddr, rhs.imm32));
+		} else if (lhs.vType == BCValueType.StackValue &&
+			rhs.vType == BCValueType.StackValue) {
+
+			emitLongInst(LongInst64(LongInst.Add, lhs.stackAddr, rhs.stackAddr));
+		} else {
+			assert(0, "Add flavour unsupported");
+		}
 	}
 
 	void emitReturn(BCValue val) {
@@ -791,6 +958,7 @@ public :
 		auto bct = toBCType(ie.type);
 		assert(bct == BCType.i32);
 		retval = BCValue(ie.getInteger(), bct);
+		assert(retval.vType == BCValueType.Immidiate);
 	}
 
 	override void visit(CmpExp ce) {
@@ -799,14 +967,16 @@ public :
 			writefln("CmpExp %s discardValue %d", ce.toString, discardValue);
 		}
 
+
 		 switch(ce.op) {
 			case TOK.TOKlt : {
-				debug {
-					import std.stdio;
-
-				}
 				retval = genLt(ce.e1, ce.e2).value;
 			} break;
+			
+			case TOK.TOKge : {
+				retval = genLt(ce.e2, ce.e1).value;
+			} break;
+
 			default : assert(0, "Unsupported Operation " ~to!string(ce.op));
 		}
 	}
@@ -818,9 +988,21 @@ public :
 			writefln("AssignExp %s", ae.toString);
 
 			ae.e1.toString().writeln;
-			ae.e2.toString().writeln;
+			ae.e1.toString().writeln;
+			ae.e2.accept(this);
 		}
 
+	}
+
+	override void visit(SwitchStatement ss) {
+		debug {
+			import std.stdio;
+			writefln("SwitchStatement %s", ss.toString);
+			writefln("SwitchStatement._body %s", ss._body.toString);
+			writefln("SwitchStatement.condition %s type :%s", ss.condition.toString, ss.condition.type.toString);
+		}
+
+		auto cond = genExpr(ss.condition);
 	}
 
 	override void visit(ReturnStatement rs) {
@@ -833,6 +1015,10 @@ public :
 		emitReturn(retval);
 	}
 
+	override void visit(CastExp ce) {
+		// just go over the cast as if it were not there :)
+		ce.e1.accept(this);
+	}
 
 	override void visit(ExpStatement es) {
 		debug {
@@ -851,7 +1037,19 @@ public :
 			writefln("Statement %s", s.toString);
 		}
 
+		//s.accept(this);
 	}
+
+	override void visit(ScopeStatement ss) {
+		debug {
+			import std.stdio;
+			writefln("ScopeStatement %s", ss.toString);
+		}
+		const oldsp = sp;
+		ss.statement.accept(this);
+		sp = oldsp;
+	}
+
 
 //	override void visit(Assign) {
 //		super.visit();
