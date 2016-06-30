@@ -28,6 +28,51 @@ import ddmd.visitor;
 
 import std.conv : to;
 
+/**
+ * checks if ThisEnum is contained in ThatEnum
+ */
+string genToParentEnum(P, E)() {
+	assert(__ctfe, "This only makes sense at CTFE");
+
+	string result = " " ~ P.stringof ~ " toParentEnum (const " ~E.stringof ~" e) const pure {
+	\tfinal switch(e) with (typeof(e)) {\n";
+	import std.format : format;
+
+	foreach(M;__traits(allMembers, E)) {
+		result ~= format("\t\tcase %s : return %s.%s;\n", M, P.stringof, M); 
+	}
+	return result ~ "\n\t}\n}";
+}
+
+mixin template mxToParentEnum(P,E) {
+	static assert(isIncluded!(E, P));
+	mixin(genToParentEnum!(P, E)());
+}
+
+template isIncluded(ThisEnum, ThatEnum) {
+	import std.traits : EnumMembers, allSatisfy;
+	enum emThisEnum = EnumMembers!ThisEnum;
+	enum emThatEnum = EnumMembers!ThatEnum;
+	static assert(is(ThisEnum == enum) && is(ThatEnum == enum),
+		"IsIncluded works only for enums"
+	);
+//	foreach(m;EnumMembers!ThisEnum) {
+
+//	}
+
+	enum isIncluded =  emThisEnum.length <= emThatEnum.length && 
+		hasMembers();
+
+	bool hasMembers() {
+		foreach(M;__traits(allMembers, ThisEnum)) {
+			static if (!is(typeof(mixin(`ThatEnum.` ~ M)))) {
+				static assert(0, "member: " ~ M ~ " is not included");
+			}
+		}
+		return true;
+	}
+}
+
 struct ByteCode {
 //	ubyte[] _data;
 }
@@ -336,6 +381,12 @@ extern(C++) final class BCV : Visitor {
 		Jmp,
 		Inc2,
 
+		ImmAdd,
+		ImmEq,
+		ImmLt,
+		ImmGt,
+		ImmSet,
+
 		// 2 StackOperands
 		Lt,
 		TJmp,
@@ -356,19 +407,28 @@ extern(C++) final class BCV : Visitor {
 		uint lw;
 		uint hi;
 
-		this(LongInst i, short stackAddr, Imm32 imm) pure const {
-			lw = i | 1 << 5 | stackAddr << 16;
+
+		this(LongInstImm32Enum i, short stackAddr, Imm32 imm) pure const {
+			mixin mxToParentEnum!(LongInst, LongInstImm32Enum);
+			lw = toParentEnum(i) | 1 << 5 | stackAddr << 16;
 			hi = imm.imm32; 
 		}
 
-	}
+		string toString() pure const {
+			return to!string(cast(LongInstImm32Enum)(lw & InstMask)) ~ " SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+		}
 
-	enum LongInstImm {
-		// Immidiate operations on one StackValue
-		ImmAdd,
-		ImmEq,
-		ImmLt,
-		ImmSet,
+		enum LongInstImm32Enum {
+			// Immidiate operations on one StackValue
+			ImmAdd,
+			ImmEq,
+			ImmLt,
+			ImmGt,
+			ImmSet,
+		}
+
+
+		alias LongInstImm32Enum this;
 	}
 
 	struct LongInst64 {
@@ -379,8 +439,6 @@ extern(C++) final class BCV : Visitor {
 			lw = i | 1 << 5;
 			hi = addr.addr;
 		}
-
-
 
 		this(LongInst i, short stackAddrLhs, short stackAddrRhs) {
 			lw = i | 1 << 5;
@@ -650,7 +708,7 @@ public :
 		} else if (_lhs.value.vType == BCValueType.StackValue &&
 			_rhs.value.vType == BCValueType.Immidiate) {
 
-			emitLongInst(LongInst64(LongInst.ImmLt, _lhs.value.stackAddr, _rhs.value.imm32));
+			emitLongInst(LongInstImm32(LongInstImm32.ImmLt, _lhs.value.stackAddr, _rhs.value.imm32));
 			result.evalBlock.end = genLabel();
 			
 			auto resultSp = sp;
@@ -924,6 +982,14 @@ public :
 		ip += 2;
 	}
 
+	void emitLongInst(LongInstImm32 i) {
+		byteCodeArray[ip] = i.lw;
+		byteCodeArray[ip + 1] = i.hi;
+		ip += 2;
+	}
+
+
+
 	void emitEq(BCValue lhs, BCValue rhs) {
 		assert(lhs.vType == BCValueType.StackValue);
 		assert(rhs.vType == BCValueType.Immidiate);
@@ -934,7 +1000,7 @@ public :
 			writeln("emitEq("~ ip.to!string ~ "|" ~  lhs.to!string ~ ", " ~ rhs.to!string ~ ")");
 		}
 		
-		emitLongInst(LongInst64(LongInst.ImmEq, lhs.stackAddr, rhs.imm32));
+		emitLongInst(LongInstImm32(LongInstImm32.ImmEq, lhs.stackAddr, rhs.imm32));
 	}
 
 	void emitSet(BCValue lhs, BCValue rhs) {
@@ -942,7 +1008,7 @@ public :
 		if (lhs.vType == BCValueType.StackValue &&
 			rhs.vType == BCValueType.Immidiate) {
 			
-			emitLongInst(LongInst64(LongInst.ImmSet, lhs.stackAddr, rhs.imm32));
+			emitLongInst(LongInstImm32(LongInstImm32.ImmSet, lhs.stackAddr, rhs.imm32));
 		} /*else if (lhs.vType == BCValueType.StackValue &&
 			rhs.vType == BCValueType.StackValue) {
 			
@@ -957,7 +1023,7 @@ public :
 		if (lhs.vType == BCValueType.StackValue &&
 			rhs.vType == BCValueType.Immidiate) {
 
-			emitLongInst(LongInst64(LongInst.ImmAdd, lhs.stackAddr, rhs.imm32));
+			emitLongInst(LongInstImm32(LongInstImm32.ImmAdd, lhs.stackAddr, rhs.imm32));
 		} else if (lhs.vType == BCValueType.StackValue &&
 			rhs.vType == BCValueType.StackValue) {
 
