@@ -69,8 +69,14 @@ auto evaluateFunction(FuncDeclaration fd, Expression[] args, ThisExp _this = nul
 			bcv.vars.writeln;
 			writeln(" stackUsage = ", (bcv.sp-4).to!string ~ " byte");
 		}
-
-		writeln("Calling with 64", interpret!int(bcv.byteCodeArray[0 .. bcv.ip+1], [BCV.BCValue(64, BCV.BCType.i32)]));
+		foreach(_;0 .. 64) {
+		import std.datetime : StopWatch;
+		StopWatch sw;
+		sw.start;
+		writeln("Calling " ~ fd.toString ~" with(100_0000_000) == ", interpret!int(bcv.byteCodeArray[0 .. bcv.ip+1], [BCV.BCValue(100_000_000, BCV.BCType.i32)]));
+		sw.stop;
+		writeln("It took " ~ sw.peek.msecs.to!string ~ "msecs");
+		}
 	}
 	return null;
 }
@@ -107,11 +113,7 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 	uint ip = 4;
 	bool cond;
 	while(true) {
-		debug { import std.stdio; writeln("ip : ", ip);
-		//	writeln ("StackValues :", (stack[0 .. 9]));
-		}
-
-
+	
 		const lw = byteCode[ip++];  
 		if (lw & InstLengthMask) {
 			// We have a long instruction
@@ -129,7 +131,7 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 					uint lhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
 					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
 					cond = lhs < rhs;
-					writeln(lhs.to!string, "<" ,rhs.to!string);
+				//	writeln(lhs.to!string, "<" ,rhs.to!string);
 				//	writeln("Lt SP[" ~ to!string(rhsOffset) ~ "]("~ (*(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset))).to!string ~", SP[" ~ to!string(lhsOffset)  ~ "]"); 
 				} break;
 				case LongInst.Jmp : {
