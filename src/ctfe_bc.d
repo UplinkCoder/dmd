@@ -51,7 +51,7 @@ auto evaluateFunction(CallExp ce, ThisExp _this = null) {
 //	ce.arguments
 }
 auto evaluateFunction(FuncDeclaration fd, Expression[] args, ThisExp _this = null) {
-	BCV bcv = new BCV();
+	scope BCV bcv = new BCV();
 //	bcv.setThis(bcv);
 	/*	if (fd.ctfeCode) {
 		return executeFun(fd.ctfeCode, args);
