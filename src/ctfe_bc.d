@@ -112,7 +112,9 @@ auto evaluateFunction(FuncDeclaration fd, Expression[] args, ThisExp _this = nul
 		//bcv.visit()
 		bcv.visit(fbody);
 		debug { import std.stdio;
+			import std.algorithm;
 			bcv.printInstructions.writeln;
+			bcv.vars.keys.each!(k => (cast(VarDeclaration)k).print);
 			bcv.vars.writeln;
 			writeln(" stackUsage = ", (bcv.sp-4).to!string ~ " byte");
 		}
@@ -267,14 +269,17 @@ extern(C++) final class BCV : Visitor {
 	BCValue[void*] vars;
 
 	BCLabel[ubyte.max] unresolvedLabels;
+	BCTemporary[ubyte.max] temporarys;
 	uint[ushort.max] byteCodeArray;
 
 	// ip starts at 4 because 0 should be an invalid address;
 	BCValue retval;
+	BCValue assignTo;
 	BCAddr ip = BCAddr(4);
 	short sp = 4;
 
 	ubyte unreslovedLabelCount;
+	ubyte temporaryCount;
 
 	bool discardValue = false;
 
@@ -293,6 +298,12 @@ extern(C++) final class BCV : Visitor {
 	 * 
 	 * 
 	 */ 
+
+	enum Cond {
+		Eq,
+		Gt,
+		Lt,
+	}
 
 	string printInstructions() {
 
@@ -473,11 +484,12 @@ extern(C++) final class BCV : Visitor {
 		return i | imm << 8; 
 	}
 
-	enum BCType {
+	enum BCType : ubyte {
 		undef,
 
 		Void,
-		
+
+		Ptr,
 		Slice,
 
 		String,
@@ -487,6 +499,39 @@ extern(C++) final class BCV : Visitor {
 		i16,
 		i32,
 		i64,
+	}
+
+	static const(uint) size(const BCType bct) pure {
+		final switch(bct) with (BCType) {
+		
+			case  undef, Void : {
+				assert(0, "We should never encounter undef or Void");
+			} 
+			case Ptr : {
+				//TODO add 64bit mode
+				return /* m64 ? 8 :*/ 4;
+			}
+			case Slice, String : {
+				//TODO add 64bit mode
+				return /* m64 ? 16 :*/ 8;
+			}
+			
+			case i1 : {
+				return 1;
+			}
+			case i8 : {
+				return 1;
+			}
+			case i16 : {
+				return 2;
+			}
+			case i32 : {
+				return 4;
+			}
+			case i64 : {
+				return 8;
+			}
+		}
 	}
 
 	static const(BCType) toBCType(Type t) /*pure*/ {
@@ -523,16 +568,18 @@ extern(C++) final class BCV : Visitor {
 	}
 
 
-	enum BCValueType {
+	enum BCValueType : ubyte {
 		Unknown,
+	//	Temporary,
 		StackValue,
 		Immidiate,
 	}
 
 	struct BCValue {
 		BCValueType vType;
-		short stackAddr;
 		BCType type;
+		short stackAddr;
+
 		union {
 			void* valAddr;
 
@@ -545,6 +592,18 @@ extern(C++) final class BCV : Visitor {
 
 			ulong imm64;
 			Imm32 imm32;
+		}
+
+		bool opCast(T:bool)() {
+			return this != typeof(this).init;
+		}
+
+		string toString() const pure {
+			import std.format : format;
+			return format("\nvType: %s\t"
+							"stackAddr: %s\t"
+							"imm64 %s\t",
+				vType, stackAddr, imm64);
 		}
 
 		this(Imm32 imm32) pure {
@@ -579,6 +638,11 @@ extern(C++) final class BCV : Visitor {
 	struct BCAddr {
 		uint addr;
 		alias addr this;
+	}
+
+	struct BCTemporary {
+		BCValue value;
+		ubyte tmpIdx;
 	}
 
 	struct BCLabel {
@@ -678,7 +742,12 @@ public :
 		}
 	}
 
-		
+	BCTemporary genTemporary(BCType bct) {
+		auto tmp = temporarys[temporaryCount] = BCTemporary(BCValue(null, sp, bct), temporaryCount);
+		sp += align4(size(bct));
+		++temporaryCount; 
+		return tmp;
+	}
 
 	
 	BCExpr* genExpr(Expression expr) {
@@ -743,16 +812,12 @@ public :
 		
 		if (_lhs.value.vType == BCValueType.StackValue &&
 			_rhs.value.vType == BCValueType.Immidiate) {
-			emitEq(_lhs.value, _rhs.value);
+			result.value = genTemporary(BCType.i1).value;
+			Eq3(result.value, _lhs.value, _rhs.value);
 			result.evalBlock.end = genLabel();
 			
-			auto resultSp = sp;
-			debug {import std.stdio; writeln("resultSp:", resultSp);}
-			result.value = BCValue(null, resultSp, BCType.i1);
 			retval = result.value;
-			sp += align4(1); // sizeof (i1) == 1;
-			debug {import std.stdio; writeln("resultSp++:", sp);}
-			
+
 			return result;
 		} else {
 			assert(0, "only StackValue comparisons are supported at this point");
@@ -774,31 +839,32 @@ public :
 
 		//auto oldRetval = retval;
 
+		retval = assignTo ? assignTo : genTemporary(toBCType(e.type)).value ;
+
 		switch (e.op) {
 			case TOK.TOKequal : {
 				retval = genEq(e.e1, e.e2).value;
 			} break;
 			case TOK.TOKplusplus : {
+				const oldDiscardValue = discardValue;
+				discardValue = false;
 				auto expr = genExpr(e.e1);
-				retval = pushOntoStack(expr.value);
-				if (expr.value.vType == BCValueType.StackValue) {
-					const oldDiscardValue = discardValue;
-					discardValue = false;
-					emitAdd(expr.value, BCValue(Imm32(1)));
-					discardValue = oldDiscardValue;
-				}
+				assert(expr.value.vType != BCValueType.Immidiate, 
+					"++ does not make sense as on an Immidiate Value"
+				);
+
+				discardValue = oldDiscardValue;
+				emitSet(retval, expr.value);
+				emitAdd(expr.value, BCValue(Imm32(1)));
+
 			} break;
 			case TOK.TOKadd : {
-				auto oldRetval = retval;
 				auto oldDiscardValue = discardValue;
 				discardValue = false;
 				auto lhs = genExpr(e.e1);
 				auto rhs = genExpr(e.e2);
-				discardValue = false;
 				assert(!discardValue, "A lone add discarding the value is strange");
-				auto result = pushOntoStack(lhs.value);
-				sp -= 4;
-				retval = Add3(result, lhs.value, rhs.value);
+				Add3(retval, lhs.value, rhs.value);
 				 // TOOD use sizeof(retval);
 				discardValue = oldDiscardValue;
 			} break;
@@ -989,6 +1055,7 @@ public :
 			writefln("BinAssignExp %s discardValue %d", e.toString, discardValue);
 		}
 		auto oldDiscardValue = discardValue;
+		auto oldAssignTo = assignTo;
 		auto oldRetval = retval;
 		discardValue = false;
 		e.e1.accept(this);
@@ -1004,7 +1071,7 @@ public :
 		switch (e.op) {
 
 			case TOK.TOKaddass : {
-				emitAdd(lhs, rhs);
+				retval = Add3(lhs, lhs, rhs);
 			}
 			break;
 			default : {
@@ -1013,8 +1080,9 @@ public :
 		}
 		//assert(discardValue);
 
-		retval = oldRetval;
+		retval = oldDiscardValue ? oldRetval : retval;
 		discardValue = oldDiscardValue;
+		assignTo = oldAssignTo;
 	}
 
 	void emitLongInst(LongInst64 i) {
@@ -1046,18 +1114,24 @@ public :
 
 	void emitSet(BCValue lhs, BCValue rhs) {
 		assert(rhs.type == BCType.i32 && lhs.type == BCType.i32, "for now only 32bit set is supported");
+		//Do not emit redundant self assignments
+		if (rhs == lhs) {
+			return ;
+		}
 		if (lhs.vType == BCValueType.StackValue &&
 			rhs.vType == BCValueType.Immidiate) {
 			
 			emitLongInst(LongInstImm32(LongInstImm32.ImmSet, lhs.stackAddr, rhs.imm32));
-		} /*else if (lhs.vType == BCValueType.StackValue &&
+		} else if (lhs.vType == BCValueType.StackValue &&
 			rhs.vType == BCValueType.StackValue) {
 			
 			emitLongInst(LongInst64(LongInst.Set, lhs.stackAddr, rhs.stackAddr));
-		}*/  else {
+		}  else {
 			assert(0, "Set flavour unsupported");
 		}
 	}
+
+
 
 	void emitAdd(BCValue lhs, BCValue rhs) {
 		assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
@@ -1073,9 +1147,22 @@ public :
 		}
 	}
 
+	void emitQueryCond(BCValue result, Cond cond) {
+		//TODO implement This!
+	}
+
+	BCValue Eq3(BCValue result, BCValue lhs, BCValue rhs) {
+		assert(result.vType != BCValueType.Immidiate, "Cannot store result of == to Immidiate");
+		emitEq(lhs, rhs);
+		//TODO make Eq3 functional!
+		emitQueryCond(result, Cond.Eq);
+		return result;
+	}
+
 	BCValue Add3(BCValue result, BCValue lhs, BCValue rhs) {
-		assert(result.vType == BCValueType.StackValue);
-		if (lhs.type != BCValueType.StackValue || lhs.stackAddr != result.stackAddr) {
+		assert(result.vType != BCValueType.Immidiate, "Cannot add to Immidiate");
+
+		if (lhs != result) {
 			emitSet(result, lhs);
 		}
 		emitAdd(result, rhs);
@@ -1093,15 +1180,15 @@ public :
 	}
 
 	void emitReturn(BCValue val) {
-		if(val.vType == BCValueType.StackValue) {
+		assert(val.vType == BCValueType.StackValue);// {
 			byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr);
 			ip += 2;
-		} else if (val.vType == BCValueType.Immidiate) {
+		/*} else if (val.vType == BCValueType.Immidiate) {
 			auto sv = pushOntoStack(val);
 			assert(sv.vType == BCValueType.StackValue);
 			byteCodeArray[ip] = ShortInst16(ShortInst.Ret, sv.stackAddr);
 			ip += 2;
-		}
+		}*/
 	}
 
 	override void visit(IntegerExp ie) {
@@ -1141,11 +1228,19 @@ public :
 	 	debug {
 			import std.stdio;
 			writefln("AssignExp %s", ae.toString);
-
-			ae.e1.toString().writeln;
-			ae.e1.toString().writeln;
-			ae.e2.accept(this);
 		}
+		auto oldRetval = retval;
+		auto oldAssignTo = assignTo;
+		auto oldDiscardValue = discardValue;
+		discardValue = false;
+		auto lhs = genExpr(ae.e1);
+		assignTo = lhs.value;
+		auto rhs = genExpr(ae.e2);
+		emitSet(lhs.value, rhs.value);
+
+		retval = oldDiscardValue ? oldRetval : retval;
+		assignTo = oldAssignTo;
+		discardValue = oldDiscardValue;
 
 	}
 
