@@ -194,8 +194,8 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 				} break;
 
 				case LongInst.Add : {
-					auto lhsOffset = (hi >> 16);
-					auto rhsOffset = hi & 0xFFFF;
+					auto lhsOffset = hi & 0xFFFF;
+					auto rhsOffset = (hi >> 16);
 					uint* lhsRef = (cast(uint*)((cast(ubyte*) stack.ptr) + lhsOffset));
 					uint rhs = *(cast(uint*)((cast(ubyte*) stack.ptr) + rhsOffset));
 					writeln("Add SP[", lhsOffset, "](", *lhsRef, "), ", "SP[", rhsOffset, "](",rhs,")");
@@ -240,7 +240,7 @@ T interpret(T) (uint[] byteCode, BCV.BCValue[] args) {
 			switch(cast(ShortInst)(lw & InstMask)) {
 				case ShortInst.Ret : {
 					auto retval = *(cast(T*)((cast(ubyte*) stack.ptr) + (lw >> 16)));
-					writeln("RET: ",retval);
+					writeln("RET: SP[",lw >> 16,"](",retval,")");
 					return retval;
 
 				}
@@ -538,10 +538,12 @@ extern(C++) final class BCV : Visitor {
 		TypeBasic bt = t.isTypeBasic;
 		if (bt) {
 			switch(bt.ty) {
+				case ENUMTY.Tbool :
+					return BCType.i1;
 				case ENUMTY.Tint8 :
 				case ENUMTY.Tuns8 :
 				case ENUMTY.Tchar :
-				return BCType.i8;
+					return BCType.i8;
 				case ENUMTY.Tint16 :
 				case ENUMTY.Tuns16 :
 					return BCType.i16;
@@ -843,7 +845,7 @@ public :
 
 		switch (e.op) {
 			case TOK.TOKequal : {
-				retval = genEq(e.e1, e.e2).value;
+				Eq3(retval, genExpr(e.e1).value, genExpr(e.e2).value);
 			} break;
 			case TOK.TOKplusplus : {
 				const oldDiscardValue = discardValue;
@@ -1286,8 +1288,25 @@ public :
 			import std.stdio;
 			writefln("Statement %s", s.toString);
 		}
-
+		assert(0, "Statement unsupported");
 		//s.accept(this);
+	}
+
+	override void visit(IfStatement fs) {
+		auto cond = genExpr(fs.condition);
+		auto branch = beginTJump();
+		BCBlock* ifbody;
+		BCBlock* elsebody;
+		if (fs.ifbody) {
+			ifbody = genBlock(fs.ifbody);
+		}
+		if (fs.elsebody) {
+			auto afterBodyJmp = beginJmp();
+			elsebody = genBlock(fs.elsebody);
+			endJmp(afterBodyJmp, genLabel());
+		}
+
+		endTJump(branch, cond.value, elsebody ? elsebody.begin : genLabel());
 	}
 
 	override void visit(ScopeStatement ss) {
@@ -1296,8 +1315,10 @@ public :
 			writefln("ScopeStatement %s", ss.toString);
 		}
 		const oldsp = sp;
+		const oldTmpCount = temporaryCount;
 		ss.statement.accept(this);
 		sp = oldsp;
+		temporaryCount = oldTmpCount;
 	}
 
 
