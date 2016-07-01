@@ -855,7 +855,7 @@ public :
 
 				discardValue = oldDiscardValue;
 				emitSet(retval, expr.value);
-				emitAdd(expr.value, BCValue(Imm32(1)));
+				Add3(expr.value, expr.value, BCValue(Imm32(1)));
 
 			} break;
 			case TOK.TOKadd : {
