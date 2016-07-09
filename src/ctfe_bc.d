@@ -779,18 +779,17 @@ public:
                 auto jmpCond = Eq3(BCValue.init, lhs, rhs);
                 auto jump = beginCndJmp();
 
-                //Add a check for isGotoCaseStatement
-                //And and for is isGotoDefaultStatement
-                //Because otherwise we can get ourselfs in trouble
                 auto cs = caseStmt.isCompoundStatement;
-                bool blockReturns = (!!cs && (cs.last.isReturnStatement ||
+                /// for some reason blockReturns works when the meaning is inverted.
+                /// not sure what causes this
+                bool blockReturns = !((cs && (cs.last.isReturnStatement ||
                     cs.last.isGotoCaseStatement || cs.last.isGotoDefaultStatement)) ||
-                    caseStmt.isReturnStatement || caseStmt.isGotoCaseStatement || caseStmt.isGotoDefaultStatement;
+                    caseStmt.isReturnStatement || caseStmt.isGotoCaseStatement || caseStmt.isGotoDefaultStatement);
 
                 switchFixup = &switchFixupTable[switchFixupTableCount];
                 auto caseBlock = genBlock(caseStmt.statement);
                 beginCaseStatements[beginCaseStatementsCount++] = caseBlock.begin;
-
+                //If the block returns regardless there is no need for a fixup
                 if (!blockReturns)
                     switchFixupTable[switchFixupTableCount++] = beginJmp();
 
@@ -826,6 +825,8 @@ public:
                 }
 
             }
+
+            switchFixupTableCount = 0;
 
             //after we are done let's set thoose indexes back to zero
             //who knowns what will happen if we don't ?
