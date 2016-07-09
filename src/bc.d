@@ -15,10 +15,10 @@ enum Cond
 }
 
 /**
- * 32bitInst : 
+ * 32bitInst :
  * [0 .. 6] Instruction
  * [6 .. 8] Flags
- * 
+ *
  * [8 .. 16] (optional InstData)
  * [16 .. 33] 16BitOperand
  */
@@ -96,7 +96,7 @@ enum LongInst : ushort
     Rsh,
     Lsh,
 
-    Lds, ///SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])]  
+    Lds, ///SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])]
 }
 
 enum InstLengthMask = ubyte(0x20); // check 6th Byte
@@ -107,12 +107,12 @@ enum CondFlagMask = 0b11_0000_0000;
  * 64BitInst :
  * [0 .. 6] Instruction
  * [6 .. 9] Flags (* Bit 6 is true for 64BitInst
- * 
- * 
+ *
+ *
  */
 
 /**
-* Layaout : 
+* Layaout :
 * [0-6] Instruction
 * [6-8] Flags
 * *****************
@@ -215,11 +215,6 @@ struct LongInst64
         lw = i | 1 << 5;
         hi = stackAddrLhs.addr | stackAddrRhs.addr << 16;
     }
-
-    //		this(LongInst i, ushort imm16, short stackAddrLhs, short stackAddrRhs) {
-    //			lw = i | 1 << 5 | imm16 << 16;
-    //			hi = stackAddrLhs | stackAddrRhs << 16;
-    //		}
 }
 
 static assert(ShortInst.max < 0x20, "Instruction do not fit in 6 byte anymore");
@@ -342,7 +337,7 @@ enum BCValueType : ubyte
 {
     Unknown,
     DataSegValue,
-    //	Temporary,
+    //  Temporary,
     StackValue,
     Immidiate,
 }
@@ -453,7 +448,7 @@ struct BCValue
 }
 pragma(msg, "Sizeof BCValue: ", BCValue.sizeof);
 static immutable bcOne = BCValue(Imm32(1));
-//	alias BCValueUnion = BCValue.BCValueUnion;
+//      alias BCValueUnion = BCValue.BCValueUnion;
 
 struct BCAddr
 {
@@ -468,10 +463,10 @@ struct BCLabel
 
 struct BCBlock
 {
-	bool opCast(T:bool)() {
-		// since 0 is an invalid address it is enough to check if begin is 0
-		return !!begin.addr.addr;
-	}
+        bool opCast(T:bool)() {
+                // since 0 is an invalid address it is enough to check if begin is 0
+                return !!begin.addr.addr;
+        }
 
     BCLabel begin;
     BCLabel end;
@@ -551,7 +546,7 @@ struct BCGen
         return tmp;
     }
 
-    //	pragma(msg, (0xFF ^ 1 << 0x7));
+    //  pragma(msg, (0xFF ^ 1 << 0x7));
     /+
     BCValue genCondFlag()
     {
@@ -891,11 +886,11 @@ struct BCGen
         byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr);
         ip += 2;
         /*} else if (val.vType == BCValueType.Immidiate) {
-			auto sv = pushOntoStack(val);
-			assert(sv.vType == BCValueType.StackValue);
-			byteCodeArray[ip] = ShortInst16(ShortInst.Ret, sv.stackAddr);
-			ip += 2;
-		}*/
+                        auto sv = pushOntoStack(val);
+                        assert(sv.vType == BCValueType.StackValue);
+                        byteCodeArray[ip] = ShortInst16(ShortInst.Ret, sv.stackAddr);
+                        ip += 2;
+                }*/
     }
 
 }
@@ -1126,7 +1121,7 @@ string printInstructions(int* startInstructions, uint length)
             case ShortInst.Drb:
                 result ~= "Drb" ~ to!string(
                     (lw & 0x0F00) >> 8) ~ " SP[" ~ to!string(cast(short)(lw >> 16)) ~ "]" ~ "\n";
-                //			((lw & ~0xFF) << 24);
+                //                      ((lw & ~0xFF) << 24);
             }
         }
     }
@@ -1138,7 +1133,7 @@ string printInstructions(int* startInstructions, uint length)
     assert(__ctfe, "This only makes sense at CTFE");
 
     string result = " " ~ P.stringof ~ " toParentEnum (const " ~ E.stringof ~ " e) const pure {
-	\tfinal switch(e) with (typeof(e)) {\n";
+        \tfinal switch(e) with (typeof(e)) {\n";
     import std.format : format;
 
     foreach (M; __traits(allMembers, E))
@@ -1222,7 +1217,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
     uint ip = 4;
     bool cond;
 
-    // debug { import std.stdio; writeln("BC.len = ", byteCode.length); } 
+    // debug { import std.stdio; writeln("BC.len = ", byteCode.length); }
     if (byteCode.length == 0 || byteCode.length == 1)
         return typeof(return).init;
 
@@ -1544,33 +1539,6 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 {
                     (*opRef) &= 3;
                 }
-                break;
-                //			case ShortInst.Dbx :
-                //					const DsIdx = (lw >> 16);
-                //					assert(DsIdx == DsIdx & 3);
-                //					final switch(DsIdx) {
-                //						case 0 :
-                //							db = (*opRef) & 0x000F;
-                //							break;
-                //						case 1 :
-                //							db = ((*opRef) & 0x00F0) >> 8;
-                //							break;
-                //						case 2 :
-                //							db = ((*opRef) & 0x0F00) >> 16;
-                //							break;
-                //						case 3 :
-                //							db = (*opRef) >> 24;
-                //							break;
-                //					}
-                //				
-                //			case ShortInst.B1 :
-                //					assert(0);
-                //			case ShortInst.B2 :
-                //					assert(0);
-                //			case ShortInst.B3 :
-                //					assert(0);
-                //			case ShortInst.B4 :
-                //					assert(0);
             }
         }
     }

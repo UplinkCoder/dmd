@@ -14,18 +14,18 @@ import ddmd.arraytypes : Expressions;
  */
 
 /**
-	Something about the instruction set :
-	The instruction set is designed to be fast to interpret. 
-	Therefore it is subject to uncommen restrictions and features uncommen ideoms.
-	
-	It is one of the few VM instruction sets that do have SIMD-Instructions.
-	
-	Example include The multiple increment which can increment 2 diffrent stack locations at once.
-	(By either 1,4,8, or 16)
-	
-	The operation-combine marker which allows to execute the same chain of operations on an abitary number of StackLocations.
-	
-	
+        Something about the instruction set :
+        The instruction set is designed to be fast to interpret.
+        Therefore it is subject to uncommen restrictions and features uncommen ideoms.
+
+        It is one of the few VM instruction sets that do have SIMD-Instructions.
+
+        Example include The multiple increment which can increment 2 diffrent stack locations at once.
+        (By either 1,4,8, or 16)
+
+        The operation-combine marker which allows to execute the same chain of operations on an abitary number of StackLocations.
+
+
 */
 
 import std.conv : to;
@@ -37,9 +37,9 @@ struct StackRef
 }
 
 struct SelfCall {
-	BCAddr callPoint;
-	BCValue[16] arguments;
-	ubyte argumentCount;
+        BCAddr callPoint;
+        BCValue[16] arguments;
+        ubyte argumentCount;
 }
 
 struct SwitchFixupEntry {
@@ -54,7 +54,7 @@ struct SwitchFixupEntry {
 struct SwitchState {
     SwitchFixupEntry[64] switchFixupTable;
     uint switchFixupTableCount;
-    
+
     BCLabel[128] beginCaseStatements;
     uint beginCaseStatementsCount;
 }
@@ -79,13 +79,13 @@ import ddmd.ctfe.bc;
 Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _this = null)
 {
     scope BCV bcv = new BCV(fd);
-    //	bcv.setThis(bcv);
-    /*	if (fd.ctfeCode) {
-		return executeFun(fd.ctfeCode, args);
-	} else {
-		fd.ctfeCode = compile(fd);
-		return executeFun(fd.ctfeCode, args);
-	} */
+    //  bcv.setThis(bcv);
+    /*  if (fd.ctfeCode) {
+                return executeFun(fd.ctfeCode, args);
+        } else {
+                fd.ctfeCode = compile(fd);
+                return executeFun(fd.ctfeCode, args);
+        } */
     import std.datetime : StopWatch;
 
 
@@ -151,27 +151,27 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
 
         StopWatch sw;
         sw.start();
-		foreach(a;args) {
-			a.toString();
-			a.accept(bcv);
-		}
+                foreach(a;args) {
+                        a.toString();
+                        a.accept(bcv);
+                }
         auto bc_args = args.map!(a => bcv.genExpr(a)).array;
         auto retval = interpret(bcv.byteCodeArray[0 .. bcv.ip], bc_args);
         sw.stop();
         import std.stdio;
-	writeln("Executing bc took " ~ sw.peek.msecs.to!string ~ "msecs");
-	if (retval != -1) 
+        writeln("Executing bc took " ~ sw.peek.msecs.to!string ~ "msecs");
+        if (retval != -1)
         {
             return new IntegerExp(retval);
         }
         else
         {
-			assert(0, "Interpreter Errored");//return null;
+                        assert(0, "Interpreter Errored");//return null;
         }
     }
     else
     {
-		assert(0, "CTFE Errored");
+                assert(0, "CTFE Errored");
         //return null;
 
     }
@@ -198,13 +198,13 @@ extern (C++) final class BCV : Visitor
     SwitchState switchState;
     SwitchFixupEntry* switchFixup;
 
-	//State needs for tail calls
-	FuncDeclaration me;
-	uint recursionDepth;
-	bool inReturnStatement;
-	SelfCall[32] selfCalls;
-	byte selfCallCount;
-	//Rest
+        //State needs for tail calls
+        FuncDeclaration me;
+        uint recursionDepth;
+        bool inReturnStatement;
+        SelfCall[32] selfCalls;
+        byte selfCallCount;
+        //Rest
 
     const(BCType) toBCType(Type t) /*pure*/
     {
@@ -218,8 +218,8 @@ extern (C++) final class BCV : Visitor
             case ENUMTY.Tint8:
             case ENUMTY.Tuns8:
                  return BCType.i8;
-			case ENUMTY.Tchar:
-				return BCType.Char;
+                        case ENUMTY.Tchar:
+                                return BCType.Char;
             case ENUMTY.Tint16:
             case ENUMTY.Tuns16:
                 return BCType.i16;
@@ -232,7 +232,7 @@ extern (C++) final class BCV : Visitor
             default:
                 IGaveUp = true;
                 debug assert(0, "Type unsupported " ~ (cast(Type)(t)).toString());
-				return BCType.init;
+                                return BCType.init;
             }
         }
         else
@@ -243,7 +243,7 @@ extern (C++) final class BCV : Visitor
             }
             IGaveUp = true;
             debug assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
-			return BCType.init;
+                        return BCType.init;
         }
     }
 
@@ -251,9 +251,9 @@ extern (C++) final class BCV : Visitor
 
     import ddmd.tokens;
 
-	BCValue[void*] vars;
-	BCAddr[ubyte.max] fixupTable;
-	uint fixupTableCount;
+        BCValue[void*] vars;
+        BCAddr[ubyte.max] fixupTable;
+        uint fixupTableCount;
 
     BCValue retval;
     BCValue assignTo;
@@ -275,21 +275,21 @@ public:
 
     this(FuncDeclaration fd)
     {
-		me = fd;
+                me = fd;
     }
 
-	~this() {
-		//We are about to finish codegen
-		//time to fixup unresolved labels
-		//and time to fixup self calls
+        ~this() {
+                //We are about to finish codegen
+                //time to fixup unresolved labels
+                //and time to fixup self calls
 
 
-		scope(exit) {
-			import std.stdio;
-			if (!__ctfe) writeln(printInstructions(/*gen.byteCodeArray[0 .. ip])*/));
-		}
+                scope(exit) {
+                        import std.stdio;
+                        if (!__ctfe) writeln(printInstructions(/*gen.byteCodeArray[0 .. ip])*/));
+                }
 
-	}
+        }
 
     BCValue genExpr(Expression expr)
     {
@@ -317,7 +317,7 @@ public:
         auto _lhs = genExpr(lhs);
         auto _rhs = genExpr(rhs);
 
-		BCValue result;
+                BCValue result;
         Lt3(result, _lhs, _rhs);
         return result;
     }
@@ -326,7 +326,7 @@ public:
     {
         auto _lhs = genExpr(lhs);
         auto _rhs = genExpr(rhs);
-		BCValue result;
+                BCValue result;
         Eq3(result, _lhs, _rhs);
 
         retval = result;
@@ -351,7 +351,7 @@ public:
         {
         case TOK.TOKequal:
             {
-				assert(!assignTo, "cannot save the result of an comparsion yet");
+                                assert(!assignTo, "cannot save the result of an comparsion yet");
 
                 Eq3(BCValue.init, genExpr(e.e1), genExpr(e.e2));
             }
@@ -425,18 +425,18 @@ public:
             }
             break;
 
-			case TOK.TOKoror : {
-				const oldDiscardValue = discardValue;
-				discardValue = false;
-				auto lhs = genExpr(e.e1);
-				fixupTable[fixupTableCount++] = beginCndJmp();
-				auto rhs = genExpr(e.e2);
-				fixupTable[fixupTableCount++] = beginCndJmp();
-
-				//auto rhsJmp = beginCndJmp();
-				assert(!oldDiscardValue, "A lone oror discarding the value is strange");
-				discardValue = oldDiscardValue;
-			} break;
+            case TOK.TOKoror : {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto lhs = genExpr(e.e1);
+                fixupTable[fixupTableCount++] = beginCndJmp();
+                auto rhs = genExpr(e.e2);
+                fixupTable[fixupTableCount++] = beginCndJmp();
+                //auto rhsJmp = beginCndJmp();
+                assert(!oldDiscardValue, "A lone oror discarding the value is strange");
+                discardValue = oldDiscardValue;
+            }
+            break;
 
         default:
             IGaveUp = true;
@@ -456,9 +456,9 @@ public:
             writefln("ie.type : %s ", ie.type.toString);
         }
 
-		assert(ie.e1.type.isString, "For now only indexes into strings a supported");
-//		writeln("ie.e1: ", genExpr(ie.e1).value.toString);
-//		writeln("ie.e2: ", genExpr(ie.e2).value.toString);
+                assert(ie.e1.type.isString, "For now only indexes into strings a supported");
+//              writeln("ie.e1: ", genExpr(ie.e1).value.toString);
+//              writeln("ie.e2: ", genExpr(ie.e2).value.toString);
         //IGaveUp = true;
         //debug assert(0, "IndexExp unsupported");
     }
@@ -491,7 +491,7 @@ public:
         if (fs.condition !is null && fs._body !is null)
         {
             BCAddr condJmp;
-			BCLabel condEval = genLabel(); 
+                        BCLabel condEval = genLabel();
             BCValue condExpr = genExpr(fs.condition);
             if (condExpr.vType == BCValueType.Unknown)
             {
@@ -521,7 +521,7 @@ public:
         }
         else if (fs.condition !is null  /* && fs._body is null*/ )
         {
-			BCLabel condEval = genLabel();
+                        BCLabel condEval = genLabel();
             BCValue condExpr = genExpr(fs.condition);
             if (fs.increment)
             {
@@ -557,10 +557,10 @@ public:
         assert(vd, "VarExp " ~ ve.toString ~ "is not a VariableDeclaration !?!");
         auto sv = vd in vars;
         if (sv is null) {
-		IGaveUp = true;
-		return ;
-	}
-	assert(sv, "Variable " ~ ve.toString ~ " not in StackFrame");
+                IGaveUp = true;
+                return ;
+        }
+        assert(sv, "Variable " ~ ve.toString ~ " not in StackFrame");
 
         debug
         {
@@ -679,16 +679,15 @@ public:
         assert(retval.vType == BCValueType.Immidiate);
     }
 
-	override void visit(StringExp se) {
-		debug
-		{
-			import std.stdio;
-			
-			writefln("StringExpression %s", se.toString);
-		}
+        override void visit(StringExp se) {
+                debug
+                {
+                    import std.stdio;
+                    writefln("StringExpression %s", se.toString);
+                }
 
-	//	retval = BCValue(Imm32(cast(uint) ie.getInteger()));
-	}
+        //      retval = BCValue(Imm32(cast(uint) ie.getInteger()));
+        }
 
 
     override void visit(CmpExp ce)
@@ -743,9 +742,9 @@ public:
 
     }
 
-    override void visit(SwitchStatement ss) {with(switchState) 
+    override void visit(SwitchStatement ss) {with(switchState)
     {
-		//This Transforms swtich in a series of if else construts.
+                //This Transforms swtich in a series of if else construts.
         debug
         {
             import std.stdio;
@@ -754,52 +753,52 @@ public:
             writefln("SwitchStatement.condition %s type :%s",
                 ss.condition.toString, ss.condition.type.toString);
         }
-        
+
         auto lhs = genExpr(ss.condition);
 
         assert(ss.cases.dim <= beginCaseStatements.length,
                 "We will not have enough array space to store all cases for gotos");
 
-		foreach(i,caseStmt;ss.cases.opSlice()) {
+                foreach(i,caseStmt;ss.cases.opSlice()) {
             caseStmt.index = cast(int)i;
             // apperantly I have to set the index myself;
-           
+
             auto rhs = genExpr(caseStmt.exp);
-			auto jmpCond = Eq3(BCValue.init, lhs, rhs);
-			auto jump = beginCndJmp();
+                        auto jmpCond = Eq3(BCValue.init, lhs, rhs);
+                        auto jump = beginCndJmp();
 
             //Add a check for isGotoCaseStatement
             //And and for is isGotoDefaultStatement
             //Because otherwise we can get ourselfs in trouble
                 auto cs = caseStmt.isCompoundStatement;
-                bool blockReturns = (!!cs && 
+                bool blockReturns = (!!cs &&
                 (cs.last.isReturnStatement ||
                  cs.last.isGotoCaseStatement ||
                  cs.last.isGotoDefaultStatement)) ||
                    caseStmt.isReturnStatement ||
                    caseStmt.isGotoCaseStatement ||
-                    caseStmt.isGotoDefaultStatement;
+                   caseStmt.isGotoDefaultStatement;
             switchFixup = &switchFixupTable[switchFixupTableCount];
             auto caseBlock = genBlock(caseStmt.statement);
             beginCaseStatements[beginCaseStatementsCount++] = caseBlock.begin;
 
-			//if (ss.sdefault && !blockReturns) 
-			//	switchFixupTable[switchFixupTableCount++] = beginJmp();
+                        //if (ss.sdefault && !blockReturns)
+                        //      switchFixupTable[switchFixupTableCount++] = beginJmp();
 
-			endCndJmp(jump, caseBlock.end);
-		}
-		if (ss.sdefault) {
+                        endCndJmp(jump, caseBlock.end);
+                }
+                if (ss.sdefault) {
             auto defaultBlock = genBlock(ss.sdefault.statement);
-			
-			foreach(ac_jmp;switchFixupTable[0 .. switchFixupTableCount]) {
+
+                        foreach(ac_jmp;switchFixupTable[0 .. switchFixupTableCount]) {
                 if (ac_jmp.fixupFor == 0)
-				    endJmp(ac_jmp, defaultBlock.end);
+                                    endJmp(ac_jmp, defaultBlock.end);
                 else if (ac_jmp.fixupFor == -1)
                     endJmp(ac_jmp, defaultBlock.begin);
                 else
                     endJmp(ac_jmp, beginCaseStatements[ac_jmp.fixupFor - 1]);
-			}
-		}
+                        }
+                }
 
         //after we are done let's set thoose indexes back to zero
         //who knowns what will happen if we don't ?
@@ -817,25 +816,25 @@ public:
             switchFixupTableCount++;
         }}
 
-	override void visit(CallExp ce) {
-		assert(inReturnStatement && ce.f == me,
-			"only direct tail recursive calls are supported for now"
-		);
+        override void visit(CallExp ce) {
+                assert(inReturnStatement && ce.f == me,
+                        "only direct tail recursive calls are supported for now"
+                );
 
 
 
-		/+
-		//This is experimental do exepect hiccups;
-		sp = StackAddr(4);
-		//first reset the stack
-		foreach(arg;ce.arguments.opSlice()) {
-			arg.accept(this);
-		}
-		//then push the arguments on
-		endJmp(beginJmp(), BCLabel(BCAddr(4)));
-		// and jump to the start of the function;
-		+/
-	}
+                /+
+                //This is experimental do exepect hiccups;
+                sp = StackAddr(4);
+                //first reset the stack
+                foreach(arg;ce.arguments.opSlice()) {
+                        arg.accept(this);
+                }
+                //then push the arguments on
+                endJmp(beginJmp(), BCLabel(BCAddr(4)));
+                // and jump to the start of the function;
+                +/
+        }
 
 
     override void visit(ReturnStatement rs)
@@ -846,15 +845,15 @@ public:
 
             writefln("ReturnStatement %s", rs.toString);
         }
-		assert(!inReturnStatement);
-		inReturnStatement = true;
+                assert(!inReturnStatement);
+                inReturnStatement = true;
         auto retval = genExpr(rs.exp);
         if (retval.vType == BCValueType.Immidiate)
         {
             retval = pushOntoStack(retval);
         }
         emitReturn(retval);
-		inReturnStatement = false;
+                inReturnStatement = false;
     }
 
     override void visit(CastExp ce)
@@ -881,7 +880,7 @@ public:
 
     override void visit(WhileStatement ws)
     {
-		auto evalBlockBegin = genLabel();
+                auto evalBlockBegin = genLabel();
         BCValue condExpr = genExpr(ws.condition);
         auto tjmp = beginCndJmp();
         auto _body = genBlock(ws._body);
@@ -905,13 +904,13 @@ public:
 
     override void visit(IfStatement fs)
     {
-		uint oldFixupTableCount = fixupTableCount;
-		auto cond = genExpr(fs.condition);
-		auto branch = beginCndJmp();
+                uint oldFixupTableCount = fixupTableCount;
+                auto cond = genExpr(fs.condition);
+                auto branch = beginCndJmp();
         BCBlock ifbody;
         BCBlock elsebody;
         if (fs.ifbody)
-		{
+                {
             ifbody = genBlock(fs.ifbody);
         }
         if (fs.elsebody)
@@ -921,7 +920,7 @@ public:
             endJmp(afterBodyJmp, genLabel());
         }
 
-		assert(oldFixupTableCount == fixupTableCount);
+                assert(oldFixupTableCount == fixupTableCount);
         endCndJmp(branch, elsebody ? elsebody.begin : genLabel());
     }
 
@@ -935,7 +934,7 @@ public:
             writefln("ScopeStatement %s", ss.toString);
         }
         ss.statement.accept(this);
-	}
+        }
 
     override void visit(CompoundStatement cs)
     {

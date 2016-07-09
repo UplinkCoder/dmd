@@ -36,7 +36,7 @@ import ddmd.tokens;
 import ddmd.utf;
 import ddmd.visitor;
 
-import ddmd.ctfe;
+import ddmd.ctfe_bc;
 
 enum CtfeGoal : int
 {
