@@ -253,8 +253,9 @@ extern (C++) final class BCV : Visitor
     alias visit = super.visit;
 
     import ddmd.tokens;
+    BCLabel[void*] labels;
 
-    BCValue[void* ] vars;
+    BCValue[void*] vars;
     BCAddr[ubyte.max] fixupTable;
     uint fixupTableCount;
 
@@ -821,13 +822,12 @@ public:
                         endJmp(ac_jmp, beginCaseStatements[ac_jmp.fixupFor - 1]);
                     else
                         assert(0, "Without a default Statement there cannot be a jump to default");
-                    
                 }
 
             }
 
             switchFixupTableCount = 0;
-
+            switchFixup = null;
             //after we are done let's set thoose indexes back to zero
             //who knowns what will happen if we don't ?
             foreach (cs; ss.cases.opSlice())
@@ -852,6 +852,31 @@ public:
         {
             *switchFixup = SwitchFixupEntry(beginJmp(), -1);
             switchFixupTableCount++;
+        }
+    }
+
+    override void visit(GotoStatement gs)
+    {
+        assert(cast(void*)gs.ident in labels, "We have not encounterd the label you want to jump to");
+        genJump(labels[cast(void*)gs.ident]);
+    }
+
+    override void visit(LabelStatement ls)
+    {
+        assert(cast(void*)ls.ident !in labels, "We already enounterd a LabelStatement with this identifier");
+        labels[cast(void*)ls.ident] = genLabel();
+    }
+
+    override void visit(BreakStatement bs)
+    {
+        assert(switchFixup, "only switch breaks are supported for now");
+        if (switchFixup)
+        {
+            with (switchState)
+            {
+                *switchFixup = SwitchFixupEntry(beginJmp(), 0);
+                switchFixupTableCount++;
+            }
         }
     }
 
