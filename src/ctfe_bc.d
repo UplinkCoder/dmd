@@ -125,22 +125,6 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
             writeln(" TemporaryCount = ", (bcv.temporaryCount).to!string);
         }
 
-        //    return null;
-
-        import std.stdio;
-        import std.algorithm : map;
-        import std.range : array;
-
-        //auto bc_args = args.map!(a => bcv.genExpr(a).value).array;
-        StopWatch sw;
-        sw.start;
-        uint callValue = 100_000_00;
-
-        //writeln("Calling " ~ fd.toString ~ " with(", bc_args.map!(a => a.toString), ") == ",
-        //    interpret(bcv.byteCodeArray[0 .. bcv.ip], bc_args));
-        sw.stop;
-
-        //writeln("bc was ", bcv.byteCodeArray[0 .. bcv.ip]);
     }
 
     if (!bcv.IGaveUp)
@@ -253,11 +237,16 @@ extern (C++) final class BCV : Visitor
     alias visit = super.visit;
 
     import ddmd.tokens;
-    BCLabel[void*] labels;
+    BCBlock[void*] labeledBlocks;
 
     BCValue[void*] vars;
     BCAddr[ubyte.max] fixupTable;
     uint fixupTableCount;
+
+    BCBlock* currentBlock;
+    BCAddr[ubyte.max] breakFixups;
+    uint breakFixupsCount;
+
 
     BCValue retval;
     BCValue assignTo;
@@ -474,10 +463,25 @@ public:
     BCBlock genBlock(Statement stmt)
     {
         BCBlock result;
+        auto oldBlock = currentBlock;
+        const oldBreakFixupsCount = breakFixupsCount;
 
+        debug {
+            import std.stdio;
+            writeln("Calling genBlock on : ",stmt.toString);
+        }
+        currentBlock = &result;
         result.begin = BCLabel(ip);
         stmt.accept(this);
         result.end = BCLabel(ip);
+
+        // Now let's fixup thoose breaks
+        foreach(Jmp;breakFixups[oldBreakFixupsCount .. breakFixupsCount])
+        {
+            endJmp(Jmp, result.end);
+        }
+        currentBlock = oldBlock;
+        breakFixupsCount = oldBreakFixupsCount;
 
         return result;
     }
@@ -857,20 +861,41 @@ public:
 
     override void visit(GotoStatement gs)
     {
-        assert(cast(void*)gs.ident in labels, "We have not encounterd the label you want to jump to");
-        genJump(labels[cast(void*)gs.ident]);
+        assert(cast(void*)gs.ident in labeledBlocks, "We have not encounterd the label you want to jump to");
+        genJump(labeledBlocks[cast(void*)gs.ident].begin);
     }
 
     override void visit(LabelStatement ls)
     {
-        assert(cast(void*)ls.ident !in labels, "We already enounterd a LabelStatement with this identifier");
-        labels[cast(void*)ls.ident] = genLabel();
+        debug
+        {
+            import std.stdio;
+            writefln("LabelStatement %s", ls.toString);
+        }
+
+        assert(cast(void*)ls.ident !in labeledBlocks, "We already enounterd a LabelStatement with this identifier");
+        labeledBlocks[cast(void*)ls.ident] = genBlock(ls.statement);
+    }
+    override void visit(ContinueStatement cs) {
+        if (cs.ident)
+        {
+            assert(cast(void*)cs.ident in labeledBlocks, "We have not encounterd the label you want to jump to");
+            genJump(labeledBlocks[cast(void*)cs.ident].begin);
+        }
+        else
+        {
+            genJump(currentBlock.begin);
+        }
     }
 
     override void visit(BreakStatement bs)
     {
-        assert(switchFixup, "only switch breaks are supported for now");
-        if (switchFixup)
+        if (bs.ident)
+        {
+            assert(cast(void*)bs.ident in labeledBlocks, "We have not encounterd the label you want to jump to");
+            genJump(labeledBlocks[cast(void*)bs.ident].end);
+        }
+        else if (switchFixup)
         {
             with (switchState)
             {
@@ -878,6 +903,11 @@ public:
                 switchFixupTableCount++;
             }
         }
+        else
+        {
+           breakFixups[breakFixupsCount++] = beginJmp();
+        }
+
     }
 
     override void visit(CallExp ce)
@@ -887,15 +917,15 @@ public:
 
         /+
                 //This is experimental do exepect hiccups;
-                sp = StackAddr(4);
                 //first reset the stack
+                sp = StackAddr(4);
+                //then push the arguments on
                 foreach(arg;ce.arguments.opSlice()) {
                         arg.accept(this);
                 }
-                //then push the arguments on
-                endJmp(beginJmp(), BCLabel(BCAddr(4)));
                 // and jump to the start of the function;
-                +/
+                endJmp(beginJmp(), BCLabel(BCAddr(4)));
+       +/
     }
 
     override void visit(ReturnStatement rs)
@@ -965,6 +995,13 @@ public:
 
     override void visit(IfStatement fs)
     {
+        debug
+        {
+            import std.stdio;
+
+            writefln("IfStatement %s", fs.toString);
+        }
+
         uint oldFixupTableCount = fixupTableCount;
         auto cond = genExpr(fs.condition);
         auto branch = beginCndJmp();
