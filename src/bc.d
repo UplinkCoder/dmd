@@ -388,7 +388,7 @@ struct BCValue
                     {
                         return imm32.imm32 == rhs.imm32.imm32;
                     }
-                /*case BCType.i64:
+                    /*case BCType.i64:
                     {
                         return imm64 == rhs.imm64;
                     }*/
@@ -446,6 +446,7 @@ struct BCValue
             this.valAddr = base + addr;
     }
 }
+
 pragma(msg, "Sizeof BCValue: ", BCValue.sizeof);
 static immutable bcOne = BCValue(Imm32(1));
 //      alias BCValueUnion = BCValue.BCValueUnion;
@@ -463,10 +464,11 @@ struct BCLabel
 
 struct BCBlock
 {
-        bool opCast(T:bool)() {
-                // since 0 is an invalid address it is enough to check if begin is 0
-                return !!begin.addr.addr;
-        }
+    bool opCast(T : bool)()
+    {
+        // since 0 is an invalid address it is enough to check if begin is 0
+        return !!begin.addr.addr;
+    }
 
     BCLabel begin;
     BCLabel end;
@@ -906,6 +908,7 @@ string printInstructions(int* startInstructions, uint length)
     string result = "StartInstructionDump: \n";
     uint pos = 0;
     import std.conv;
+
     bool has4ByteOffset;
     if (length > 4 && startInstructions[0 .. 4] == [0, 0, 0, 0])
     {
@@ -1041,24 +1044,28 @@ string printInstructions(int* startInstructions, uint length)
 
             case LongInst.JmpFalse:
                 {
-                    result ~= "JmpFalse CF[" ~ to!string((lw & 0xF00) >> 8) ~ "], &" ~ to!string((has4ByteOffset ? hi-4 : hi)) ~ "\n";
+                    result ~= "JmpFalse CF[" ~ to!string((lw & 0xF00) >> 8) ~ "], &" ~ to!string(
+                        (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
                 }
                 break;
             case LongInst.JmpTrue:
                 {
-                    result ~= "JmpTrue CF[" ~ to!string((lw & 0xF00) >> 8) ~ "], &" ~ to!string((has4ByteOffset ? hi-4 : hi)) ~ "\n";
+                    result ~= "JmpTrue CF[" ~ to!string((lw & 0xF00) >> 8) ~ "], &" ~ to!string(
+                        (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
                 }
                 break;
 
             case LongInst.JmpNZ:
                 {
-                    result ~= "JmpNZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string((has4ByteOffset ? (hi >> 16)-4 : hi >> 16)) ~ "\n";
+                    result ~= "JmpNZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(
+                        (has4ByteOffset ? (hi >> 16) - 4 : hi >> 16)) ~ "\n";
                 }
                 break;
 
             case LongInst.JmpZ:
                 {
-                    result ~= "JmpZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string((has4ByteOffset ? (hi >> 16)-4 : hi >> 16)) ~ "\n";
+                    result ~= "JmpZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(
+                        (has4ByteOffset ? (hi >> 16) - 4 : hi >> 16)) ~ "\n";
                 }
                 break;
 
@@ -1475,7 +1482,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 {
                     debug if (!__ctfe)
                     {
-                           printf("Ret: %d".ptr , (*opRef));
+                        printf("Ret: %d".ptr, (*opRef));
                     }
                     return *opRef;
                 }
@@ -1495,8 +1502,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 {
                     if (!__ctfe)
                     {
-                        printf("SP[%d](%d)".ptr, (lw >> 16),
-                            (*opRef));
+                        printf("SP[%d](%d)".ptr, (lw >> 16), (*opRef));
                     }
                 }
                 break;

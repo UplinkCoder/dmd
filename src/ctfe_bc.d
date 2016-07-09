@@ -36,13 +36,15 @@ struct StackRef
     Type type;
 }
 
-struct SelfCall {
-        BCAddr callPoint;
-        BCValue[16] arguments;
-        ubyte argumentCount;
+struct SelfCall
+{
+    BCAddr callPoint;
+    BCValue[16] arguments;
+    ubyte argumentCount;
 }
 
-struct SwitchFixupEntry {
+struct SwitchFixupEntry
+{
     BCAddr atIp;
     alias atIp this;
     /// 0 means jump after the swich
@@ -51,14 +53,14 @@ struct SwitchFixupEntry {
     int fixupFor;
 }
 
-struct SwitchState {
+struct SwitchState
+{
     SwitchFixupEntry[64] switchFixupTable;
     uint switchFixupTableCount;
 
     BCLabel[128] beginCaseStatements;
     uint beginCaseStatementsCount;
 }
-
 
 Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression thisExp)
 {
@@ -88,25 +90,24 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         } */
     import std.datetime : StopWatch;
 
-
     StopWatch csw;
 
     if (auto fbody = fd.fbody.isCompoundStatement)
     {
         csw.start();
-            foreach (i, p; fd.parameters.opSlice)
+        foreach (i, p; fd.parameters.opSlice)
+        {
+            debug
             {
-                debug
-                {
-                    import std.stdio;
+                import std.stdio;
 
-                    writeln("parameter [", i, "] : ", p.toString);
-                }
-                p.accept(bcv);
+                writeln("parameter [", i, "] : ", p.toString);
             }
+            p.accept(bcv);
+        }
 
-            bcv.visit(fbody);
-            csw.stop();
+        bcv.visit(fbody);
+        csw.stop();
 
         debug
         {
@@ -151,14 +152,16 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
 
         StopWatch sw;
         sw.start();
-                foreach(a;args) {
-                        a.toString();
-                        a.accept(bcv);
-                }
+        foreach (a; args)
+        {
+            a.toString();
+            a.accept(bcv);
+        }
         auto bc_args = args.map!(a => bcv.genExpr(a)).array;
         auto retval = interpret(bcv.byteCodeArray[0 .. bcv.ip], bc_args);
         sw.stop();
         import std.stdio;
+
         writeln("Executing bc took " ~ sw.peek.msecs.to!string ~ "msecs");
         if (retval != -1)
         {
@@ -166,12 +169,12 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         }
         else
         {
-                        assert(0, "Interpreter Errored");//return null;
+            assert(0, "Interpreter Errored"); //return null;
         }
     }
     else
     {
-                assert(0, "CTFE Errored");
+        assert(0, "CTFE Errored");
         //return null;
 
     }
@@ -198,13 +201,13 @@ extern (C++) final class BCV : Visitor
     SwitchState switchState;
     SwitchFixupEntry* switchFixup;
 
-        //State needs for tail calls
-        FuncDeclaration me;
-        uint recursionDepth;
-        bool inReturnStatement;
-        SelfCall[32] selfCalls;
-        byte selfCallCount;
-        //Rest
+    //State needs for tail calls
+    FuncDeclaration me;
+    uint recursionDepth;
+    bool inReturnStatement;
+    SelfCall[32] selfCalls;
+    byte selfCallCount;
+    //Rest
 
     const(BCType) toBCType(Type t) /*pure*/
     {
@@ -217,9 +220,9 @@ extern (C++) final class BCV : Visitor
                 return BCType.i1;
             case ENUMTY.Tint8:
             case ENUMTY.Tuns8:
-                 return BCType.i8;
-                        case ENUMTY.Tchar:
-                                return BCType.Char;
+                return BCType.i8;
+            case ENUMTY.Tchar:
+                return BCType.Char;
             case ENUMTY.Tint16:
             case ENUMTY.Tuns16:
                 return BCType.i16;
@@ -232,7 +235,7 @@ extern (C++) final class BCV : Visitor
             default:
                 IGaveUp = true;
                 debug assert(0, "Type unsupported " ~ (cast(Type)(t)).toString());
-                                return BCType.init;
+                return BCType.init;
             }
         }
         else
@@ -243,7 +246,7 @@ extern (C++) final class BCV : Visitor
             }
             IGaveUp = true;
             debug assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
-                        return BCType.init;
+            return BCType.init;
         }
     }
 
@@ -251,9 +254,9 @@ extern (C++) final class BCV : Visitor
 
     import ddmd.tokens;
 
-        BCValue[void*] vars;
-        BCAddr[ubyte.max] fixupTable;
-        uint fixupTableCount;
+    BCValue[void* ] vars;
+    BCAddr[ubyte.max] fixupTable;
+    uint fixupTableCount;
 
     BCValue retval;
     BCValue assignTo;
@@ -275,21 +278,24 @@ public:
 
     this(FuncDeclaration fd)
     {
-                me = fd;
+        me = fd;
     }
 
-        ~this() {
-                //We are about to finish codegen
-                //time to fixup unresolved labels
-                //and time to fixup self calls
+    ~this()
+    {
+        //We are about to finish codegen
+        //time to fixup unresolved labels
+        //and time to fixup self calls
 
+        scope (exit)
+        {
+            import std.stdio;
 
-                scope(exit) {
-                        import std.stdio;
-                        if (!__ctfe) writeln(printInstructions(/*gen.byteCodeArray[0 .. ip])*/));
-                }
-
+            if (!__ctfe)
+                writeln(printInstructions( /*gen.byteCodeArray[0 .. ip])*/ ));
         }
+
+    }
 
     BCValue genExpr(Expression expr)
     {
@@ -317,7 +323,7 @@ public:
         auto _lhs = genExpr(lhs);
         auto _rhs = genExpr(rhs);
 
-                BCValue result;
+        BCValue result;
         Lt3(result, _lhs, _rhs);
         return result;
     }
@@ -326,7 +332,7 @@ public:
     {
         auto _lhs = genExpr(lhs);
         auto _rhs = genExpr(rhs);
-                BCValue result;
+        BCValue result;
         Eq3(result, _lhs, _rhs);
 
         retval = result;
@@ -351,7 +357,7 @@ public:
         {
         case TOK.TOKequal:
             {
-                                assert(!assignTo, "cannot save the result of an comparsion yet");
+                assert(!assignTo, "cannot save the result of an comparsion yet");
 
                 Eq3(BCValue.init, genExpr(e.e1), genExpr(e.e2));
             }
@@ -425,7 +431,8 @@ public:
             }
             break;
 
-            case TOK.TOKoror : {
+        case TOK.TOKoror:
+            {
                 const oldDiscardValue = discardValue;
                 discardValue = false;
                 auto lhs = genExpr(e.e1);
@@ -456,9 +463,9 @@ public:
             writefln("ie.type : %s ", ie.type.toString);
         }
 
-                assert(ie.e1.type.isString, "For now only indexes into strings a supported");
-//              writeln("ie.e1: ", genExpr(ie.e1).value.toString);
-//              writeln("ie.e2: ", genExpr(ie.e2).value.toString);
+        assert(ie.e1.type.isString, "For now only indexes into strings a supported");
+        //              writeln("ie.e1: ", genExpr(ie.e1).value.toString);
+        //              writeln("ie.e2: ", genExpr(ie.e2).value.toString);
         //IGaveUp = true;
         //debug assert(0, "IndexExp unsupported");
     }
@@ -491,7 +498,7 @@ public:
         if (fs.condition !is null && fs._body !is null)
         {
             BCAddr condJmp;
-                        BCLabel condEval = genLabel();
+            BCLabel condEval = genLabel();
             BCValue condExpr = genExpr(fs.condition);
             if (condExpr.vType == BCValueType.Unknown)
             {
@@ -521,7 +528,7 @@ public:
         }
         else if (fs.condition !is null  /* && fs._body is null*/ )
         {
-                        BCLabel condEval = genLabel();
+            BCLabel condEval = genLabel();
             BCValue condExpr = genExpr(fs.condition);
             if (fs.increment)
             {
@@ -556,9 +563,10 @@ public:
         auto vd = cast(void*) ve.var.isVarDeclaration;
         assert(vd, "VarExp " ~ ve.toString ~ "is not a VariableDeclaration !?!");
         auto sv = vd in vars;
-        if (sv is null) {
-                IGaveUp = true;
-                return ;
+        if (sv is null)
+        {
+            IGaveUp = true;
+            return;
         }
         assert(sv, "Variable " ~ ve.toString ~ " not in StackFrame");
 
@@ -679,16 +687,17 @@ public:
         assert(retval.vType == BCValueType.Immidiate);
     }
 
-        override void visit(StringExp se) {
-                debug
-                {
-                    import std.stdio;
-                    writefln("StringExpression %s", se.toString);
-                }
+    override void visit(StringExp se)
+    {
+        debug
+        {
+            import std.stdio;
 
-        //      retval = BCValue(Imm32(cast(uint) ie.getInteger()));
+            writefln("StringExpression %s", se.toString);
         }
 
+        //      retval = BCValue(Imm32(cast(uint) ie.getInteger()));
+    }
 
     override void visit(CmpExp ce)
     {
@@ -742,88 +751,111 @@ public:
 
     }
 
-    override void visit(SwitchStatement ss) {with(switchState)
+    override void visit(SwitchStatement ss)
     {
-                //This Transforms swtich in a series of if else construts.
-        debug
+        with (switchState)
         {
-            import std.stdio;
+            //This Transforms swtich in a series of if else construts.
+            debug
+            {
+                import std.stdio;
 
-            writefln("SwitchStatement %s", ss.toString);
-            writefln("SwitchStatement.condition %s type :%s",
-                ss.condition.toString, ss.condition.type.toString);
-        }
+                writefln("SwitchStatement %s", ss.toString);
+                writefln("SwitchStatement.condition %s type :%s",
+                    ss.condition.toString, ss.condition.type.toString);
+            }
 
-        auto lhs = genExpr(ss.condition);
+            auto lhs = genExpr(ss.condition);
 
-        assert(ss.cases.dim <= beginCaseStatements.length,
+            assert(ss.cases.dim <= beginCaseStatements.length,
                 "We will not have enough array space to store all cases for gotos");
 
-                foreach(i,caseStmt;ss.cases.opSlice()) {
-            caseStmt.index = cast(int)i;
-            // apperantly I have to set the index myself;
+            foreach (i, caseStmt; ss.cases.opSlice())
+            {
+                caseStmt.index = cast(int) i;
+                // apperantly I have to set the index myself;
 
-            auto rhs = genExpr(caseStmt.exp);
-                        auto jmpCond = Eq3(BCValue.init, lhs, rhs);
-                        auto jump = beginCndJmp();
+                auto rhs = genExpr(caseStmt.exp);
+                auto jmpCond = Eq3(BCValue.init, lhs, rhs);
+                auto jump = beginCndJmp();
 
-            //Add a check for isGotoCaseStatement
-            //And and for is isGotoDefaultStatement
-            //Because otherwise we can get ourselfs in trouble
+                //Add a check for isGotoCaseStatement
+                //And and for is isGotoDefaultStatement
+                //Because otherwise we can get ourselfs in trouble
                 auto cs = caseStmt.isCompoundStatement;
-                bool blockReturns = (!!cs &&
-                (cs.last.isReturnStatement ||
-                 cs.last.isGotoCaseStatement ||
-                 cs.last.isGotoDefaultStatement)) ||
-                   caseStmt.isReturnStatement ||
-                   caseStmt.isGotoCaseStatement ||
-                   caseStmt.isGotoDefaultStatement;
-            switchFixup = &switchFixupTable[switchFixupTableCount];
-            auto caseBlock = genBlock(caseStmt.statement);
-            beginCaseStatements[beginCaseStatementsCount++] = caseBlock.begin;
+                bool blockReturns = (!!cs && (cs.last.isReturnStatement ||
+                    cs.last.isGotoCaseStatement || cs.last.isGotoDefaultStatement)) ||
+                    caseStmt.isReturnStatement || caseStmt.isGotoCaseStatement || caseStmt.isGotoDefaultStatement;
 
-                        //if (ss.sdefault && !blockReturns)
-                        //      switchFixupTable[switchFixupTableCount++] = beginJmp();
+                switchFixup = &switchFixupTable[switchFixupTableCount];
+                auto caseBlock = genBlock(caseStmt.statement);
+                beginCaseStatements[beginCaseStatementsCount++] = caseBlock.begin;
 
-                        endCndJmp(jump, caseBlock.end);
+                if (!blockReturns)
+                    switchFixupTable[switchFixupTableCount++] = beginJmp();
+
+                endCndJmp(jump, caseBlock.end);
+            }
+            if (ss.sdefault)
+            {
+                auto defaultBlock = genBlock(ss.sdefault.statement);
+
+                foreach (ac_jmp; switchFixupTable[0 .. switchFixupTableCount])
+                {
+                    if (ac_jmp.fixupFor == 0)
+                        endJmp(ac_jmp, defaultBlock.end);
+                    else if (ac_jmp.fixupFor == -1)
+                        endJmp(ac_jmp, defaultBlock.begin);
+                    else
+                        endJmp(ac_jmp, beginCaseStatements[ac_jmp.fixupFor - 1]);
                 }
-                if (ss.sdefault) {
-            auto defaultBlock = genBlock(ss.sdefault.statement);
+            }
+            else
+            {
+                auto afterSwitch = genLabel();
 
-                        foreach(ac_jmp;switchFixupTable[0 .. switchFixupTableCount]) {
-                if (ac_jmp.fixupFor == 0)
-                                    endJmp(ac_jmp, defaultBlock.end);
-                else if (ac_jmp.fixupFor == -1)
-                    endJmp(ac_jmp, defaultBlock.begin);
-                else
-                    endJmp(ac_jmp, beginCaseStatements[ac_jmp.fixupFor - 1]);
-                        }
+                foreach (ac_jmp; switchFixupTable[0 .. switchFixupTableCount])
+                {
+                    else if (ac_jmp.fixupFor == -1)
+                        assert(0, "Without a default Statement there cannot be a jump to default")
+                    
                 }
 
-        //after we are done let's set thoose indexes back to zero
-        //who knowns what will happen if we don't ?
-        foreach(cs;ss.cases.opSlice()) {
-            cs.index = 0;
+            }
+
+            //after we are done let's set thoose indexes back to zero
+            //who knowns what will happen if we don't ?
+            foreach (cs; ss.cases.opSlice())
+            {
+                cs.index = 0;
+            }
         }
-    }}
+    }
 
-    override void visit(GotoCaseStatement gcs) {with (switchState) {
-        *switchFixup = SwitchFixupEntry(beginJmp(), gcs.cs.index + 1);
-         switchFixupTableCount++;
-    }}
-    override void visit(GotoDefaultStatement gd) {with (switchState) {
+    override void visit(GotoCaseStatement gcs)
+    {
+        with (switchState)
+        {
+            *switchFixup = SwitchFixupEntry(beginJmp(), gcs.cs.index + 1);
+            switchFixupTableCount++;
+        }
+    }
+
+    override void visit(GotoDefaultStatement gd)
+    {
+        with (switchState)
+        {
             *switchFixup = SwitchFixupEntry(beginJmp(), -1);
             switchFixupTableCount++;
-        }}
+        }
+    }
 
-        override void visit(CallExp ce) {
-                assert(inReturnStatement && ce.f == me,
-                        "only direct tail recursive calls are supported for now"
-                );
+    override void visit(CallExp ce)
+    {
+        assert(inReturnStatement && ce.f == me,
+            "only direct tail recursive calls are supported for now");
 
-
-
-                /+
+        /+
                 //This is experimental do exepect hiccups;
                 sp = StackAddr(4);
                 //first reset the stack
@@ -834,8 +866,7 @@ public:
                 endJmp(beginJmp(), BCLabel(BCAddr(4)));
                 // and jump to the start of the function;
                 +/
-        }
-
+    }
 
     override void visit(ReturnStatement rs)
     {
@@ -845,15 +876,15 @@ public:
 
             writefln("ReturnStatement %s", rs.toString);
         }
-                assert(!inReturnStatement);
-                inReturnStatement = true;
+        assert(!inReturnStatement);
+        inReturnStatement = true;
         auto retval = genExpr(rs.exp);
         if (retval.vType == BCValueType.Immidiate)
         {
             retval = pushOntoStack(retval);
         }
         emitReturn(retval);
-                inReturnStatement = false;
+        inReturnStatement = false;
     }
 
     override void visit(CastExp ce)
@@ -880,7 +911,7 @@ public:
 
     override void visit(WhileStatement ws)
     {
-                auto evalBlockBegin = genLabel();
+        auto evalBlockBegin = genLabel();
         BCValue condExpr = genExpr(ws.condition);
         auto tjmp = beginCndJmp();
         auto _body = genBlock(ws._body);
@@ -904,13 +935,13 @@ public:
 
     override void visit(IfStatement fs)
     {
-                uint oldFixupTableCount = fixupTableCount;
-                auto cond = genExpr(fs.condition);
-                auto branch = beginCndJmp();
+        uint oldFixupTableCount = fixupTableCount;
+        auto cond = genExpr(fs.condition);
+        auto branch = beginCndJmp();
         BCBlock ifbody;
         BCBlock elsebody;
         if (fs.ifbody)
-                {
+        {
             ifbody = genBlock(fs.ifbody);
         }
         if (fs.elsebody)
@@ -920,10 +951,9 @@ public:
             endJmp(afterBodyJmp, genLabel());
         }
 
-                assert(oldFixupTableCount == fixupTableCount);
+        assert(oldFixupTableCount == fixupTableCount);
         endCndJmp(branch, elsebody ? elsebody.begin : genLabel());
     }
-
 
     override void visit(ScopeStatement ss)
     {
@@ -934,7 +964,7 @@ public:
             writefln("ScopeStatement %s", ss.toString);
         }
         ss.statement.accept(this);
-        }
+    }
 
     override void visit(CompoundStatement cs)
     {
@@ -947,7 +977,7 @@ public:
 
         foreach (stmt; cs.statements.opSlice())
         {
-                stmt.accept(this);
+            stmt.accept(this);
         }
     }
 }
