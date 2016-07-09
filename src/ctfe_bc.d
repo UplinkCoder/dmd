@@ -1,0 +1,954 @@
+module ddmd.ctfe_bc;
+
+import ddmd.expression;
+import ddmd.declaration : FuncDeclaration, VarDeclaration, Declaration;
+import ddmd.dsymbol;
+import ddmd.mtype;
+import ddmd.statement;
+import ddmd.visitor;
+import ddmd.arraytypes : Expressions;
+
+/**
+ * Written By Stefan Koch in 2016
+ * All Rights Reserved.
+ */
+
+/**
+	Something about the instruction set :
+	The instruction set is designed to be fast to interpret. 
+	Therefore it is subject to uncommen restrictions and features uncommen ideoms.
+	
+	It is one of the few VM instruction sets that do have SIMD-Instructions.
+	
+	Example include The multiple increment which can increment 2 diffrent stack locations at once.
+	(By either 1,4,8, or 16)
+	
+	The operation-combine marker which allows to execute the same chain of operations on an abitary number of StackLocations.
+	
+	
+*/
+
+import std.conv : to;
+
+struct StackRef
+{
+    short sp;
+    Type type;
+}
+
+struct SelfCall {
+	BCAddr callPoint;
+	BCValue[16] arguments;
+	ubyte argumentCount;
+}
+
+struct SwitchFixupEntry {
+    BCAddr atIp;
+    alias atIp this;
+    /// 0 means jump after the swich
+    /// -1 means jump to the defaultStmt
+    /// positve numbers denote which case to jump to
+    int fixupFor;
+}
+
+struct SwitchState {
+    SwitchFixupEntry[64] switchFixupTable;
+    uint switchFixupTableCount;
+    
+    BCLabel[128] beginCaseStatements;
+    uint beginCaseStatementsCount;
+}
+
+
+Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression thisExp)
+{
+    Expression[] _args;
+    //TODO check if the functions returnType is a uint;
+
+    if (args)
+        foreach (a; args.opSlice)
+        {
+            _args ~= a;
+        }
+
+    return evaluateFunction(fd, _args, thisExp);
+}
+
+import ddmd.ctfe.bc;
+
+Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _this = null)
+{
+    scope BCV bcv = new BCV(fd);
+    //	bcv.setThis(bcv);
+    /*	if (fd.ctfeCode) {
+		return executeFun(fd.ctfeCode, args);
+	} else {
+		fd.ctfeCode = compile(fd);
+		return executeFun(fd.ctfeCode, args);
+	} */
+    import std.datetime : StopWatch;
+
+
+    StopWatch csw;
+
+    if (auto fbody = fd.fbody.isCompoundStatement)
+    {
+        csw.start();
+            foreach (i, p; fd.parameters.opSlice)
+            {
+                debug
+                {
+                    import std.stdio;
+
+                    writeln("parameter [", i, "] : ", p.toString);
+                }
+                p.accept(bcv);
+            }
+
+            bcv.visit(fbody);
+            csw.stop();
+
+        debug
+        {
+            import std.stdio;
+            import std.algorithm;
+
+            //writeln("EXECPTION!!! :", th.msg);
+
+            bcv.printInstructions.writeln;
+            bcv.vars.keys.each!(k => (cast(VarDeclaration) k).print);
+            bcv.vars.writeln;
+            writeln("Generting bc took " ~ csw.peek.usecs.to!string ~ "usecs");
+
+            writeln(" stackUsage = ", (bcv.sp - 4).to!string ~ " byte");
+            writeln(" TemporaryCount = ", (bcv.temporaryCount).to!string);
+        }
+
+        //    return null;
+
+        import std.stdio;
+        import std.algorithm : map;
+        import std.range : array;
+
+        //auto bc_args = args.map!(a => bcv.genExpr(a).value).array;
+        StopWatch sw;
+        sw.start;
+        uint callValue = 100_000_00;
+
+        //writeln("Calling " ~ fd.toString ~ " with(", bc_args.map!(a => a.toString), ") == ",
+        //    interpret(bcv.byteCodeArray[0 .. bcv.ip], bc_args));
+        sw.stop;
+
+        //writeln("bc was ", bcv.byteCodeArray[0 .. bcv.ip]);
+    }
+
+    if (!bcv.IGaveUp)
+    {
+        import std.algorithm;
+        import std.range;
+        import std.datetime : StopWatch;
+        import std.stdio;
+
+        StopWatch sw;
+        sw.start();
+		foreach(a;args) {
+			a.toString();
+			a.accept(bcv);
+		}
+        auto bc_args = args.map!(a => bcv.genExpr(a)).array;
+        auto retval = interpret(bcv.byteCodeArray[0 .. bcv.ip], bc_args);
+        sw.stop();
+        import std.stdio;
+	writeln("Executing bc took " ~ sw.peek.msecs.to!string ~ "msecs");
+	if (retval != -1) 
+        {
+            return new IntegerExp(retval);
+        }
+        else
+        {
+			assert(0, "Interpreter Errored");//return null;
+        }
+    }
+    else
+    {
+		assert(0, "CTFE Errored");
+        //return null;
+
+    }
+
+}
+
+string toString(T)(T value) if (is(T : Statement) || is(T : Declaration)
+        || is(T : Expression) || is(T : Dsymbol) || is(T : Type))
+{
+    import core.stdc.string : strlen;
+
+    const(char)* cPtr = value.toChars();
+    return cast(string) cPtr[0 .. strlen(cPtr)];
+}
+
+extern (C++) final class BCV : Visitor
+{
+
+    BCGen gen;
+    alias gen this;
+
+    bool IGaveUp;
+    /// just used in switch handling to share local state between visit functions
+    SwitchState switchState;
+    SwitchFixupEntry* switchFixup;
+
+	//State needs for tail calls
+	FuncDeclaration me;
+	uint recursionDepth;
+	bool inReturnStatement;
+	SelfCall[32] selfCalls;
+	byte selfCallCount;
+	//Rest
+
+    const(BCType) toBCType(Type t) /*pure*/
+    {
+        TypeBasic bt = t.isTypeBasic;
+        if (bt)
+        {
+            switch (bt.ty)
+            {
+            case ENUMTY.Tbool:
+                return BCType.i1;
+            case ENUMTY.Tint8:
+            case ENUMTY.Tuns8:
+                 return BCType.i8;
+			case ENUMTY.Tchar:
+				return BCType.Char;
+            case ENUMTY.Tint16:
+            case ENUMTY.Tuns16:
+                return BCType.i16;
+            case ENUMTY.Tint32:
+            case ENUMTY.Tuns32:
+                return BCType.i32;
+            case ENUMTY.Tint64:
+            case ENUMTY.Tuns64:
+                return BCType.i64;
+            default:
+                IGaveUp = true;
+                debug assert(0, "Type unsupported " ~ (cast(Type)(t)).toString());
+				return BCType.init;
+            }
+        }
+        else
+        {
+            if (t.isString)
+            {
+                return BCType.String;
+            }
+            IGaveUp = true;
+            debug assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
+			return BCType.init;
+        }
+    }
+
+    alias visit = super.visit;
+
+    import ddmd.tokens;
+
+	BCValue[void*] vars;
+	BCAddr[ubyte.max] fixupTable;
+	uint fixupTableCount;
+
+    BCValue retval;
+    BCValue assignTo;
+
+    bool discardValue = false;
+
+    string printInstructions()
+    {
+        return ddmd.ctfe.bc.printInstructions(cast(int*) byteCodeArray.ptr, ip.addr);
+    }
+
+    enum VisitationType
+    {
+        asExpression,
+        asDeclatation,
+    }
+
+public:
+
+    this(FuncDeclaration fd)
+    {
+		me = fd;
+    }
+
+	~this() {
+		//We are about to finish codegen
+		//time to fixup unresolved labels
+		//and time to fixup self calls
+
+
+		scope(exit) {
+			import std.stdio;
+			if (!__ctfe) writeln(printInstructions(/*gen.byteCodeArray[0 .. ip])*/));
+		}
+
+	}
+
+    BCValue genExpr(Expression expr)
+    {
+
+        debug
+        {
+            import std.stdio;
+        }
+        auto oldRetval = retval;
+
+        expr.accept(this);
+        debug
+        {
+            writeln("expr: ", expr.toString, " == ", retval);
+        }
+        assert(!discardValue || retval.vType != BCValueType.Unknown);
+        BCValue ret = retval;
+        retval = oldRetval;
+
+        return ret;
+    }
+
+    BCValue genLt(Expression lhs, Expression rhs)
+    {
+        auto _lhs = genExpr(lhs);
+        auto _rhs = genExpr(rhs);
+
+		BCValue result;
+        Lt3(result, _lhs, _rhs);
+        return result;
+    }
+
+    BCValue genEq(Expression lhs, Expression rhs)
+    {
+        auto _lhs = genExpr(lhs);
+        auto _rhs = genExpr(rhs);
+		BCValue result;
+        Eq3(result, _lhs, _rhs);
+
+        retval = result;
+        return result;
+    }
+
+    override void visit(BinExp e)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("Called visit(BinExp) %s ... \n\tdiscardReturnValue %d",
+                e.toString, discardValue);
+            writefln("(BinExp).Op: %s", e.op.to!string);
+
+        }
+
+        retval = assignTo ? assignTo : genTemporary(toBCType(e.type)).value;
+
+        switch (e.op)
+        {
+        case TOK.TOKequal:
+            {
+				assert(!assignTo, "cannot save the result of an comparsion yet");
+
+                Eq3(BCValue.init, genExpr(e.e1), genExpr(e.e2));
+            }
+            break;
+        case TOK.TOKplusplus:
+            {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto expr = genExpr(e.e1);
+                assert(expr.vType != BCValueType.Immidiate,
+                    "++ does not make sense as on an Immidiate Value");
+
+                discardValue = oldDiscardValue;
+                if (assignTo || !discardValue)
+                    emitSet(retval, expr);
+
+                Add3(expr, expr, BCValue(Imm32(1)));
+
+            }
+            break;
+        case TOK.TOKminusminus:
+            {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto expr = genExpr(e.e1);
+                assert(expr.vType != BCValueType.Immidiate,
+                    "-- does not make sense as on an Immidiate Value");
+
+                discardValue = oldDiscardValue;
+                if (assignTo || !discardValue)
+                    emitSet(retval, expr);
+
+                Sub3(expr, expr, BCValue(Imm32(1)));
+
+            }
+            break;
+        case TOK.TOKadd:
+            {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto lhs = genExpr(e.e1);
+                auto rhs = genExpr(e.e2);
+                assert(!oldDiscardValue, "A lone add discarding the value is strange");
+                Add3(retval, lhs, rhs);
+                // TOOD use sizeof(retval);
+                discardValue = oldDiscardValue;
+            }
+            break;
+        case TOK.TOKmin:
+            {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto lhs = genExpr(e.e1);
+                auto rhs = genExpr(e.e2);
+                assert(!oldDiscardValue, "A lone sub discarding the value is strange");
+                Sub3(retval, lhs, rhs);
+                // TOOD use sizeof(retval);
+                discardValue = oldDiscardValue;
+            }
+            break;
+        case TOK.TOKmul:
+            {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto lhs = genExpr(e.e1);
+                auto rhs = genExpr(e.e2);
+                assert(!oldDiscardValue, "A lone mul discarding the value is strange");
+                Mul3(retval, lhs, rhs);
+                // TOOD use sizeof(retval);
+                discardValue = oldDiscardValue;
+            }
+            break;
+
+			case TOK.TOKoror : {
+				const oldDiscardValue = discardValue;
+				discardValue = false;
+				auto lhs = genExpr(e.e1);
+				fixupTable[fixupTableCount++] = beginCndJmp();
+				auto rhs = genExpr(e.e2);
+				fixupTable[fixupTableCount++] = beginCndJmp();
+
+				//auto rhsJmp = beginCndJmp();
+				assert(!oldDiscardValue, "A lone oror discarding the value is strange");
+				discardValue = oldDiscardValue;
+			} break;
+
+        default:
+            IGaveUp = true;
+            debug assert(0, "BinExp.Op " ~ to!string(e.op) ~ " not handeled");
+        }
+
+    }
+
+    override void visit(IndexExp ie)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("IndexExpression %s ... \n\tdiscardReturnValue %d", ie.toString,
+                discardValue);
+            writefln("ie.type : %s ", ie.type.toString);
+        }
+
+		assert(ie.e1.type.isString, "For now only indexes into strings a supported");
+//		writeln("ie.e1: ", genExpr(ie.e1).value.toString);
+//		writeln("ie.e2: ", genExpr(ie.e2).value.toString);
+        //IGaveUp = true;
+        //debug assert(0, "IndexExp unsupported");
+    }
+
+    BCBlock genBlock(Statement stmt)
+    {
+        BCBlock result;
+
+        result.begin = BCLabel(ip);
+        stmt.accept(this);
+        result.end = BCLabel(ip);
+
+        return result;
+    }
+
+    override void visit(ForStatement fs)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("ForStatement %s", fs.toString);
+        }
+
+        if (fs._init)
+        {
+            (fs._init.accept(this));
+        }
+
+        if (fs.condition !is null && fs._body !is null)
+        {
+            BCAddr condJmp;
+			BCLabel condEval = genLabel(); 
+            BCValue condExpr = genExpr(fs.condition);
+            if (condExpr.vType == BCValueType.Unknown)
+            {
+                condJmp = beginCndJmp();
+            }
+            else
+            {
+                condJmp = beginJmpZ();
+            }
+            auto _body = genBlock(fs._body);
+            if (fs.increment)
+            {
+                fs.increment.accept(this);
+                _body.end = genLabel();
+            }
+            genJump(condEval);
+            auto afterJmp = genLabel();
+            if (condExpr.vType == BCValueType.Unknown)
+            {
+                endCndJmp(condJmp, afterJmp);
+            }
+            else
+            {
+                endJmpZ(condJmp, condExpr.stackAddr, afterJmp);
+            }
+
+        }
+        else if (fs.condition !is null  /* && fs._body is null*/ )
+        {
+			BCLabel condEval = genLabel();
+            BCValue condExpr = genExpr(fs.condition);
+            if (fs.increment)
+            {
+                fs.increment.accept(this);
+            }
+            genJump(condEval);
+        }
+        else
+        { // fs.condition is null && fs._body !is null
+            auto _body = genBlock(fs._body);
+            if (fs.increment)
+            {
+                fs.increment.accept(this);
+            }
+            genJump(_body.begin);
+        }
+
+    }
+
+    override void visit(Expression e)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("Expression %s", e.toString);
+        }
+    }
+
+    override void visit(VarExp ve)
+    {
+        auto vd = cast(void*) ve.var.isVarDeclaration;
+        assert(vd, "VarExp " ~ ve.toString ~ "is not a VariableDeclaration !?!");
+        auto sv = vd in vars;
+        if (sv is null) {
+		IGaveUp = true;
+		return ;
+	}
+	assert(sv, "Variable " ~ ve.toString ~ " not in StackFrame");
+
+        debug
+        {
+            import std.stdio;
+
+            writefln("VarExp %s discardValue %d", ve.toString, discardValue);
+            writeln("ve.var sp : ", (vd in vars).stackAddr);
+        }
+        retval = (*sv);
+    }
+
+    override void visit(DeclarationExp de)
+    {
+        auto oldRetval = retval;
+        auto vd = de.declaration.isVarDeclaration();
+        assert(vd, "DeclarationExps are expected to be VariableDeclarations");
+        visit(vd);
+        auto var = retval;
+        debug
+        {
+            import std.stdio;
+
+            writefln("DeclarationExp %s discardValue %d", de.toString, discardValue);
+            writefln("DeclarationExp.declaration: %x", cast(void*) de.declaration.isVarDeclaration);
+        }
+
+        if (auto ci = vd.getConstInitializer)
+        {
+
+            ci.accept(this);
+            if (retval.vType == BCValueType.Immidiate && retval.type == BCType.i32)
+            {
+                emitSet(var, retval);
+            }
+            retval = oldRetval;
+        }
+        assert(sp < ushort.max, "StackOverflow Stack is currently constrained to 64K");
+
+    }
+
+    override void visit(VarDeclaration vd)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("VariableDeclaration %s discardValue %d", vd.toString, discardValue);
+        }
+        auto var = BCValue(StackAddr(sp), toBCType(vd.type));
+        vars[cast(void*) vd] = var;
+        sp += cast(short) align4(cast(uint) vd.type.size);
+        retval = var;
+        debug
+        {
+            import std.stdio;
+
+            writeln("StackPointer after push: ", sp);
+        }
+    }
+
+    override void visit(BinAssignExp e)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("BinAssignExp %s discardValue %d", e.toString, discardValue);
+        }
+        const oldDiscardValue = discardValue;
+        auto oldAssignTo = assignTo;
+        auto oldRetval = retval;
+        discardValue = false;
+        e.e1.accept(this);
+        auto lhs = retval;
+        //assert(lhs.vType == BCValueType.StackValue);
+        discardValue = false;
+        e.e2.accept(this);
+        auto rhs = retval;
+        //assert(rhs.vType == BCValueType.Immidiate);
+
+        //assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+
+        switch (e.op)
+        {
+
+        case TOK.TOKaddass:
+            {
+                retval = Add3(lhs, lhs, rhs);
+            }
+            break;
+        default:
+            {
+                IGaveUp = true;
+                debug assert(0, "Unsupported for now");
+            }
+        }
+        //assert(discardValue);
+
+        retval = oldDiscardValue ? oldRetval : retval;
+        discardValue = oldDiscardValue;
+        assignTo = oldAssignTo;
+    }
+
+    override void visit(IntegerExp ie)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("IntegerExpression %s", ie.toString);
+        }
+
+        auto bct = toBCType(ie.type);
+        //assert(bct == BCType.i32, "only 32bit is suppoorted for now");
+        retval = BCValue(Imm32(cast(uint) ie.getInteger()));
+        assert(retval.vType == BCValueType.Immidiate);
+    }
+
+	override void visit(StringExp se) {
+		debug
+		{
+			import std.stdio;
+			
+			writefln("StringExpression %s", se.toString);
+		}
+
+	//	retval = BCValue(Imm32(cast(uint) ie.getInteger()));
+	}
+
+
+    override void visit(CmpExp ce)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("CmpExp %s discardValue %d", ce.toString, discardValue);
+        }
+
+        switch (ce.op)
+        {
+        case TOK.TOKlt:
+            {
+                retval = genLt(ce.e1, ce.e2);
+            }
+            break;
+
+            /*case TOK.TOKge:
+            {
+                retval = genGe(ce.e2, ce.e1).value;
+            }
+            break;*/
+
+        default:
+            IGaveUp = true;
+            debug assert(0, "Unsupported Operation " ~ to!string(ce.op));
+        }
+    }
+
+    override void visit(AssignExp ae)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("AssignExp %s", ae.toString);
+        }
+        auto oldRetval = retval;
+        auto oldAssignTo = assignTo;
+        const oldDiscardValue = discardValue;
+        discardValue = false;
+        auto lhs = genExpr(ae.e1);
+        assignTo = lhs;
+        auto rhs = genExpr(ae.e2);
+        emitSet(lhs, rhs);
+
+        retval = oldDiscardValue ? oldRetval : retval;
+        assignTo = oldAssignTo;
+        discardValue = oldDiscardValue;
+
+    }
+
+    override void visit(SwitchStatement ss) {with(switchState) 
+    {
+		//This Transforms swtich in a series of if else construts.
+        debug
+        {
+            import std.stdio;
+
+            writefln("SwitchStatement %s", ss.toString);
+            writefln("SwitchStatement.condition %s type :%s",
+                ss.condition.toString, ss.condition.type.toString);
+        }
+        
+        auto lhs = genExpr(ss.condition);
+
+        assert(ss.cases.dim <= beginCaseStatements.length,
+                "We will not have enough array space to store all cases for gotos");
+
+		foreach(i,caseStmt;ss.cases.opSlice()) {
+            caseStmt.index = cast(int)i;
+            // apperantly I have to set the index myself;
+           
+            auto rhs = genExpr(caseStmt.exp);
+			auto jmpCond = Eq3(BCValue.init, lhs, rhs);
+			auto jump = beginCndJmp();
+
+            //Add a check for isGotoCaseStatement
+            //And and for is isGotoDefaultStatement
+            //Because otherwise we can get ourselfs in trouble
+                auto cs = caseStmt.isCompoundStatement;
+                bool blockReturns = (!!cs && 
+                (cs.last.isReturnStatement ||
+                 cs.last.isGotoCaseStatement ||
+                 cs.last.isGotoDefaultStatement)) ||
+                   caseStmt.isReturnStatement ||
+                   caseStmt.isGotoCaseStatement ||
+                    caseStmt.isGotoDefaultStatement;
+            switchFixup = &switchFixupTable[switchFixupTableCount];
+            auto caseBlock = genBlock(caseStmt.statement);
+            beginCaseStatements[beginCaseStatementsCount++] = caseBlock.begin;
+
+			//if (ss.sdefault && !blockReturns) 
+			//	switchFixupTable[switchFixupTableCount++] = beginJmp();
+
+			endCndJmp(jump, caseBlock.end);
+		}
+		if (ss.sdefault) {
+            auto defaultBlock = genBlock(ss.sdefault.statement);
+			
+			foreach(ac_jmp;switchFixupTable[0 .. switchFixupTableCount]) {
+                if (ac_jmp.fixupFor == 0)
+				    endJmp(ac_jmp, defaultBlock.end);
+                else if (ac_jmp.fixupFor == -1)
+                    endJmp(ac_jmp, defaultBlock.begin);
+                else
+                    endJmp(ac_jmp, beginCaseStatements[ac_jmp.fixupFor - 1]);
+			}
+		}
+
+        //after we are done let's set thoose indexes back to zero
+        //who knowns what will happen if we don't ?
+        foreach(cs;ss.cases.opSlice()) {
+            cs.index = 0;
+        }
+    }}
+
+    override void visit(GotoCaseStatement gcs) {with (switchState) {
+        *switchFixup = SwitchFixupEntry(beginJmp(), gcs.cs.index + 1);
+         switchFixupTableCount++;
+    }}
+    override void visit(GotoDefaultStatement gd) {with (switchState) {
+            *switchFixup = SwitchFixupEntry(beginJmp(), -1);
+            switchFixupTableCount++;
+        }}
+
+	override void visit(CallExp ce) {
+		assert(inReturnStatement && ce.f == me,
+			"only direct tail recursive calls are supported for now"
+		);
+
+
+
+		/+
+		//This is experimental do exepect hiccups;
+		sp = StackAddr(4);
+		//first reset the stack
+		foreach(arg;ce.arguments.opSlice()) {
+			arg.accept(this);
+		}
+		//then push the arguments on
+		endJmp(beginJmp(), BCLabel(BCAddr(4)));
+		// and jump to the start of the function;
+		+/
+	}
+
+
+    override void visit(ReturnStatement rs)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("ReturnStatement %s", rs.toString);
+        }
+		assert(!inReturnStatement);
+		inReturnStatement = true;
+        auto retval = genExpr(rs.exp);
+        if (retval.vType == BCValueType.Immidiate)
+        {
+            retval = pushOntoStack(retval);
+        }
+        emitReturn(retval);
+		inReturnStatement = false;
+    }
+
+    override void visit(CastExp ce)
+    {
+        // just go over the cast as if it were not there :)
+        //FIXME make this handle casts properly
+        //e.g. calling opCast do truncation and so on
+        ce.e1.accept(this);
+    }
+
+    override void visit(ExpStatement es)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("ExpStatement %s", es.toString);
+        }
+        immutable oldDiscardValue = discardValue;
+        discardValue = true;
+        genExpr(es.exp);
+        discardValue = oldDiscardValue;
+    }
+
+    override void visit(WhileStatement ws)
+    {
+		auto evalBlockBegin = genLabel();
+        BCValue condExpr = genExpr(ws.condition);
+        auto tjmp = beginCndJmp();
+        auto _body = genBlock(ws._body);
+        genJump(evalBlockBegin);
+        auto afterJmp = genLabel();
+        endCndJmp(tjmp, afterJmp);
+    }
+
+    override void visit(Statement s)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("Statement %s", s.toString);
+        }
+        IGaveUp = true;
+        debug assert(0, "Statement unsupported");
+        //s.accept(this);
+    }
+
+    override void visit(IfStatement fs)
+    {
+		uint oldFixupTableCount = fixupTableCount;
+		auto cond = genExpr(fs.condition);
+		auto branch = beginCndJmp();
+        BCBlock ifbody;
+        BCBlock elsebody;
+        if (fs.ifbody)
+		{
+            ifbody = genBlock(fs.ifbody);
+        }
+        if (fs.elsebody)
+        {
+            auto afterBodyJmp = beginJmp();
+            elsebody = genBlock(fs.elsebody);
+            endJmp(afterBodyJmp, genLabel());
+        }
+
+		assert(oldFixupTableCount == fixupTableCount);
+        endCndJmp(branch, elsebody ? elsebody.begin : genLabel());
+    }
+
+
+    override void visit(ScopeStatement ss)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("ScopeStatement %s", ss.toString);
+        }
+        ss.statement.accept(this);
+	}
+
+    override void visit(CompoundStatement cs)
+    {
+        debug
+        {
+            import std.stdio;
+
+            writefln("CompundStatement %s", cs.toString);
+        }
+
+        foreach (stmt; cs.statements.opSlice())
+        {
+                stmt.accept(this);
+        }
+    }
+}

@@ -36,6 +36,8 @@ import ddmd.tokens;
 import ddmd.utf;
 import ddmd.visitor;
 
+import ddmd.ctfe;
+
 enum CtfeGoal : int
 {
     ctfeNeedRvalue,     // Must return an Rvalue (== CTFE value)
@@ -808,6 +810,10 @@ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expres
         return CTFEExp.cantexp;
     if (fd.semanticRun < PASSsemantic3done)
         return CTFEExp.cantexp;
+
+    // try the new interpreter
+    if(auto retval = evaluateFunction(fd, arguments, thisarg))
+        return retval;
 
     // CTFE-compile the function
     if (!fd.ctfeCode)
