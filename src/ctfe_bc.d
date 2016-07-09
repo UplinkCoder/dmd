@@ -30,12 +30,45 @@ import ddmd.arraytypes : Expressions;
 
 import std.conv : to;
 
-struct StackRef
+static private
 {
-    short sp;
-    Type type;
-}
+    ScopeStatement reduceNestedScopeAndCompoundStatements(ScopeStatement _ss) pure
+    {
+        if (_ss is null)
+            return null;
 
+        for (;;)
+        {
+            auto _cs = reduceNestedCompundAndScopeStatements(_ss.statement.isCompoundStatement);
+            auto __ss = ((_cs
+                && _cs.statements.dim == 1) ? (*_cs.statements)[0].isScopeStatement
+                : _ss.statement.isScopeStatement);
+            if (__ss)
+                _ss = __ss;
+            else
+                return _ss;
+        }
+    }
+
+    CompoundStatement reduceNestedCompundAndScopeStatements(CompoundStatement cs) pure
+    {
+        if (cs is null)
+            return null;
+
+        while (cs.statements.dim == 1)
+        {
+            auto _ss = reduceNestedScopeAndCompoundStatements((*cs.statements)[0].isScopeStatement);
+            auto _cs = (
+                _ss ? _ss.statement.isCompoundStatement : ((*cs.statements)[0].isCompoundStatement));
+            if (_cs)
+                cs = _cs;
+            else
+                return cs;
+        }
+
+        return cs;
+    }
+}
 struct SelfCall
 {
     BCAddr callPoint;
@@ -237,6 +270,7 @@ extern (C++) final class BCV : Visitor
     alias visit = super.visit;
 
     import ddmd.tokens;
+
     BCBlock[void*] labeledBlocks;
 
     BCValue[void*] vars;
@@ -246,7 +280,6 @@ extern (C++) final class BCV : Visitor
     BCBlock* currentBlock;
     BCAddr[ubyte.max] breakFixups;
     uint breakFixupsCount;
-
 
     BCValue retval;
     BCValue assignTo;
@@ -466,9 +499,11 @@ public:
         auto oldBlock = currentBlock;
         const oldBreakFixupsCount = breakFixupsCount;
 
-        debug {
+        debug
+        {
             import std.stdio;
-            writeln("Calling genBlock on : ",stmt.toString);
+
+            writeln("Calling genBlock on : ", stmt.toString);
         }
         currentBlock = &result;
         result.begin = BCLabel(ip);
@@ -476,7 +511,7 @@ public:
         result.end = BCLabel(ip);
 
         // Now let's fixup thoose breaks
-        foreach(Jmp;breakFixups[oldBreakFixupsCount .. breakFixupsCount])
+        foreach (Jmp; breakFixups[oldBreakFixupsCount .. breakFixupsCount])
         {
             endJmp(Jmp, result.end);
         }
@@ -766,8 +801,6 @@ public:
                 import std.stdio;
 
                 writefln("SwitchStatement %s", ss.toString);
-                writefln("SwitchStatement.condition %s type :%s",
-                    ss.condition.toString, ss.condition.type.toString);
             }
 
             auto lhs = genExpr(ss.condition);
@@ -784,19 +817,35 @@ public:
                 auto jmpCond = Eq3(BCValue.init, lhs, rhs);
                 auto jump = beginCndJmp();
 
-                auto cs = caseStmt.isCompoundStatement;
-                /// for some reason blockReturns works when the meaning is inverted.
-                /// not sure what causes this
-                bool blockReturns = !((cs && (cs.last.isReturnStatement ||
-                    cs.last.isGotoCaseStatement || cs.last.isGotoDefaultStatement)) ||
-                    caseStmt.isReturnStatement || caseStmt.isGotoCaseStatement || caseStmt.isGotoDefaultStatement);
+                auto cs = reduceNestedCompundAndScopeStatements(
+                    caseStmt.statement.isCompoundStatement);
+                auto _ss = reduceNestedScopeAndCompoundStatements(
+                    caseStmt.statement.isScopeStatement);
+
+                if (!cs && ss)
+                {
+                    cs = reduceNestedCompundAndScopeStatements(_ss.statement.isCompoundStatement);
+                }
+
+                static bool endsSwitchBlock(Statement stmt) pure
+                {
+                    return stmt.isBreakStatement || stmt.isReturnStatement ||
+                        stmt.isGotoCaseStatement || stmt.isGotoDefaultStatement;
+                }
+
+                bool blockReturns = ((cs && (endsSwitchBlock(cs.last))) || 
+                    (_ss && (endsSwitchBlock(_ss.statement))) || 
+                    endsSwitchBlock(caseStmt.statement));
 
                 switchFixup = &switchFixupTable[switchFixupTableCount];
                 auto caseBlock = genBlock(caseStmt.statement);
                 beginCaseStatements[beginCaseStatementsCount++] = caseBlock.begin;
                 //If the block returns regardless there is no need for a fixup
                 if (!blockReturns)
+                {
                     switchFixupTable[switchFixupTableCount++] = beginJmp();
+                    switchFixup = &switchFixupTable[switchFixupTableCount];
+                }
 
                 endCndJmp(jump, caseBlock.end);
             }
@@ -861,8 +910,9 @@ public:
 
     override void visit(GotoStatement gs)
     {
-        assert(cast(void*)gs.ident in labeledBlocks, "We have not encounterd the label you want to jump to");
-        genJump(labeledBlocks[cast(void*)gs.ident].begin);
+        assert(cast(void*) gs.ident in labeledBlocks,
+            "We have not encounterd the label you want to jump to");
+        genJump(labeledBlocks[cast(void*) gs.ident].begin);
     }
 
     override void visit(LabelStatement ls)
@@ -870,17 +920,22 @@ public:
         debug
         {
             import std.stdio;
+
             writefln("LabelStatement %s", ls.toString);
         }
 
-        assert(cast(void*)ls.ident !in labeledBlocks, "We already enounterd a LabelStatement with this identifier");
-        labeledBlocks[cast(void*)ls.ident] = genBlock(ls.statement);
+        assert(cast(void*) ls.ident !in labeledBlocks,
+            "We already enounterd a LabelStatement with this identifier");
+        labeledBlocks[cast(void*) ls.ident] = genBlock(ls.statement);
     }
-    override void visit(ContinueStatement cs) {
+
+    override void visit(ContinueStatement cs)
+    {
         if (cs.ident)
         {
-            assert(cast(void*)cs.ident in labeledBlocks, "We have not encounterd the label you want to jump to");
-            genJump(labeledBlocks[cast(void*)cs.ident].begin);
+            assert(cast(void*) cs.ident in labeledBlocks,
+                "We have not encounterd the label you want to jump to");
+            genJump(labeledBlocks[cast(void*) cs.ident].begin);
         }
         else
         {
@@ -892,8 +947,9 @@ public:
     {
         if (bs.ident)
         {
-            assert(cast(void*)bs.ident in labeledBlocks, "We have not encounterd the label you want to jump to");
-            genJump(labeledBlocks[cast(void*)bs.ident].end);
+            assert(cast(void*) bs.ident in labeledBlocks,
+                "We have not encounterd the label you want to jump to");
+            genJump(labeledBlocks[cast(void*) bs.ident].end);
         }
         else if (switchFixup)
         {
@@ -905,7 +961,7 @@ public:
         }
         else
         {
-           breakFixups[breakFixupsCount++] = beginJmp();
+            breakFixups[breakFixupsCount++] = beginJmp();
         }
 
     }
