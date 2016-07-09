@@ -40,8 +40,7 @@ static private
         for (;;)
         {
             auto _cs = reduceNestedCompundAndScopeStatements(_ss.statement.isCompoundStatement);
-            auto __ss = ((_cs
-                && _cs.statements.dim == 1) ? (*_cs.statements)[0].isScopeStatement
+            auto __ss = ((_cs) ? _cs.last.isScopeStatement
                 : _ss.statement.isScopeStatement);
             if (__ss)
                 _ss = __ss;
