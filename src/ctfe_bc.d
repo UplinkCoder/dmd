@@ -55,7 +55,7 @@ struct SwitchFixupEntry
 
 struct SwitchState
 {
-    SwitchFixupEntry[64] switchFixupTable;
+    SwitchFixupEntry[128] switchFixupTable;
     uint switchFixupTableCount;
 
     BCLabel[128] beginCaseStatements;
@@ -816,8 +816,12 @@ public:
 
                 foreach (ac_jmp; switchFixupTable[0 .. switchFixupTableCount])
                 {
-                    else if (ac_jmp.fixupFor == -1)
-                        assert(0, "Without a default Statement there cannot be a jump to default")
+                    if (ac_jmp.fixupFor == 0)
+                        endJmp(ac_jmp, afterSwitch);
+                    else if (ac_jmp.fixupFor != -1)
+                        endJmp(ac_jmp, beginCaseStatements[ac_jmp.fixupFor - 1]);
+                    else
+                        assert(0, "Without a default Statement there cannot be a jump to default");
                     
                 }
 
