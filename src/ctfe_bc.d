@@ -137,7 +137,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
             }
             p.accept(bcv);
         }
-
+        import std.stdio;
+       
         bcv.visit(fbody);
         csw.stop();
 
@@ -171,9 +172,10 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         foreach (a; args)
         {
             a.toString();
-            a.accept(bcv);
+            //a.accept(bcv);
         }
         auto bc_args = args.map!(a => bcv.genExpr(a)).array;
+        bcv.printInstructions.writeln;
         auto retval = interpret(bcv.byteCodeArray[0 .. bcv.ip], bc_args);
         sw.stop();
         import std.stdio;
@@ -735,7 +737,23 @@ public:
             writefln("StringExpression %s", se.toString);
         }
 
-        //      retval = BCValue(Imm32(cast(uint) ie.getInteger()));
+        assert(se.sz == 1, "only char strings are supported for now");
+        assert(se.string[se.len] == '\0', "string should be 0-terminated");
+        auto result = BCValue(StackAddr(sp), BCType.String);
+        emitSet(BCValue(StackAddr(sp), BCType.i32), BCValue(Imm32(cast(int)se.len)));
+        sp += align4(size(BCType.i32));
+        auto rest = se.len % 4;
+        foreach(cellIndex;0 .. (se.len / 4) + (rest!=0)) {
+            emitSet(BCValue(StackAddr(sp), BCType.i32), BCValue(Imm32(*((cast(uint*)se.string) + cellIndex))));
+            sp += align4(size(BCType.i32));
+        }
+
+        if (!rest) {
+            //trailing 0
+            sp += align4(size(BCType.i32));
+        }
+
+        retval = result;
     }
 
     override void visit(CmpExp ce)
