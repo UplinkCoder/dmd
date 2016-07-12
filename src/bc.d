@@ -282,9 +282,12 @@ enum BCType : ubyte
     i16,
     i32,
     i64,
+
+    Array,
+    Struct,
 }
 
-static const(uint) size(const BCType bct) pure
+const(uint) basicTypeSize(const BCType bct) pure
 {
     final switch (bct) with (BCType)
     {
@@ -324,6 +327,11 @@ static const(uint) size(const BCType bct) pure
         {
             return 8;
         }
+     
+    case Array, Struct : 
+        {
+            return 0;
+        } 
     }
 }
 
@@ -346,6 +354,9 @@ struct BCValue
 {
     BCValueType vType;
     BCType type;
+
+    ///default value 0 - meaning BuiltinType
+    uint typeIndex;
     union
     {
         StackAddr stackAddr;
@@ -357,7 +368,7 @@ struct BCValue
     {
         void* valAddr;
 
-        BCSlice* slice;
+        //BCSlice* slice;
 
         ubyte* i8;
         ushort* i16;
@@ -449,7 +460,6 @@ struct BCValue
 
 pragma(msg, "Sizeof BCValue: ", BCValue.sizeof);
 static immutable bcOne = BCValue(Imm32(1));
-//      alias BCValueUnion = BCValue.BCValueUnion;
 
 struct BCAddr
 {
@@ -504,8 +514,89 @@ import core.bitop : bsf;
 static assert(bsf(0xFF) == 0);
 static assert(bsf(0x20) == 5);
 
+bool isBasicBCType(BCType bct) 
+{
+    return !(bct == BCType.Struct || bct == BCType.Array);
+}
+
+struct BCArray
+{
+    BCType elementType;
+    uint elementTypeIndex;
+
+    uint length;
+
+    const(uint) arraySize() const
+    {
+        return length*basicTypeSize(elementType);
+    }
+
+    const(uint) arraySize(const SharedBcState* sharedState) const
+    {
+        return sharedState.size(elementType, elementTypeIndex)*length;
+    }
+}
+
+struct BCStruct
+{
+    BCType memberTypes[ubyte.max];
+    uint memberTypeIndexs[ubyte.max];
+
+    uint memeberTypesCount;
+//    uint[] methodByteCode;
+}
+
+struct SharedBcState
+{
+    uint _threadLock;
+    //Type 0 beeing the terminator for chainedTypes
+    BCStruct[ubyte.max] structs;
+    uint structCount;
+    BCArray[ubyte.max] arrays;
+    uint arrayCount;
+
+    const(uint) size(const BCType type, const uint elementTypeIndex) const
+    {
+        case BCType.Struct :
+        {
+            uint _size;
+            assert(elementTypeIndex <= structCount);
+            BCStruct _struct = structs[elementTypeIndex];
+
+            //import std.algorithm : sum;
+            foreach(i, memberType; _struct.memberTypes[0 .. _struct.memeberTypesCount])
+            {
+                _size += isBasicBCType(memberType) ? 
+                    basicTypeSize(memberType)
+                    : this.size(memberType, _struct.memberTypeIndexs[i]);
+            }
+
+            return _size;
+
+        }
+
+        case BCType.Array :
+        {
+            assert(elementTypeIndex <= arrayCount);
+            BCArray _array = arrays[elementTypeIndex];
+            
+                return (isBasicBCType(_array.elementType) ? _array.arraySize() : _array.arraySize(&this));
+
+            
+        }
+
+    }
+
+}
+
 struct BCGen
 {
+    //SharedState 
+    // The following is shared between ALL BC generator instances in a given run
+    SharedBcState* sharedState;
+
+    /////////////////////////////////////////////
+
     int[ushort.max] byteCodeArray;
     /// ip starts at 4 because 0 should be an invalid address;
     BCAddr ip = BCAddr(4);
@@ -543,7 +634,10 @@ struct BCGen
     {
         auto tmp = temporarys[temporaryCount] = BCTemporary(BCValue(StackAddr(sp),
             bct), temporaryCount);
-        sp += align4(size(bct));
+        //make BCType a struct
+        //FIXE make the typeIndex a part of BCType. 
+
+        sp += align4(isBasicBCType(bct) ? basicTypeSize(bct) : sharedState.size(bct, 0));
         ++temporaryCount;
         return tmp;
     }
