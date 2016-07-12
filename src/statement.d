@@ -1329,19 +1329,12 @@ extern (C++) class CompoundStatement : Statement
         return statements;
     }
 
-    override final inout(ReturnStatement) isReturnStatement() inout nothrow pure
+    final inout(ReturnStatement) lastIsReturnStatement() inout nothrow pure
     {
-        ReturnStatement rs = null;
-        foreach (s; *statements)
-        {
-            if (s)
-            {
-                rs = cast(ReturnStatement)s.isReturnStatement();
-                if (rs)
-                    break;
-            }
-        }
-        return cast(inout)rs;
+        if (auto cs = last.isCompoundStatement())
+            return cs.lastIsReturnStatement();
+        else
+            return last.isReturnStatement();
     }
 
     override final inout(Statement) last() inout nothrow pure

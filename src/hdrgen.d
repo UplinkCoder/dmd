@@ -1827,19 +1827,17 @@ public:
         if (!f.inferRetType && tf.next)
             typeToBuffer(tf.next, null);
         parametersToBuffer(tf.parameters, tf.varargs);
-        CompoundStatement cs = f.fbody.isCompoundStatement();
-        Statement s1;
-        if (f.semanticRun >= PASSsemantic3done && cs)
+
+        if (f.fbody)
         {
-            s1 = (*cs.statements)[cs.statements.dim - 1];
-        }
-        else
-            s1 = !cs ? f.fbody : null;
-        ReturnStatement rs = s1 ? s1.isReturnStatement() : null;
-        if (rs && rs.exp)
-        {
-            buf.writestring(" => ");
-            rs.exp.accept(this);
+            auto cs = f.fbody.isCompoundStatement();
+            auto rs = cs ? cs.lastIsReturnStatement() : f.fbody.isReturnStatement();
+
+            if (rs && rs.exp)
+            {
+                buf.writestring(" => ");
+                rs.exp.accept(this);
+            }
         }
         else
         {
