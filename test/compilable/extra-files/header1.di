@@ -289,11 +289,7 @@ template V10(T)
 int foo11(int function() fn);
 int bar11(T)()
 {
-	return foo11(function int()
-	{
-		return 0;
-	}
-	);
+	return foo11(function int() => 0);
 }
 struct S6360
 {

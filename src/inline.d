@@ -53,6 +53,20 @@ bool tooCostly(int cost)
     return ((cost & (STATEMENT_COST - 1)) >= COST_MAX);
 }
 
+static bool isOrHasReturnStatement(Statement s)
+{
+    if (!s.isReturnStatement) {
+        if (auto cs = s.isCompoundStatement())
+        {
+            return !!cs.lastIsReturnStatement();
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
 /***********************************************************
  * Compute cost of inlining.
  *
@@ -113,11 +127,11 @@ public:
                 Statement s3;
                 if ((ifs = s2.isIfStatement()) !is null &&
                     ifs.ifbody &&
-                    ifs.ifbody.isReturnStatement() &&
+                    ifs.ifbody.isOrHasReturnStatement() &&
                     !ifs.elsebody &&
                     i + 1 < s.statements.dim &&
                     (s3 = (*s.statements)[i + 1]) !is null &&
-                    s3.isReturnStatement()
+                    s3.isOrHasReturnStatement()
                    )
                 {
                     if (ifs.prm)       // if variables are declared
@@ -178,7 +192,7 @@ public:
          *      return exp2;
          * Otherwise, we can't handle return statements nested in if's.
          */
-        if (s.elsebody && s.ifbody && s.ifbody.isReturnStatement() && s.elsebody.isReturnStatement())
+        if (s.elsebody && s.ifbody && s.ifbody.isOrHasReturnStatement() && s.elsebody.isOrHasReturnStatement())
         {
             s.ifbody.accept(this);
             s.elsebody.accept(this);
@@ -509,11 +523,11 @@ public:
                 Statement s3;
                 if ((ifs = sx.isIfStatement()) !is null &&
                     ifs.ifbody &&
-                    ifs.ifbody.isReturnStatement() &&
+                    ifs.ifbody.isOrHasReturnStatement() &&
                     !ifs.elsebody &&
                     i + 1 < s.statements.dim &&
                     (s3 = (*s.statements)[i + 1]) !is null &&
-                    s3.isReturnStatement()
+                    s3.isOrHasReturnStatement()
                    )
                 {
                     /* Rewrite as ?:
