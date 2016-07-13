@@ -97,6 +97,7 @@ enum LongInst : ushort
     Lsh,
 
     Lds, ///SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])]
+    Lss, /// defref pointer on the stack :)
 }
 
 enum InstLengthMask = ubyte(0x20); // check 6th Byte
@@ -223,6 +224,7 @@ static assert(ShortInst.max < 64);
 static short isShortJump(const int offset) pure
 {
     assert(offset != 0, "An Jump to the Jump itself is invalid");
+    
 
     const bool wasNegative = (offset < 0);
     int abs_offset = wasNegative ? offset * -1 : offset;
@@ -420,11 +422,11 @@ struct BCValue
 
     string toString() const pure
     {
-        /*import std.format : format;
+        import std.format : format;
 
-        return format("\nvType: %s\tType: %s\tstackAddr: %s\timm64 %s\t",
-            vType, type, stackAddr, imm64);*/
-        return "";
+        return format("\nvType: %s\tType: %s\tstackAddr: %s\timm32 %s\t",
+            vType, type, stackAddr, imm32);
+       // return "";
     }
 
     this(Imm32 imm32) pure
@@ -555,8 +557,9 @@ struct SharedBcState
     BCArray[ubyte.max] arrays;
     uint arrayCount;
 
-    const(uint) size(const BCType type, const uint elementTypeIndex) const
-    {
+    const(uint) size(const BCType type, const uint elementTypeIndex) const {
+ 
+    switch (type) {
         case BCType.Struct :
         {
             uint _size;
@@ -585,8 +588,12 @@ struct SharedBcState
             
         }
 
-    }
+        default : {
+                return 0;
+        }
 
+    }
+}
 }
 
 struct BCGen
@@ -788,8 +795,8 @@ struct BCGen
         {
             debug if (!__ctfe)
             {
-
-                //    writeln("lhs.vType : ", lhs.vType, "rhs.vType : ", rhs.vType);
+                import std.stdio;
+                    writeln("lhs.vType : ", lhs.vType, "rhs.vType : ", rhs.vType);
             }
             assert(0, "Set flavour unsupported");
         }
@@ -967,7 +974,7 @@ struct BCGen
             auto stackref = BCValue(null, sp, val.type);
             emitSet(stackref, val);
 
-            sp += align4(size(val.type));
+            sp += align4(sharedState.size(val.type, val.typeIndex));
             return stackref;
         }
         else
@@ -1309,6 +1316,9 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 stackOffset += uint.sizeof;
             }
             break;
+            case BCType.String : {
+
+            } break;
         default:
             return -1;
             //       assert(0, "unsupported Type " ~ to!string(arg.type));
@@ -1559,6 +1569,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
                 break;
+            case LongInst.Lss:
+                {
+                    (*lhsRef) = *(stack.ptr + (rhs/4));
+                    //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
+                }
+                    break;
+
             default:
                 {
                     assert(0, "Unkown LongInst." ~ to!string(cast(LongInst)(lw & InstMask)) ~ " \n");

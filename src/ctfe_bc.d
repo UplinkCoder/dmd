@@ -110,6 +110,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression th
 
 import ddmd.ctfe.bc;
 
+
+
 Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _this = null)
 {
     scope BCV bcv = new BCV(fd);
@@ -127,7 +129,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
     if (auto fbody = fd.fbody.isCompoundStatement)
     {
         csw.start();
-        foreach (i, p; fd.parameters.opSlice)
+        bcv.beginParameters();
+        foreach (i, p; *(fd.parameters))
         {
             debug
             {
@@ -136,6 +139,11 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
                 writeln("parameter [", i, "] : ", p.toString);
             }
             p.accept(bcv);
+        }
+        bcv.endParameters();
+        debug {
+            import std.stdio;
+            writeln("ParameterType : ", bcv.parameterTypes);
         }
         import std.stdio;
        
@@ -174,8 +182,13 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
             a.toString();
             //a.accept(bcv);
         }
+
+        auto argumentsBeginIp = bcv.beginArguments();
         auto bc_args = args.map!(a => bcv.genExpr(a)).array;
+        bcv.endArguments(argumentsBeginIp);
+
         bcv.printInstructions.writeln;
+
         auto retval = interpret(bcv.byteCodeArray[0 .. bcv.ip], bc_args);
         sw.stop();
         import std.stdio;
@@ -213,6 +226,15 @@ extern (C++) final class BCV : Visitor
 
     BCGen gen;
     alias gen this;
+
+    BCAddr headJmp;
+
+    // for now!
+    BCValue[] arguments;
+    BCType[] parameterTypes;
+
+    bool processingArguments;
+    bool processingParameters;
 
     bool IGaveUp;
     /// just used in switch handling to share local state between visit functions
@@ -303,6 +325,7 @@ public:
     this(FuncDeclaration fd)
     {
         me = fd;
+        headJmp = beginJmp();
     }
 
     ~this()
@@ -320,6 +343,24 @@ public:
         }
 
     }
+    void beginParameters() {
+        processingParameters = true;
+    }
+
+    void endParameters() {
+        processingParameters = false;
+    }
+
+    BCAddr beginArguments() {
+        processingArguments = true;
+        return ip;
+    }
+
+    void endArguments(BCAddr argIp) {
+        endJmp(headJmp, BCLabel(argIp));
+        processingArguments = false;
+        genJump(BCLabel(BCAddr(6)));
+    }
 
     BCValue genExpr(Expression expr)
     {
@@ -330,6 +371,13 @@ public:
         }
         auto oldRetval = retval;
 
+
+        if (processingArguments) {
+            assignTo = BCValue(StackAddr(cast(short)(4 + (arguments.length*4))), BCType.i32);
+            assert(arguments.length <= parameterTypes.length, "passed to many arguments");
+        }
+
+
         expr.accept(this);
         debug
         {
@@ -338,6 +386,12 @@ public:
         assert(!discardValue || retval.vType != BCValueType.Unknown);
         BCValue ret = retval;
         retval = oldRetval;
+
+        if (processingArguments) {
+            arguments ~= retval;
+            assert(arguments.length <= parameterTypes.length, "passed to many arguments");
+        }
+
 
         return ret;
     }
@@ -597,6 +651,23 @@ public:
 
             writefln("Expression %s", e.toString);
         }
+
+        assert(0, "Cannot handleExpression");
+    }
+
+    override void visit(ArrayLengthExp ale) {
+        auto array = genExpr(ale.e1);
+        assert(array.type == BCType.String, "We only handle StringLengths");
+        assert(array.vType == BCValueType.StackValue, "We only handle StringLengths");
+        auto p1 = BCValue(StackAddr(4), BCType.i32);
+        emitLongInst(LongInst64(LongInst.Lss, p1.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
+
+        //emitSet(, array);
+        //emitPrt(retval);
+        /*
+        uint_32 length 
+        uint_32 [length/4+1] chars;
+         */
     }
 
     override void visit(VarExp ve)
@@ -656,12 +727,20 @@ public:
         {
             import std.stdio;
 
-            writefln("VariableDeclaration %s discardValue %d", vd.toString, discardValue);
+            writefln("VarDeclaration %s discardValue %d", vd.toString, discardValue);
         }
+
+
         auto var = BCValue(StackAddr(sp), toBCType(vd.type));
         vars[cast(void*) vd] = var;
         sp += cast(short) align4(cast(uint) vd.type.size);
         retval = var;
+
+        if (processingParameters)
+        {
+            parameterTypes ~= var.type;
+        }
+
         debug
         {
             import std.stdio;
@@ -741,16 +820,22 @@ public:
         assert(se.string[se.len] == '\0', "string should be 0-terminated");
         auto result = BCValue(StackAddr(sp), BCType.String);
         emitSet(BCValue(StackAddr(sp), BCType.i32), BCValue(Imm32(cast(int)se.len)));
-        sp += align4(size(BCType.i32));
+        sp += align4(basicTypeSize(BCType.i32));
         auto rest = se.len % 4;
-        foreach(cellIndex;0 .. (se.len / 4) + (rest!=0)) {
+        foreach(cellIndex;0 .. (se.len / 4) + (rest!=0))
+        {
             emitSet(BCValue(StackAddr(sp), BCType.i32), BCValue(Imm32(*((cast(uint*)se.string) + cellIndex))));
-            sp += align4(size(BCType.i32));
+            sp += align4(basicTypeSize(BCType.i32));
         }
 
-        if (!rest) {
+        if (!rest)
+        {
             //trailing 0
-            sp += align4(size(BCType.i32));
+            sp += align4(basicTypeSize(BCType.i32));
+        }
+
+        if (assignTo) {
+            emitSet(assignTo, BCValue(Imm32(result.stackAddr)));
         }
 
         retval = result;
