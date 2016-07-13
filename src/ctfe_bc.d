@@ -100,7 +100,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression th
     //TODO check if the functions returnType is a uint;
 
     if (args)
-        foreach (a; args.opSlice)
+        foreach (a; *args)
         {
             _args ~= a;
         }
@@ -536,12 +536,14 @@ public:
         {
             import std.stdio;
 
-            writefln("IndexExpression %s ... \n\tdiscardReturnValue %d", ie.toString,
+            writefln("IndexExp %s ... \n\tdiscardReturnValue %d", ie.toString,
                 discardValue);
             writefln("ie.type : %s ", ie.type.toString);
         }
 
         assert(ie.e1.type.isString, "For now only indexes into strings a supported");
+        auto idx = genExpr(ie.e2);
+        assert(idx.type == BCType.i32);
         //              writeln("ie.e1: ", genExpr(ie.e1).value.toString);
         //              writeln("ie.e2: ", genExpr(ie.e2).value.toString);
         //IGaveUp = true;
@@ -659,9 +661,9 @@ public:
         auto array = genExpr(ale.e1);
         assert(array.type == BCType.String, "We only handle StringLengths");
         assert(array.vType == BCValueType.StackValue, "We only handle StringLengths");
-        auto p1 = BCValue(StackAddr(4), BCType.i32);
-        emitLongInst(LongInst64(LongInst.Lss, p1.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
-
+        assignTo = assignTo ? assignTo : genTemporary(BCType.i32).value; 
+        emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
+        retval = assignTo;
         //emitSet(, array);
         //emitPrt(retval);
         /*
@@ -733,7 +735,7 @@ public:
 
         auto var = BCValue(StackAddr(sp), toBCType(vd.type));
         vars[cast(void*) vd] = var;
-        sp += cast(short) align4(cast(uint) vd.type.size);
+        sp += cast(short) align4(cast(uint) basicTypeSize(var.type));
         retval = var;
 
         if (processingParameters)
@@ -910,7 +912,7 @@ public:
             assert(ss.cases.dim <= beginCaseStatements.length,
                 "We will not have enough array space to store all cases for gotos");
 
-            foreach (i, caseStmt; ss.cases.opSlice())
+            foreach (i, caseStmt; *(ss.cases))
             {
                 caseStmt.index = cast(int) i;
                 // apperantly I have to set the index myself;
@@ -985,7 +987,7 @@ public:
             switchFixup = null;
             //after we are done let's set thoose indexes back to zero
             //who knowns what will happen if we don't ?
-            foreach (cs; ss.cases.opSlice())
+            foreach (cs; *(ss.cases))
             {
                 cs.index = 0;
             }
@@ -1200,7 +1202,7 @@ public:
             writefln("CompundStatement %s", cs.toString);
         }
 
-        foreach (stmt; cs.statements.opSlice())
+        foreach (stmt; *(cs.statements))
         {
             stmt.accept(this);
         }

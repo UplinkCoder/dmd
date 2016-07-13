@@ -306,7 +306,7 @@ const(uint) basicTypeSize(const BCType bct) pure
     case Slice, String:
         {
             //TODO add 64bit mode
-            return  /* m64 ? 16 :*/ 8;
+            return  /* m64 ? 16 :*/ 4;
         }
 
     case i1:
@@ -1176,6 +1176,15 @@ string printInstructions(int* startInstructions, uint length)
                         hi >> 16) ~ "])]\n";
                 }
                 break;
+                case LongInst.Lss:
+                {
+                    result ~= "Lss SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(
+                        hi >> 16) ~ "]\n";
+
+                    //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
+                }
+                    break;
+
             default:
                 {
                     result ~= "Unkown LongInst \n" ~ to!string(cast(LongInst)(lw & InstMask));
