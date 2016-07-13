@@ -542,8 +542,27 @@ public:
         }
 
         assert(ie.e1.type.isString, "For now only indexes into strings a supported");
+        auto _string = genExpr(ie.e1);
+        assert(_string.type == BCType.String);
         auto idx = genExpr(ie.e2);
+
+        auto ptr = genTemporary(BCType.i32).value;
+        /// we have to add the size of the length to the ptr
+        Add3(ptr, _string, idx);
+        Add3(ptr, ptr, BCValue(Imm32(basicTypeSize(BCType.i32))));
+
+
+        assignTo = assignTo ? assignTo : genTemporary(BCType.i32).value;
+
+        emitLongInst(LongInst64(LongInst.Lsb, assignTo.stackAddr, ptr.stackAddr));
+
+
+
         assert(idx.type == BCType.i32);
+        //emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, ptr.stackAddr));
+         // *lhsRef = DS[aligin4(rhs)]
+        retval = assignTo;
+
         //              writeln("ie.e1: ", genExpr(ie.e1).value.toString);
         //              writeln("ie.e2: ", genExpr(ie.e2).value.toString);
         //IGaveUp = true;

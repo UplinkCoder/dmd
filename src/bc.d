@@ -98,6 +98,7 @@ enum LongInst : ushort
 
     Lds, ///SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])]
     Lss, /// defref pointer on the stack :)
+    Lsb, /// load stack byte
 }
 
 enum InstLengthMask = ubyte(0x20); // check 6th Byte
@@ -461,7 +462,7 @@ struct BCValue
 }
 
 pragma(msg, "Sizeof BCValue: ", BCValue.sizeof);
-static immutable bcOne = BCValue(Imm32(1));
+static bcOne = BCValue(Imm32(1));
 
 struct BCAddr
 {
@@ -1180,8 +1181,6 @@ string printInstructions(int* startInstructions, uint length)
                 {
                     result ~= "Lss SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(
                         hi >> 16) ~ "]\n";
-
-                    //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
                     break;
 
@@ -1584,7 +1583,28 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
                     break;
+                case LongInst.Lsb :
+                {
 
+                    uint _dr = *(stack.ptr + (rhs/4));
+                    debug {import std.stdio; writeln("Lsb_ _dr:",_dr , "  rhs: ", rhs, " rhs/4: ", rhs/4, " rhs & 3: ", rhs&3 );}
+                    final switch (rhs & 3)
+                    {
+                        case 0:
+                            (*lhsRef) = _dr & 0xFF;
+                            break;
+                        case 1:
+                            (*lhsRef) =  (_dr & 0xFF00) >> 8;
+                            break;
+                        case 2:
+                            (*lhsRef) = (_dr & 0xFF0000) >> 16;
+                            break;
+                        case 3:
+                            (*lhsRef) = _dr >> 24;
+                            break;
+                    }
+
+                } break;
             default:
                 {
                     assert(0, "Unkown LongInst." ~ to!string(cast(LongInst)(lw & InstMask)) ~ " \n");
