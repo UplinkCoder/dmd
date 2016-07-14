@@ -1725,12 +1725,12 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             case ShortInst.Flg:
                 {
                     (*opRef) = cond;
-                }
+                } break;
 
             case ShortInst.Mod4:
                 {
                     (*opRef) &= 3;
-                }
+                } break;
             }
         }
     }

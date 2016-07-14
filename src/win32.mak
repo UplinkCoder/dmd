@@ -78,7 +78,7 @@ SCPDIR=..\backup
 # C++ compiler
 CC=dmc
 # D compiler (set with env variable)
-#HOST_DC=dmd
+HOST_DC=dmd
 # Make program
 MAKE=make
 # Librarian
@@ -142,7 +142,7 @@ DMDMAKE=$(MAKE) -fwin32.mak C=$C TK=$(TK) ROOT=$(ROOT) MAKE="$(MAKE)" HOST_DC="$
 
 # D front end
 FRONT_SRCS=access.d aggregate.d aliasthis.d apply.d argtypes.d arrayop.d	\
-	arraytypes.d attrib.d builtin.d canthrow.d clone.d complex.d		\
+	arraytypes.d attrib.d builtin.d bc.d ctfe_bc.d canthrow.d clone.d complex.d		\
 	cond.d constfold.d cppmangle.d ctfeexpr.d dcast.d dclass.d		\
 	declaration.d delegatize.d denum.d dimport.d dinifile.d dinterpret.d	\
 	dmacro.d dmangle.d dmodule.d doc.d dscope.d dstruct.d dsymbol.d		\
