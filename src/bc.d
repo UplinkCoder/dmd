@@ -31,7 +31,7 @@ enum ShortInst : ubyte
     Neg,
     Soh, /// set hi stack addr
     Sdh, /// set hi dataseg addr
-
+    Flg, // writes the conditionFlag into [lw >> 16]
     Drb, /// sets db = DS[align4(SP[lw >> 16])[SP[lw >> 16] % 4]]
     Mod4, ///SP[lw >> 16] = SP[lw >> 16] & 3
 
@@ -742,6 +742,13 @@ struct BCGen
         return at;
     }
 
+    void emitFlg(BCValue lhs)
+    {
+        assert(lhs.vType == BCValueType.StackValue, "Can only store flags in Stack Values");
+        byteCodeArray[ip] = ShortInst16(ShortInst.Flg, lhs.stackAddr.addr);
+        ip += 2;
+    }
+
     void emitEq(BCValue lhs, BCValue rhs)
     {
         //  assert(rhs.type == BCType.i32 && lhs.type == BCType.i32, "For now only 32bit is supported");
@@ -755,6 +762,20 @@ struct BCGen
         {
 
             emitLongInst(LongInst64(LongInst.Eq, lhs.stackAddr, rhs.stackAddr));
+        }
+    }
+
+    void emitGt(BCValue lhs, BCValue rhs)
+    {
+        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
+        {
+            
+            emitLongInst(LongInstImm32(LongInstImm32.ImmGt, lhs.stackAddr, rhs.imm32));
+        }
+        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
+        {
+            
+            emitLongInst(LongInst64(LongInst.Gt, lhs.stackAddr, rhs.stackAddr));
         }
     }
 
@@ -895,15 +916,31 @@ struct BCGen
 
     BCValue Lt3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType == BCValueType.Unknown, "The result for ths must be Empty");
+        assert(result.vType == BCValueType.Unknown || result.vType == BCValueType.StackValue, "The result for this must be Empty or a StackValue");
         emitLt(lhs, rhs);
+        if(result.vType == BCValueType.StackValue) {
+            emitFlg(result);
+        }
+        return result;
+    }
+
+    BCValue Gt3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType == BCValueType.Unknown || result.vType == BCValueType.StackValue, "The result for this must be Empty or a StackValue");
+        emitGt(lhs, rhs);
+        if(result.vType == BCValueType.StackValue) {
+            emitFlg(result);
+        }
         return result;
     }
 
     BCValue Eq3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType == BCValueType.Unknown, "The result for ths must be Empty");
+        assert(result.vType == BCValueType.Unknown || result.vType == BCValueType.StackValue, "The result for this must be Empty or a StackValue");
         emitEq(lhs, rhs);
+        if(result.vType == BCValueType.StackValue) {
+            emitFlg(result);
+        }
         return result;
     }
 
@@ -1233,6 +1270,11 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "Mod4 SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
+                case ShortInst.Flg:
+                {
+                    result ~= "Flg SP[" ~ to!string(lw >> 16) ~ "] \n";
+                }
+                    break;
 
             case ShortInst.Drb:
                 result ~= "Drb" ~ to!string(
@@ -1667,19 +1709,23 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 final switch (DsIdx & 3)
                 {
                 case 0:
-                    db = dr & 0x000F;
+                    db = dr & 0x00FF;
                     break;
                 case 1:
-                    db = (dr & 0x00F0) >> 8;
+                    db = (dr & 0xFF00) >> 8;
                     break;
                 case 2:
-                    db = (dr & 0x0F00) >> 16;
+                    db = (dr & 0xFF0000) >> 16;
                     break;
                 case 3:
                     db = dr >> 24;
                     break;
                 }
                 break;
+            case ShortInst.Flg:
+                {
+                    (*opRef) = cond;
+                }
 
             case ShortInst.Mod4:
                 {

@@ -875,15 +875,15 @@ public:
         {
         case TOK.TOKlt:
             {
-                retval = genLt(ce.e1, ce.e2);
+                retval = Lt3(assignTo, genExpr(ce.e1), genExpr(ce.e2));
             }
             break;
 
-            /*case TOK.TOKge:
+            case TOK.TOKgt:
             {
-                retval = genGe(ce.e2, ce.e1).value;
+                retval = Gt3(assignTo, genExpr(ce.e1), genExpr(ce.e2));
             }
-            break;*/
+            break;
 
         default:
             IGaveUp = true;
