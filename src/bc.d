@@ -1824,19 +1824,19 @@ int[] testDs()
 
 }
 
-//pragma(msg, printInstructions(testMul().ptr, cast(uint)(testMul().length + 4)));
 static assert(interpret(testArith(), []) == 7);
-pragma(msg, testDs.printInstructions);
+//pragma(msg, testDs.printInstructions);
 
 static assert(interpret(testLt(), [BCValue(Imm32(21)), BCValue(Imm32(25))]));
 static assert(!interpret(testLt(), [BCValue(Imm32(27)), BCValue(Imm32(25))]));
 static assert(!interpret(testLt(), [BCValue(Imm32(25)), BCValue(Imm32(25))]));
 
-pragma(msg, interpret(testLt(), [BCValue(Imm32(27)), BCValue(Imm32(25))]));
-pragma(msg, testLt.printInstructions);
+//pragma(msg, testLt.printInstructions);
 
-pragma(msg, interpret(testBC, [BCValue(Imm32(12))]));
-pragma(msg, testBC.printInstructions);
+static assert(interpret(testBC, [BCValue(Imm32(12))]) == 24);
+static assert(interpret(testBC, [BCValue(Imm32(16))]) == 16);
+
+//pragma(msg, testBC.printInstructions);
 
 static assert(cast(dchar) testDs.interpret([BCValue(Imm32(1))],
     (cast(uint[]) "hello"d).ptr) == "e"[0]);
