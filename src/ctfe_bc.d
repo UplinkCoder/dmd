@@ -107,7 +107,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression th
             _args ~= a;
         }
 
-    return evaluateFunction(fd, _args, thisExp);
+    return evaluateFunction(fd, _args ? _args : [], thisExp);
 }
 
 import ddmd.ctfe.bc;
@@ -132,7 +132,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
     {
         csw.start();
         bcv.beginParameters();
-        foreach (i, p; *(fd.parameters))
+        if (fd.parameters) foreach (i, p; *(fd.parameters))
         {
             debug
             {
@@ -459,12 +459,12 @@ public:
     }
 
     void endParameters() {
+        sp += (parameterTypes.length * 4);
         processingParameters = false;
     }
 
     BCAddr beginArguments() {
         processingArguments = true;
-        sp += (parameterTypes.length * 4); 
         return ip;
     }
 
@@ -485,7 +485,7 @@ public:
 
 
         if (processingArguments) {
-            assignTo = BCValue(StackAddr(cast(short)(4 + (arguments.length*4))), BCType.i32);
+            assignTo = BCValue(StackAddr(cast(short)(4 + (arguments.length*4))), BCType(BCTypeEnum.i32));
             assert(arguments.length <= parameterTypes.length, "passed to many arguments");
         }
 
@@ -669,19 +669,19 @@ public:
         assert(_string.type == BCType.String);
         auto idx = genExpr(ie.e2);
 
-        auto ptr = genTemporary(BCType.i32).value;
+        auto ptr = genTemporary(BCType(BCTypeEnum.i32)).value;
         /// we have to add the size of the length to the ptr
         Add3(ptr, _string, idx);
-        Add3(ptr, ptr, BCValue(Imm32(basicTypeSize(BCType.i32))));
+        Add3(ptr, ptr, BCValue(Imm32(basicTypeSize(BCType(BCTypeEnum.i32)))));
 
 
-        assignTo = assignTo ? assignTo : genTemporary(BCType.i32).value;
+        assignTo = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value;
 
         emitLongInst(LongInst64(LongInst.Lsb, assignTo.stackAddr, ptr.stackAddr));
 
 
 
-        assert(idx.type == BCType.i32);
+        assert(idx.type == BCType(BCTypeEnum.i32));
         //emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, ptr.stackAddr));
          // *lhsRef = DS[aligin4(rhs)]
         retval = assignTo;
@@ -814,17 +814,19 @@ public:
             import std.stdio;
             writeln(*_struct);
         }
+        assignTo = assignTo && assignTo.vType == BCValueType.StackValue ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value;
+
         auto lhs = genExpr(dve.e1);
+
         assert(lhs.type == BCTypeEnum.Struct);
         assert(lhs.vType == BCValueType.StackValue);
         auto offset = BCValue(Imm32(dve.var.isVarDeclaration.offset));
 
-        auto ptr = genTemporary(BCType.i32).value;
+        auto ptr = genTemporary(BCType(BCTypeEnum.i32)).value;
         /// we have to add the size of the length to the ptr
         Add3(ptr, lhs, offset);
         
-        assignTo = assignTo && assignTo.vType == BCValueType.StackValue ? assignTo : genTemporary(BCType.i32).value;
-        
+
         emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, ptr.stackAddr));
 
         debug {
@@ -850,8 +852,8 @@ public:
             assert(ty.type == BCTypeEnum.i32, "can only deal with ints and uints atm.");
         }
 
-        auto result = BCValue(StackAddr(cast(short)(sp)), BCType.Struct);
-
+        retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value;
+        auto result  = BCValue(StackAddr(sp), BCType(BCTypeEnum.i32));
         foreach(elem;*sle.elements) {
             auto elexpr = genExpr(elem);
             assert(elexpr.type == BCTypeEnum.i32);
@@ -859,14 +861,7 @@ public:
             sp += align4(basicTypeSize(elexpr.type));
         }
 
-        if (assignTo) {
-            emitSet(assignTo, BCValue(Imm32(result.stackAddr)));
-        }
-
-        retval = result;
-
-
-       
+        emitSet(retval, BCValue(Imm32(result.stackAddr)));
     }
 
 
@@ -874,8 +869,8 @@ public:
         auto array = genExpr(ale.e1);
         assert(array.type == BCType.String, "We only handle StringLengths");
         assert(array.vType == BCValueType.StackValue, "We only handle StringLengths");
-        assignTo = assignTo ? assignTo : genTemporary(BCType.i32).value; 
-        emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
+        retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value; 
+        emitLongInst(LongInst64(LongInst.Lss, retval.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
         retval = assignTo;
         //emitSet(, array);
         //emitPrt(retval);
@@ -926,7 +921,7 @@ public:
         {
 
             ci.accept(this);
-            if (retval.vType == BCValueType.Immidiate && retval.type == BCType.i32)
+            if (retval.vType == BCValueType.Immidiate && retval.type == BCType(BCTypeEnum.i32))
             {
                 emitSet(var, retval);
             }
@@ -984,7 +979,7 @@ public:
         auto rhs = retval;
         //assert(rhs.vType == BCValueType.Immidiate);
 
-        //assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+        //assert(rhs.type == BCType.i32 && lhs.type == BCType(BCTypeEnum.i32));
 
         switch (e.op)
         {
@@ -1033,20 +1028,20 @@ public:
 
         assert(se.sz == 1, "only char strings are supported for now");
         assert(se.string[se.len] == '\0', "string should be 0-terminated");
-        auto result = BCValue(StackAddr(sp), BCType.String);
-        emitSet(BCValue(StackAddr(sp), BCType.i32), BCValue(Imm32(cast(int)se.len)));
-        sp += align4(basicTypeSize(BCType.i32));
+        auto result = BCValue(StackAddr(sp), BCType(BCTypeEnum.String));
+        emitSet(BCValue(StackAddr(sp), BCType(BCTypeEnum.i32)), BCValue(Imm32(cast(int)se.len)));
+        sp += align4(basicTypeSize(BCType(BCTypeEnum.i32)));
         auto rest = se.len % 4;
         foreach(cellIndex;0 .. (se.len / 4) + (rest!=0))
         {
-            emitSet(BCValue(StackAddr(sp), BCType.i32), BCValue(Imm32(*((cast(uint*)se.string) + cellIndex))));
-            sp += align4(basicTypeSize(BCType.i32));
+            emitSet(BCValue(StackAddr(sp), BCType(BCTypeEnum.i32)), BCValue(Imm32(*((cast(uint*)se.string) + cellIndex))));
+            sp += align4(basicTypeSize(BCType(BCTypeEnum.i32)));
         }
 
         if (!rest)
         {
             //trailing 0
-            sp += align4(basicTypeSize(BCType.i32));
+            sp += align4(basicTypeSize(BCType(BCTypeEnum.i32)));
         }
 
         if (assignTo) {

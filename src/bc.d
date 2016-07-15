@@ -453,18 +453,18 @@ struct BCValue
         imm64 = value;
     } */
 
-    this(StackAddr sp, BCTypeEnum type) pure
+    this(StackAddr sp, BCType type) pure
     {
         this.vType = BCValueType.StackValue;
         this.stackAddr = sp;
-        this.type.type = type;
+        this.type = type;
     }
 
-    this(void* base, short addr, BCTypeEnum type) pure
+    this(void* base, short addr, BCType type) pure
     {
         this.vType = BCValueType.StackValue;
         this.stackAddr = StackAddr(addr);
-        this.type.type = type;
+        this.type = type;
         if (!__ctfe)
             this.valAddr = base + addr;
     }
@@ -571,14 +571,14 @@ struct BCGen
         ip += 2;
     }
 
-    BCTemporary genTemporary(BCTypeEnum bct)
+    BCTemporary genTemporary(BCType bct)
     {
         auto tmp = temporarys[temporaryCount] = BCTemporary(BCValue(StackAddr(sp),
             bct), temporaryCount);
         //make BCTypeEnum a struct
         //FIXE make the typeIndex a part of BCTypeEnum. 
 
-        sp += align4(/*isBasicBCTypeEnum(bct) ? */basicTypeSize(bct)/* : sharedState.size(bct, 0)*/);
+        sp += align4( isBasicBCType(bct)?  basicTypeSize(bct) :  0);//sharedState.size(bct.type, typeIndex));
         ++temporaryCount;
         return tmp;
     }
@@ -1011,7 +1011,7 @@ string printInstructions(int* startInstructions, uint length)
             --length;
             uint hi = arr[pos++];
 
-            switch (cast(LongInst)(lw & InstMask))
+            final switch (cast(LongInst)(lw & InstMask))
             {
             case LongInst.ImmSet:
                 {
@@ -1044,7 +1044,16 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "And SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
                 }
                 break;
-
+            case LongInst.ImmLsh:
+                {
+                    result ~= "Lsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+                }
+                break;
+            case LongInst.ImmRsh:
+                {
+                    result ~= "Rsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+                }
+                break;
             case LongInst.ImmEq:
                 {
                     result ~= "Eq CF [" ~ to!string((lw & 0xF00) >> 8) ~ "] SP[" ~ to!string(
@@ -1086,6 +1095,16 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "And SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
                 break;
+                case LongInst.Lsh:
+                {
+                    result ~= "Lsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+                }
+                    break;
+                case LongInst.Rsh:
+                {
+                    result ~= "Rsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+                }
+                    break;
             case LongInst.Eq:
                 {
                     result ~= "Eq SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
@@ -1147,18 +1166,26 @@ string printInstructions(int* startInstructions, uint length)
                         hi >> 16) ~ "])]\n";
                 }
                 break;
-                case LongInst.Lss:
+            case LongInst.Lss:
                 {
                     result ~= "Lss SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(
                         hi >> 16) ~ "]\n";
                 }
-                    break;
+                break;
+            case LongInst.Lsb:
+                {
+                    result ~= "Lsb SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(
+                        hi >> 16) ~ "]\n";
+                }
+                break;
 
+
+                    /*
             default:
                 {
                     result ~= "Unkown LongInst \n" ~ to!string(cast(LongInst)(lw & InstMask));
                 }
-                break;
+                break;*/
             }
         }
         else
@@ -1678,7 +1705,7 @@ int[] testArith()
     auto sixteen = BCValue(Imm32(16));
     auto four = BCValue(Imm32(4));
 
-    auto result = gen.genTemporary(BCTypeEnum.i32);
+    auto result = gen.genTemporary(BCType(BCTypeEnum.i32));
 
     gen.Mul3(result.value, two, sixteen);
     gen.Div3(result.value, result.value, four);
@@ -1692,11 +1719,11 @@ int[] testLt()
     BCGen gen;
     with (gen)
     {
-        auto p1 = BCValue(StackAddr(4), BCTypeEnum.i32); //first parameter gets push on here
-        auto p2 = BCValue(StackAddr(8), BCTypeEnum.i32); //the second goes here
+        auto p1 = BCValue(StackAddr(4), BCType(BCTypeEnum.i32)); //first parameter gets push on here
+        auto p2 = BCValue(StackAddr(8), BCType(BCTypeEnum.i32)); //the second goes here
         sp += 8;
         // we dont want to overwrite our parameters;
-        BCValue result = genTemporary(BCTypeEnum.i32).value;
+        BCValue result = genTemporary(BCType(BCTypeEnum.i32)).value;
         auto eval_label = genLabel();
         emitPrt(p1);
         emitPrt(p2);
@@ -1719,7 +1746,7 @@ int[] testBC()
     BCGen gen;
     with (gen)
     {
-        auto p1 = BCValue(StackAddr(4), BCTypeEnum.i32);
+        auto p1 = BCValue(StackAddr(4), BCType(BCTypeEnum.i32));
         sp += 4;
         auto cond = Eq3(BCValue.init, p1, BCValue(Imm32(16)));
         auto cndJmp = beginCndJmp();
@@ -1743,10 +1770,10 @@ int[] testDs()
     BCGen gen;
     with (gen)
     {
-        auto p1 = BCValue(StackAddr(4), BCTypeEnum.i32);
+        auto p1 = BCValue(StackAddr(4), BCType(BCTypeEnum.i32));
         sp += 4;
 
-        auto result = genTemporary(BCTypeEnum.i32).value;
+        auto result = genTemporary(BCType(BCTypeEnum.i32)).value;
 
         emitLongInst(LongInst64(LongInst.Lds, result.stackAddr, p1.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
 
