@@ -508,7 +508,18 @@ public:
                 discardValue = oldDiscardValue;
             }
             break;
-
+        case TOK.TOKdiv:
+            {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto lhs = genExpr(e.e1);
+                auto rhs = genExpr(e.e2);
+                assert(!oldDiscardValue, "A lone mul discarding the value is strange");
+                Div3(retval, lhs, rhs);
+                // TOOD use sizeof(retval);
+                discardValue = oldDiscardValue;
+            }
+            break;
         case TOK.TOKoror:
             {
                 const oldDiscardValue = discardValue;

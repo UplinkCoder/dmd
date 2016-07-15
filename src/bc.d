@@ -64,7 +64,6 @@ enum LongInst : ushort
 {
 
     Jmp,
-    Inc2,
     JmpFalse,
     JmpTrue,
     JmpZ,
@@ -275,9 +274,7 @@ enum BCType : ubyte
     Void,
 
     Ptr,
-    Slice,
 
-    String,
     Char,
     i1,
 
@@ -285,9 +282,12 @@ enum BCType : ubyte
     i16,
     i32,
     i64,
-
+    //  everything below here is not used by the bc layer.
+    String,
     Array,
     Struct,
+    //Slice,
+
 }
 
 const(uint) basicTypeSize(const BCType bct) pure
@@ -542,8 +542,8 @@ struct BCArray
 
 struct BCStruct
 {
-    BCType memberTypes[ubyte.max];
-    uint memberTypeIndexs[ubyte.max];
+    BCType[ubyte.max] memberTypes;
+    uint[ubyte.max] memberTypeIndexs;
 
     uint memeberTypesCount;
 //    uint[] methodByteCode;
@@ -561,47 +561,45 @@ struct SharedBcState
     const(uint) size(const BCType type, const uint elementTypeIndex) const {
  
     switch (type) {
-        case BCType.Struct :
-        {
-            uint _size;
-            assert(elementTypeIndex <= structCount);
-            BCStruct _struct = structs[elementTypeIndex];
-
-            //import std.algorithm : sum;
-            foreach(i, memberType; _struct.memberTypes[0 .. _struct.memeberTypesCount])
+            case BCType.Struct :
             {
-                _size += isBasicBCType(memberType) ? 
-                    basicTypeSize(memberType)
-                    : this.size(memberType, _struct.memberTypeIndexs[i]);
+                uint _size;
+                assert(elementTypeIndex <= structCount);
+                BCStruct _struct = structs[elementTypeIndex];
+
+                //import std.algorithm : sum;
+                foreach(i, memberType; _struct.memberTypes[0 .. _struct.memeberTypesCount])
+                {
+                    _size += isBasicBCType(memberType) ? 
+                        basicTypeSize(memberType)
+                        : this.size(memberType, _struct.memberTypeIndexs[i]);
+                }
+
+                return _size;
+
             }
 
-            return _size;
-
-        }
-
-        case BCType.Array :
-        {
-            assert(elementTypeIndex <= arrayCount);
-            BCArray _array = arrays[elementTypeIndex];
-            
+            case BCType.Array :
+            {
+                assert(elementTypeIndex <= arrayCount);
+                BCArray _array = arrays[elementTypeIndex];
+                
                 return (isBasicBCType(_array.elementType) ? _array.arraySize() : _array.arraySize(&this));
+            }
 
-            
+            default : {
+                    return 0;
+            }
+
         }
-
-        default : {
-                return 0;
-        }
-
     }
 }
-}
+SharedBcState* sharedState;
 
 struct BCGen
 {
     //SharedState 
     // The following is shared between ALL BC generator instances in a given run
-    SharedBcState* sharedState;
 
     /////////////////////////////////////////////
 
