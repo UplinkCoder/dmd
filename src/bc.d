@@ -224,7 +224,6 @@ static assert(ShortInst.max < 64);
 static short isShortJump(const int offset) pure
 {
     assert(offset != 0, "An Jump to the Jump itself is invalid");
-    
 
     const bool wasNegative = (offset < 0);
     int abs_offset = wasNegative ? offset * -1 : offset;
@@ -270,14 +269,14 @@ uint ShortInst24(const ShortInst i, const uint imm) pure
 enum BCTypeEnum : ubyte
 {
     undef,
-    
+
     Void,
-    
+
     Ptr,
-    
+
     Char,
     i1,
-    
+
     i8,
     i16,
     i32,
@@ -285,11 +284,9 @@ enum BCTypeEnum : ubyte
     //  everything below here is not used by the bc layer.
     String,
     Array,
-    Struct,
-    //Slice,
-    
-}
+    Struct,//Slice,
 
+}
 
 struct BCType
 {
@@ -339,11 +336,11 @@ const(uint) basicTypeSize(const BCTypeEnum bct) pure
         {
             return 8;
         }
-     
-    case Array, Struct : 
+
+    case Array, Struct:
         {
             return 0;
-        } 
+        }
     }
 }
 
@@ -436,7 +433,7 @@ struct BCValue
 
         return format("\nvType: %s\tType: %s\tstackAddr: %s\timm32 %s\t",
             vType, type, stackAddr, imm32);
-       // return "";
+        // return "";
     }
 
     this(Imm32 imm32) pure
@@ -526,7 +523,7 @@ import core.bitop : bsf;
 static assert(bsf(0xFF) == 0);
 static assert(bsf(0x20) == 5);
 
-bool isBasicBCType(BCTypeEnum bct) 
+bool isBasicBCType(BCTypeEnum bct)
 {
     return !(bct == BCTypeEnum.Struct || bct == BCTypeEnum.Array);
 }
@@ -578,7 +575,7 @@ struct BCGen
         //make BCTypeEnum a struct
         //FIXE make the typeIndex a part of BCTypeEnum. 
 
-        sp += align4( isBasicBCType(bct)?  basicTypeSize(bct) :  0);//sharedState.size(bct.type, typeIndex));
+        sp += align4(isBasicBCType(bct) ? basicTypeSize(bct) : 0); //sharedState.size(bct.type, typeIndex));
         ++temporaryCount;
         return tmp;
     }
@@ -702,12 +699,12 @@ struct BCGen
     {
         if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
         {
-            
+
             emitLongInst(LongInstImm32(LongInstImm32.ImmGt, lhs.stackAddr, rhs.imm32));
         }
         else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
         {
-            
+
             emitLongInst(LongInst64(LongInst.Gt, lhs.stackAddr, rhs.stackAddr));
         }
     }
@@ -751,7 +748,8 @@ struct BCGen
             debug if (!__ctfe)
             {
                 import std.stdio;
-                    writeln("lhs.vType : ", lhs.vType, "rhs.vType : ", rhs.vType);
+
+                writeln("lhs.vType : ", lhs.vType, "rhs.vType : ", rhs.vType);
             }
             assert(0, "Set flavour unsupported");
         }
@@ -849,9 +847,12 @@ struct BCGen
 
     BCValue Lt3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType == BCValueType.Unknown || result.vType == BCValueType.StackValue, "The result for this must be Empty or a StackValue");
+        assert(result.vType == BCValueType.Unknown
+            || result.vType == BCValueType.StackValue,
+            "The result for this must be Empty or a StackValue");
         emitLt(lhs, rhs);
-        if(result.vType == BCValueType.StackValue) {
+        if (result.vType == BCValueType.StackValue)
+        {
             emitFlg(result);
         }
         return result;
@@ -859,9 +860,12 @@ struct BCGen
 
     BCValue Gt3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType == BCValueType.Unknown || result.vType == BCValueType.StackValue, "The result for this must be Empty or a StackValue");
+        assert(result.vType == BCValueType.Unknown
+            || result.vType == BCValueType.StackValue,
+            "The result for this must be Empty or a StackValue");
         emitGt(lhs, rhs);
-        if(result.vType == BCValueType.StackValue) {
+        if (result.vType == BCValueType.StackValue)
+        {
             emitFlg(result);
         }
         return result;
@@ -869,9 +873,12 @@ struct BCGen
 
     BCValue Eq3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType == BCValueType.Unknown || result.vType == BCValueType.StackValue, "The result for this must be Empty or a StackValue");
+        assert(result.vType == BCValueType.Unknown
+            || result.vType == BCValueType.StackValue,
+            "The result for this must be Empty or a StackValue");
         emitEq(lhs, rhs);
-        if(result.vType == BCValueType.StackValue) {
+        if (result.vType == BCValueType.StackValue)
+        {
             emitFlg(result);
         }
         return result;
@@ -1095,16 +1102,16 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "And SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
                 break;
-                case LongInst.Lsh:
+            case LongInst.Lsh:
                 {
                     result ~= "Lsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
-                    break;
-                case LongInst.Rsh:
+                break;
+            case LongInst.Rsh:
                 {
                     result ~= "Rsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
-                    break;
+                break;
             case LongInst.Eq:
                 {
                     result ~= "Eq SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
@@ -1168,19 +1175,16 @@ string printInstructions(int* startInstructions, uint length)
                 break;
             case LongInst.Lss:
                 {
-                    result ~= "Lss SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(
-                        hi >> 16) ~ "]\n";
+                    result ~= "Lss SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
                 break;
             case LongInst.Lsb:
                 {
-                    result ~= "Lsb SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(
-                        hi >> 16) ~ "]\n";
+                    result ~= "Lsb SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
                 break;
 
-
-                    /*
+                /*
             default:
                 {
                     result ~= "Unkown LongInst \n" ~ to!string(cast(LongInst)(lw & InstMask));
@@ -1230,11 +1234,11 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "Mod4 SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
-                case ShortInst.Flg:
+            case ShortInst.Flg:
                 {
                     result ~= "Flg SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
-                    break;
+                break;
 
             case ShortInst.Drb:
                 result ~= "Drb" ~ to!string(
@@ -1326,9 +1330,11 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 stackOffset += uint.sizeof;
             }
             break;
-            case BCTypeEnum.Struct, BCTypeEnum.String : {
+        case BCTypeEnum.Struct, BCTypeEnum.String:
+            {
 
-            } break;
+            }
+            break;
         default:
             return -1;
             //       assert(0, "unsupported Type " ~ to!string(arg.type));
@@ -1581,32 +1587,39 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.Lss:
                 {
-                    (*lhsRef) = *(stack.ptr + (rhs/4));
+                    (*lhsRef) = *(stack.ptr + (rhs / 4));
                     //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
-                    break;
-                case LongInst.Lsb :
+                break;
+            case LongInst.Lsb:
                 {
 
-                    uint _dr = *(stack.ptr + (rhs/4));
-                    debug {import std.stdio; writeln("Lsb_ _dr:",_dr , "  rhs: ", rhs, " rhs/4: ", rhs/4, " rhs & 3: ", rhs&3 );}
+                    uint _dr = *(stack.ptr + (rhs / 4));
+                    debug
+                    {
+                        import std.stdio;
+
+                        writeln("Lsb_ _dr:", _dr, "  rhs: ", rhs, " rhs/4: ",
+                            rhs / 4, " rhs & 3: ", rhs & 3);
+                    }
                     final switch (rhs & 3)
                     {
-                        case 0:
-                            (*lhsRef) = _dr & 0xFF;
-                            break;
-                        case 1:
-                            (*lhsRef) =  (_dr & 0xFF00) >> 8;
-                            break;
-                        case 2:
-                            (*lhsRef) = (_dr & 0xFF0000) >> 16;
-                            break;
-                        case 3:
-                            (*lhsRef) = _dr >> 24;
-                            break;
+                    case 0:
+                        (*lhsRef) = _dr & 0xFF;
+                        break;
+                    case 1:
+                        (*lhsRef) = (_dr & 0xFF00) >> 8;
+                        break;
+                    case 2:
+                        (*lhsRef) = (_dr & 0xFF0000) >> 16;
+                        break;
+                    case 3:
+                        (*lhsRef) = _dr >> 24;
+                        break;
                     }
 
-                } break;
+                }
+                break;
             default:
                 {
                     assert(0, "Unkown LongInst." ~ to!string(cast(LongInst)(lw & InstMask)) ~ " \n");
@@ -1685,12 +1698,14 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             case ShortInst.Flg:
                 {
                     (*opRef) = cond;
-                } break;
+                }
+                break;
 
             case ShortInst.Mod4:
                 {
                     (*opRef) &= 3;
-                } break;
+                }
+                break;
             }
         }
     }
