@@ -3,6 +3,7 @@ module ddmd.ctfe_bc;
 import ddmd.expression;
 import ddmd.declaration : FuncDeclaration, VarDeclaration, Declaration;
 import ddmd.dsymbol;
+import ddmd.dstruct;
 import ddmd.mtype;
 import ddmd.statement;
 import ddmd.visitor;
@@ -29,7 +30,8 @@ import ddmd.arraytypes : Expressions;
 */
 
 import std.conv : to;
-
+__gshared SharedCtfeState _sharedCtfeState;
+__gshared SharedCtfeState* sharedCtfeState = &_sharedCtfeState;
 static private
 {
     ScopeStatement reduceNestedScopeAndCompoundStatements(ScopeStatement _ss) pure
@@ -68,12 +70,12 @@ static private
         return cs;
     }
 }
-struct SelfCall
+/*struct SelfCall
 {
     BCAddr callPoint;
     BCValue[16] arguments;
     ubyte argumentCount;
-}
+}*/
 
 struct SwitchFixupEntry
 {
@@ -221,6 +223,106 @@ string toString(T)(T value) if (is(T : Statement) || is(T : Declaration)
     return cast(string) cPtr[0 .. strlen(cPtr)];
 }
 
+
+struct BCArray
+{
+    BCType elementType;
+    uint elementTypeIndex;
+    
+    uint length;
+    
+    const(uint) arraySize() const
+    {
+        return length*basicTypeSize(elementType);
+    }
+    
+    const(uint) arraySize(const SharedCtfeState* sharedState) const
+    {
+        return sharedState.size(elementType, elementTypeIndex)*length;
+    }
+}
+
+struct BCStruct
+{
+    BCType[ubyte.max] memberTypes;
+    uint[ubyte.max] memberTypeIndexs;
+    
+    uint memeberTypesCount;
+    //    uint[] methodByteCode;
+
+    void addField(BCType bct)
+    {
+        assert(isBasicBCType(bct));
+        memberTypes[memeberTypesCount++] = bct;
+    }
+}
+
+struct SharedCtfeState
+{
+    uint _threadLock;
+    //Type 0 beeing the terminator for chainedTypes
+    void*[ubyte.max] structDeclPointers;
+    BCStruct[ubyte.max] structs;
+    uint structCount;
+    BCArray[ubyte.max] arrays;
+    uint arrayCount;
+
+    bool addStructInProgress;
+
+    BCStruct* beginStruct(void* structDeclPointer)
+    {
+        assert(!addStructInProgress);
+        addStructInProgress = true;
+        structDeclPointers[structCount] = structDeclPointer;
+        return &structs[structCount];
+    }
+
+    const(BCType) endStruct(BCStruct* s)
+    {
+        assert(addStructInProgress);
+        assert(s == &structs[structCount]);
+        return BCType(BCType.Struct, structCount++);
+        addStructInProgress = false;
+    }
+
+    const(uint) size(const BCType type, const uint elementTypeIndex) const {
+        
+        switch (type) {
+            case BCType.Struct :
+            {
+                uint _size;
+                assert(elementTypeIndex <= structCount);
+                BCStruct _struct = structs[elementTypeIndex];
+                
+                //import std.algorithm : sum;
+                foreach(i, memberType; _struct.memberTypes[0 .. _struct.memeberTypesCount])
+                {
+                    _size += isBasicBCType(memberType) ? 
+                        basicTypeSize(memberType)
+                            : this.size(memberType, _struct.memberTypeIndexs[i]);
+                }
+                
+                return _size;
+                
+            }
+                
+            case BCType.Array :
+            {
+                assert(elementTypeIndex <= arrayCount);
+                BCArray _array = arrays[elementTypeIndex];
+                
+                return (isBasicBCType(_array.elementType) ? _array.arraySize() : _array.arraySize(&this));
+            }
+                
+            default : {
+                return 0;
+            }
+                
+        }
+    }
+}
+
+
 extern (C++) final class BCV : Visitor
 {
 
@@ -241,13 +343,8 @@ extern (C++) final class BCV : Visitor
     SwitchState switchState;
     SwitchFixupEntry* switchFixup;
 
-    //State needs for tail calls
     FuncDeclaration me;
-    uint recursionDepth;
     bool inReturnStatement;
-    SelfCall[32] selfCalls;
-    byte selfCallCount;
-    //Rest
 
     const(BCType) toBCType(Type t) /*pure*/
     {
@@ -257,21 +354,21 @@ extern (C++) final class BCV : Visitor
             switch (bt.ty)
             {
             case ENUMTY.Tbool:
-                return BCType.i1;
+                return BCType(BCTypeEnum.i1);
             case ENUMTY.Tint8:
             case ENUMTY.Tuns8:
-                return BCType.i8;
+                return BCType(BCTypeEnum.i8);
             case ENUMTY.Tchar:
-                return BCType.Char;
+                return BCType(BCTypeEnum.Char);
             case ENUMTY.Tint16:
             case ENUMTY.Tuns16:
-                return BCType.i16;
+                return BCType(BCTypeEnum.i16);
             case ENUMTY.Tint32:
             case ENUMTY.Tuns32:
-                return BCType.i32;
+                return BCType(BCTypeEnum.i32);
             case ENUMTY.Tint64:
             case ENUMTY.Tuns64:
-                return BCType.i64;
+                return BCType(BCTypeEnum.i64);
             default:
                 IGaveUp = true;
                 debug assert(0, "Type unsupported " ~ (cast(Type)(t)).toString());
@@ -282,10 +379,23 @@ extern (C++) final class BCV : Visitor
         {
             if (t.isString)
             {
-                return BCType.String;
+                return BCType(BCTypeEnum.String);
+            } else if (t.ty == Tstruct) {
+                StructDeclaration sd = (cast(TypeStruct)t).sym;
+                auto st = sharedCtfeState.beginStruct(cast(void*)sd);
+
+                foreach(sMember;sd.fields) {
+                   st.addField(toBCType(sMember.type));
+                }
+
+                return sharedCtfeState.endStruct(st);
+
             }
+
+
             IGaveUp = true;
-            debug assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
+
+             debug assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
             return BCType.init;
         }
     }
@@ -353,6 +463,7 @@ public:
 
     BCAddr beginArguments() {
         processingArguments = true;
+        sp += (parameterTypes.length * 4); 
         return ip;
     }
 
@@ -387,10 +498,10 @@ public:
         BCValue ret = retval;
         retval = oldRetval;
 
-        if (processingArguments) {
-            arguments ~= retval;
-            assert(arguments.length <= parameterTypes.length, "passed to many arguments");
-        }
+//        if (processingArguments) {
+//            arguments ~= retval;
+//            assert(arguments.length <= parameterTypes.length, "passed to many arguments");
+//        }
 
 
         return ret;
@@ -686,6 +797,77 @@ public:
 
         assert(0, "Cannot handleExpression");
     }
+
+    override void visit(DotVarExp dve) {
+        assert(dve.e1.type.ty == Tstruct, "Can only take members of a struct for now");
+        auto structDeclPtr = cast(void*)((cast(TypeStruct)dve.e1.type).sym);
+        BCStruct* _struct;
+        foreach(i;0 .. sharedCtfeState.structCount) {
+            if (sharedCtfeState.structDeclPointers[i] == structDeclPtr) {
+                _struct = &sharedCtfeState.structs[i];
+                break;
+            }
+        }
+        assert(_struct, "We don't know the struct Type");
+        debug {
+            import std.stdio;
+            writeln(*_struct);
+        }
+        auto lhs = genExpr(dve.e1);
+        assert(lhs.type == BCTypeEnum.Struct);
+        assert(lhs.vType == BCValueType.StackValue);
+        auto offset = BCValue(Imm32(dve.var.isVarDeclaration.offset));
+
+        auto ptr = genTemporary(BCType.i32).value;
+        /// we have to add the size of the length to the ptr
+        Add3(ptr, lhs, offset);
+        
+        assignTo = assignTo && assignTo.vType == BCValueType.StackValue ? assignTo : genTemporary(BCType.i32).value;
+        
+        emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, ptr.stackAddr));
+
+        debug {
+            import std.stdio;
+            writeln("dve.var : ", dve.var.toString);
+            writeln(dve.var.isVarDeclaration.offset);
+        }
+        retval = assignTo;
+    }
+
+    override void visit(StructLiteralExp sle) {
+        auto structDeclPtr = cast(void*)sle.sd;
+        BCStruct* _struct;
+
+        foreach(i;0 .. sharedCtfeState.structCount) {
+            if (sharedCtfeState.structDeclPointers[i] == structDeclPtr) {
+                _struct = &sharedCtfeState.structs[i];
+                break;
+            }
+        }
+        assert(_struct, "We don't know the struct Type");
+        foreach(ty;_struct.memberTypes[0 .. _struct.memeberTypesCount]) {
+            assert(ty.type == BCTypeEnum.i32, "can only deal with ints and uints atm.");
+        }
+
+        auto result = BCValue(StackAddr(cast(short)(sp)), BCType.Struct);
+
+        foreach(elem;*sle.elements) {
+            auto elexpr = genExpr(elem);
+            assert(elexpr.type == BCTypeEnum.i32);
+            emitSet(BCValue(StackAddr(sp), elexpr.type), elexpr);
+            sp += align4(basicTypeSize(elexpr.type));
+        }
+
+        if (assignTo) {
+            emitSet(assignTo, BCValue(Imm32(result.stackAddr)));
+        }
+
+        retval = result;
+
+
+       
+    }
+
 
     override void visit(ArrayLengthExp ale) {
         auto array = genExpr(ale.e1);

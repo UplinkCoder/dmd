@@ -267,17 +267,17 @@ uint ShortInst24(const ShortInst i, const uint imm) pure
     return i | imm << 8;
 }
 
-enum BCType : ubyte
+enum BCTypeEnum : ubyte
 {
     undef,
-
+    
     Void,
-
+    
     Ptr,
-
+    
     Char,
     i1,
-
+    
     i8,
     i16,
     i32,
@@ -287,12 +287,21 @@ enum BCType : ubyte
     Array,
     Struct,
     //Slice,
-
+    
 }
 
-const(uint) basicTypeSize(const BCType bct) pure
+
+struct BCType
 {
-    final switch (bct) with (BCType)
+    BCTypeEnum type;
+    alias type this;
+    /// 0 means basic type
+    uint typeIndex;
+}
+
+const(uint) basicTypeSize(const BCTypeEnum bct) pure
+{
+    final switch (bct) with (BCTypeEnum)
     {
 
     case undef, Void:
@@ -304,7 +313,7 @@ const(uint) basicTypeSize(const BCType bct) pure
             //TODO add 64bit mode
             return  /* m64 ? 8 :*/ 4;
         }
-    case Slice, String:
+    case String:
         {
             //TODO add 64bit mode
             return  /* m64 ? 16 :*/ 4;
@@ -340,7 +349,7 @@ const(uint) basicTypeSize(const BCType bct) pure
 
 struct BCSlice
 {
-    BCType elem;
+    BCTypeEnum elem;
     uint length;
 }
 
@@ -359,7 +368,7 @@ struct BCValue
     BCType type;
 
     ///default value 0 - meaning BuiltinType
-    uint typeIndex;
+
     union
     {
         StackAddr stackAddr;
@@ -388,7 +397,7 @@ struct BCValue
 
     bool opEquals(const BCValue rhs) pure const
     {
-        if (this.vType == rhs.vType && this.type == rhs.type)
+        if (this.vType == rhs.vType && this.type.type == rhs.type)
         {
             final switch (this.vType)
             {
@@ -398,11 +407,11 @@ struct BCValue
             case BCValueType.Immidiate:
                 switch (this.type)
                 {
-                case BCType.i32:
+                case BCTypeEnum.i32:
                     {
                         return imm32.imm32 == rhs.imm32.imm32;
                     }
-                    /*case BCType.i64:
+                    /*case BCTypeEnum.i64:
                     {
                         return imm64 == rhs.imm64;
                     }*/
@@ -432,37 +441,37 @@ struct BCValue
 
     this(Imm32 imm32) pure
     {
-        this.type = BCType.i32;
+        this.type.type = BCTypeEnum.i32;
         this.vType = BCValueType.Immidiate;
         this.imm32 = imm32;
     }
 
-    /*    this(Imm64 value, BCType type) pure
+    /*    this(Imm64 value, BCTypeEnum type) pure
     {
         this.vType = BCValueType.Immidiate;
-        this.type = type;
+        this.type.type = type;
         imm64 = value;
     } */
 
-    this(StackAddr sp, BCType type) pure
+    this(StackAddr sp, BCTypeEnum type) pure
     {
         this.vType = BCValueType.StackValue;
         this.stackAddr = sp;
-        this.type = type;
+        this.type.type = type;
     }
 
-    this(void* base, short addr, BCType type) pure
+    this(void* base, short addr, BCTypeEnum type) pure
     {
         this.vType = BCValueType.StackValue;
         this.stackAddr = StackAddr(addr);
-        this.type = type;
+        this.type.type = type;
         if (!__ctfe)
             this.valAddr = base + addr;
     }
 }
 
 pragma(msg, "Sizeof BCValue: ", BCValue.sizeof);
-static bcOne = BCValue(Imm32(1));
+__gshared static bcOne = BCValue(Imm32(1));
 
 struct BCAddr
 {
@@ -517,84 +526,10 @@ import core.bitop : bsf;
 static assert(bsf(0xFF) == 0);
 static assert(bsf(0x20) == 5);
 
-bool isBasicBCType(BCType bct) 
+bool isBasicBCType(BCTypeEnum bct) 
 {
-    return !(bct == BCType.Struct || bct == BCType.Array);
+    return !(bct == BCTypeEnum.Struct || bct == BCTypeEnum.Array);
 }
-
-struct BCArray
-{
-    BCType elementType;
-    uint elementTypeIndex;
-
-    uint length;
-
-    const(uint) arraySize() const
-    {
-        return length*basicTypeSize(elementType);
-    }
-
-    const(uint) arraySize(const SharedBcState* sharedState) const
-    {
-        return sharedState.size(elementType, elementTypeIndex)*length;
-    }
-}
-
-struct BCStruct
-{
-    BCType[ubyte.max] memberTypes;
-    uint[ubyte.max] memberTypeIndexs;
-
-    uint memeberTypesCount;
-//    uint[] methodByteCode;
-}
-
-struct SharedBcState
-{
-    uint _threadLock;
-    //Type 0 beeing the terminator for chainedTypes
-    BCStruct[ubyte.max] structs;
-    uint structCount;
-    BCArray[ubyte.max] arrays;
-    uint arrayCount;
-
-    const(uint) size(const BCType type, const uint elementTypeIndex) const {
- 
-    switch (type) {
-            case BCType.Struct :
-            {
-                uint _size;
-                assert(elementTypeIndex <= structCount);
-                BCStruct _struct = structs[elementTypeIndex];
-
-                //import std.algorithm : sum;
-                foreach(i, memberType; _struct.memberTypes[0 .. _struct.memeberTypesCount])
-                {
-                    _size += isBasicBCType(memberType) ? 
-                        basicTypeSize(memberType)
-                        : this.size(memberType, _struct.memberTypeIndexs[i]);
-                }
-
-                return _size;
-
-            }
-
-            case BCType.Array :
-            {
-                assert(elementTypeIndex <= arrayCount);
-                BCArray _array = arrays[elementTypeIndex];
-                
-                return (isBasicBCType(_array.elementType) ? _array.arraySize() : _array.arraySize(&this));
-            }
-
-            default : {
-                    return 0;
-            }
-
-        }
-    }
-}
-SharedBcState* sharedState;
 
 struct BCGen
 {
@@ -636,14 +571,14 @@ struct BCGen
         ip += 2;
     }
 
-    BCTemporary genTemporary(BCType bct)
+    BCTemporary genTemporary(BCTypeEnum bct)
     {
         auto tmp = temporarys[temporaryCount] = BCTemporary(BCValue(StackAddr(sp),
             bct), temporaryCount);
-        //make BCType a struct
-        //FIXE make the typeIndex a part of BCType. 
+        //make BCTypeEnum a struct
+        //FIXE make the typeIndex a part of BCTypeEnum. 
 
-        sp += align4(isBasicBCType(bct) ? basicTypeSize(bct) : sharedState.size(bct, 0));
+        sp += align4(/*isBasicBCTypeEnum(bct) ? */basicTypeSize(bct)/* : sharedState.size(bct, 0)*/);
         ++temporaryCount;
         return tmp;
     }
@@ -749,7 +684,7 @@ struct BCGen
 
     void emitEq(BCValue lhs, BCValue rhs)
     {
-        //  assert(rhs.type == BCType.i32 && lhs.type == BCType.i32, "For now only 32bit is supported");
+        //  assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32, "For now only 32bit is supported");
 
         if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
         {
@@ -794,7 +729,7 @@ struct BCGen
 
     void emitSet(BCValue lhs, BCValue rhs)
     {
-        //assert(rhs.type == BCType.i32 && lhs.type == BCType.i32,
+        //assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32,
         //    "for now only 32bit set is supported");
         //Do not emit redundant self assignments
         if (rhs == lhs)
@@ -824,7 +759,7 @@ struct BCGen
 
     void emitAdd(BCValue lhs, BCValue rhs)
     {
-        assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
         if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
         {
 
@@ -842,7 +777,7 @@ struct BCGen
 
     void emitSub(BCValue lhs, BCValue rhs)
     {
-        assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
         if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
         {
 
@@ -860,7 +795,7 @@ struct BCGen
 
     void emitMul(BCValue lhs, BCValue rhs)
     {
-        assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
         if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
         {
 
@@ -878,7 +813,7 @@ struct BCGen
 
     void emitDiv(BCValue lhs, BCValue rhs)
     {
-        assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
         if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
         {
 
@@ -896,7 +831,7 @@ struct BCGen
 
     void emitAnd(BCValue lhs, BCValue rhs)
     {
-        assert(rhs.type == BCType.i32 && lhs.type == BCType.i32);
+        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
         if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
         {
 
@@ -1004,13 +939,13 @@ struct BCGen
 
     BCValue pushOntoStack(BCValue val)
     {
-        assert(val.type == BCType.i32);
+        assert(val.type == BCTypeEnum.i32);
         if (val.vType != BCValueType.StackValue)
         {
             auto stackref = BCValue(null, sp, val.type);
             emitSet(stackref, val);
 
-            sp += align4(sharedState.size(val.type, val.typeIndex));
+            sp += align4(basicTypeSize(val.type));
             return stackref;
         }
         else
@@ -1351,20 +1286,20 @@ uint interpret(const int[] byteCode, const BCValue[] args,
     {
         switch (arg.type)
         {
-        case BCType.i32:
+        case BCTypeEnum.i32:
             {
                 *(stack.ptr + (stackOffset / 4)) = arg.imm32;
                 stackOffset += uint.sizeof;
             }
             break;
-        case BCType.i64:
+        case BCTypeEnum.i64:
             {
                 pragma(msg, "I treat ulongs as uints ... beware");
                 *(stack.ptr + (stackOffset / 4)) = arg.imm32;
                 stackOffset += uint.sizeof;
             }
             break;
-            case BCType.String : {
+            case BCTypeEnum.Struct, BCTypeEnum.String : {
 
             } break;
         default:
@@ -1743,7 +1678,7 @@ int[] testArith()
     auto sixteen = BCValue(Imm32(16));
     auto four = BCValue(Imm32(4));
 
-    auto result = gen.genTemporary(BCType.i32);
+    auto result = gen.genTemporary(BCTypeEnum.i32);
 
     gen.Mul3(result.value, two, sixteen);
     gen.Div3(result.value, result.value, four);
@@ -1757,11 +1692,11 @@ int[] testLt()
     BCGen gen;
     with (gen)
     {
-        auto p1 = BCValue(StackAddr(4), BCType.i32); //first parameter gets push on here
-        auto p2 = BCValue(StackAddr(8), BCType.i32); //the second goes here
+        auto p1 = BCValue(StackAddr(4), BCTypeEnum.i32); //first parameter gets push on here
+        auto p2 = BCValue(StackAddr(8), BCTypeEnum.i32); //the second goes here
         sp += 8;
         // we dont want to overwrite our parameters;
-        BCValue result = genTemporary(BCType.i32).value;
+        BCValue result = genTemporary(BCTypeEnum.i32).value;
         auto eval_label = genLabel();
         emitPrt(p1);
         emitPrt(p2);
@@ -1784,7 +1719,7 @@ int[] testBC()
     BCGen gen;
     with (gen)
     {
-        auto p1 = BCValue(StackAddr(4), BCType.i32);
+        auto p1 = BCValue(StackAddr(4), BCTypeEnum.i32);
         sp += 4;
         auto cond = Eq3(BCValue.init, p1, BCValue(Imm32(16)));
         auto cndJmp = beginCndJmp();
@@ -1808,10 +1743,10 @@ int[] testDs()
     BCGen gen;
     with (gen)
     {
-        auto p1 = BCValue(StackAddr(4), BCType.i32);
+        auto p1 = BCValue(StackAddr(4), BCTypeEnum.i32);
         sp += 4;
 
-        auto result = genTemporary(BCType.i32).value;
+        auto result = genTemporary(BCTypeEnum.i32).value;
 
         emitLongInst(LongInst64(LongInst.Lds, result.stackAddr, p1.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
 
