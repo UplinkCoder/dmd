@@ -281,8 +281,9 @@ struct SharedCtfeState
     {
         assert(addStructInProgress);
         assert(s == &structs[structCount]);
-        return BCType(BCType.Struct, structCount++);
         addStructInProgress = false;
+
+        return BCType(BCType.Struct, structCount++);
     }
 
     const(uint) size(const BCType type, const uint elementTypeIndex) const {
