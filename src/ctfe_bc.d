@@ -505,7 +505,7 @@ public:
         {
             writeln("expr: ", expr.toString, " == ", retval);
         }
-        assert(!discardValue || retval.vType != BCValueType.Unknown);
+//        assert(!discardValue || retval.vType != BCValueType.Unknown);
         BCValue ret = retval;
         retval = oldRetval;
 
@@ -870,7 +870,10 @@ public:
         }
 
         retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value;
+        /*HACK HACK HACK*/ sp += 4; //HACK
         auto result = BCValue(StackAddr(sp), BCType(BCTypeEnum.i32));
+
+    
         foreach (elem; *sle.elements)
         {
             auto elexpr = genExpr(elem);
