@@ -87,6 +87,13 @@ struct SwitchFixupEntry
     int fixupFor;
 }
 
+struct BoolExprFixupEntry
+{
+    BCAddr atIp;
+    alias atIp this;
+    bool ifTrue;
+}
+
 struct SwitchState
 {
     SwitchFixupEntry[128] switchFixupTable;
@@ -252,7 +259,6 @@ struct BCStruct
 
     void addField(BCType bct)
     {
-        assert(isBasicBCType(bct));
         memberTypes[memeberTypesCount++] = bct;
     }
 }
@@ -262,10 +268,13 @@ struct SharedCtfeState
     uint _threadLock;
     //Type 0 beeing the terminator for chainedTypes
     void*[ubyte.max] structDeclPointers;
+
     BCStruct[ubyte.max] structs;
     uint structCount;
     BCArray[ubyte.max] arrays;
     uint arrayCount;
+    //BCPointer[ubyte.max] pointers;
+    //uint pointerCount;
 
     bool addStructInProgress;
 
@@ -410,10 +419,10 @@ extern (C++) final class BCV : Visitor
 
     import ddmd.tokens;
 
-    BCBlock[void* ] labeledBlocks;
+    BCBlock[void*] labeledBlocks;
 
-    BCValue[void* ] vars;
-    BCAddr[ubyte.max] fixupTable;
+    BCValue[void*] vars;
+    BoolExprFixupEntry[ubyte.max] fixupTable;
     uint fixupTableCount;
 
     BCBlock* currentBlock;
@@ -556,9 +565,7 @@ public:
         {
         case TOK.TOKequal:
             {
-                assert(!assignTo, "cannot save the result of an comparsion yet");
-
-                Eq3(BCValue.init, genExpr(e.e1), genExpr(e.e2));
+                Eq3(assignTo, genExpr(e.e1), genExpr(e.e2));
             }
             break;
         case TOK.TOKplusplus:
@@ -646,11 +653,24 @@ public:
                 const oldDiscardValue = discardValue;
                 discardValue = false;
                 auto lhs = genExpr(e.e1);
-                fixupTable[fixupTableCount++] = beginCndJmp();
+                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), false);
                 auto rhs = genExpr(e.e2);
-                fixupTable[fixupTableCount++] = beginCndJmp();
+                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), false);
                 //auto rhsJmp = beginCndJmp();
                 assert(!oldDiscardValue, "A lone oror discarding the value is strange");
+                discardValue = oldDiscardValue;
+            }
+            break;
+        case TOK.TOKandand:
+            {
+                const oldDiscardValue = discardValue;
+                discardValue = false;
+                auto lhs = genExpr(e.e1);
+                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), true);
+                auto rhs = genExpr(e.e2);
+                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), true);
+                //auto rhsJmp = beginCndJmp();
+                assert(!oldDiscardValue, "A lone andand discarding the value is strange");
                 discardValue = oldDiscardValue;
             }
             break;
@@ -806,7 +826,7 @@ public:
 
     override void visit(DotVarExp dve)
     {
-        assert(dve.e1.type.ty == Tstruct, "Can only take members of a struct for now");
+        if(dve.e1.type.ty == Tstruct) {
         auto structDeclPtr = cast(void*)((cast(TypeStruct) dve.e1.type).sym);
         BCStruct* _struct;
         foreach (i; 0 .. sharedCtfeState.structCount)
@@ -824,8 +844,8 @@ public:
 
             writeln(*_struct);
         }
-        assignTo = assignTo
-            && assignTo.vType == BCValueType.StackValue ? assignTo : genTemporary(
+        assignTo = (assignTo
+            && assignTo.vType == BCValueType.StackValue) ? assignTo : genTemporary(
             BCType(BCTypeEnum.i32)).value;
 
         auto lhs = genExpr(dve.e1);
@@ -834,11 +854,9 @@ public:
         assert(lhs.vType == BCValueType.StackValue);
         auto offset = BCValue(Imm32(dve.var.isVarDeclaration.offset));
 
-        auto ptr = genTemporary(BCType(BCTypeEnum.i32)).value;
+        auto ptr = genTemporary(BCType(BCTypeEnum.i32Ptr)).value;
         /// we have to add the size of the length to the ptr
         Add3(ptr, lhs, offset);
-
-        emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, ptr.stackAddr));
 
         debug
         {
@@ -848,6 +866,10 @@ public:
             writeln(dve.var.isVarDeclaration.offset);
         }
         retval = assignTo;
+        }
+         else {
+        assert(0, "Can only take members of a struct for now");
+        }
     }
 
     override void visit(StructLiteralExp sle)
@@ -1399,12 +1421,23 @@ public:
         if (fs.ifbody)
         {
             ifbody = genBlock(fs.ifbody);
+        
+            if (fs.elsebody)
+            {
+                auto afterBodyJmp = beginJmp();
+                elsebody = genBlock(fs.elsebody);
+                endJmp(afterBodyJmp, genLabel());
+            }
         }
-        if (fs.elsebody)
-        {
-            auto afterBodyJmp = beginJmp();
-            elsebody = genBlock(fs.elsebody);
-            endJmp(afterBodyJmp, genLabel());
+
+        foreach(fixup;fixupTable[oldFixupTableCount .. fixupTableCount]) {
+            if (fixup.ifTrue) {
+                endCndJmp(fixup.atIp, ifbody ? ifbody.begin : genLabel(), false);
+            } else {
+                endCndJmp(fixup.atIp, elsebody ? elsebody.begin : genLabel(), true);
+            }
+
+            --fixupTableCount;
         }
 
         assert(oldFixupTableCount == fixupTableCount);
