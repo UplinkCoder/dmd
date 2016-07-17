@@ -69,19 +69,6 @@ enum LongInst : ushort
     JmpZ,
     JmpNZ,
 
-    // Immidate operand
-    ImmAdd,
-    ImmSub,
-    ImmDiv,
-    ImmMul,
-    ImmEq,
-    ImmLt,
-    ImmGt,
-    ImmSet,
-    ImmAnd,
-    ImmLsh,
-    ImmRsh,
-
     // 2 StackOperands
     Add,
     Sub,
@@ -92,15 +79,39 @@ enum LongInst : ushort
     Gt, //sets condflags
     Set,
     And,
-    Rsh,
+    Or,
     Lsh,
+    Rsh,
+    Mod,
+
+    // Immidate operand
+    ImmAdd,
+    ImmSub,
+    ImmDiv,
+    ImmMul,
+    ImmEq,
+    ImmLt,
+    ImmGt,
+    ImmSet,
+    ImmAnd,
+    ImmOr,
+    ImmLsh,
+    ImmRsh,
+    ImmMod,
+
 
     Lds, ///SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])]
     Lss, /// defref pointer on the stack :)
     Lsb, /// load stack byte
 }
+//Imm-Intructuins and corrospinding 2Operand instructions have to be in the same order
 
-enum InstLengthMask = ubyte(0x20); // check 6th Byte
+static assert(LongInst.ImmAdd - LongInst.Add  == LongInst.ImmRsh - LongInst.Rsh);
+static assert(LongInst.ImmAnd - LongInst.And  == LongInst.ImmLt - LongInst.Lt);
+
+enum InstLengthMask = ubyte(0x20); // check 6th bit
+enum IndirectionFlagMask = ubyte(0x40); // check 7th bit
+
 enum InstMask = ubyte(0x1F); // mask for bit 0-5
 //enum CondFlagMask = ~ushort(0x2FF); // mask for 8-10th bit
 enum CondFlagMask = 0b11_0000_0000;
@@ -112,7 +123,7 @@ enum CondFlagMask = 0b11_0000_0000;
  *
  */
 
-/**
+/* Only for ImmInstructions
 * Layaout :
 * [0-6] Instruction
 * [6-8] Flags
@@ -120,101 +131,38 @@ enum CondFlagMask = 0b11_0000_0000;
 * [8-12] CondFlag (or Padding)
 * [12-16] Padding
 * [16-32] StackOffset (lhs)
-* [32-64] Imm32 (rhs)
+* [32-64] Imm32 (rhs) 
 */
 
-struct LongInstImm32
-{
-    uint lw;
-    uint hi;
-    LongInst toParentEnum(const LongInstImm32Enum e) const pure
-    {
-        final switch (e) with (typeof(e))
-        {
-        case ImmAdd:
-            return LongInst.ImmAdd;
-        case ImmSub:
-            return LongInst.ImmSub;
-        case ImmDiv:
-            return LongInst.ImmDiv;
-        case ImmMul:
-            return LongInst.ImmMul;
-        case ImmEq:
-            return LongInst.ImmEq;
-        case ImmLt:
-            return LongInst.ImmLt;
-        case ImmGt:
-            return LongInst.ImmGt;
-        case ImmAnd:
-            return LongInst.ImmAnd;
-        case ImmSet:
-            return LongInst.ImmSet;
-        case ImmLsh:
-            return LongInst.ImmLsh;
-        case ImmRsh:
-            return LongInst.ImmRsh;
-
-        }
-    }
-
-    this(LongInstImm32Enum i, short stackAddr, Imm32 imm) pure
-    {
-        //       mixin mxToParentEnum!(LongInst, LongInstImm32Enum);
-        lw = toParentEnum(i) | 1 << 5 | stackAddr << 16;
-        hi = imm.imm32;
-    }
-
-    //    import std.conv : to;
-
-    string toString() pure const
-    {
-        return to!string(cast(LongInstImm32Enum)(lw & InstMask)) ~ " SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(
-            hi) ~ "\n";
-    }
-
-    enum LongInstImm32Enum
-    {
-        // Immidiate operations on one StackValue
-
-        ImmAdd,
-        ImmSub,
-        ImmDiv,
-        ImmMul,
-
-        ImmEq,
-        ImmLt,
-        ImmGt,
-
-        ImmAnd,
-        ImmSet,
-        ImmLsh,
-        ImmRsh,
-    }
-
-    alias LongInstImm32Enum this;
-}
 
 struct LongInst64
 {
     uint lw;
     uint hi;
 
-    this(LongInst i, BCAddr addr)
+    this(const LongInst i, BCAddr addr) pure
     {
         lw = i | 1 << 5;
         hi = addr.addr;
     }
 
-    this(LongInst i, StackAddr stackAddrLhs, BCAddr targetAddr)
+    this(const LongInst i, const StackAddr stackAddrLhs, const BCAddr targetAddr) pure
     {
         lw = i | 1 << 5;
         hi = stackAddrLhs.addr | targetAddr.addr << 16;
     }
 
-    this(LongInst i, StackAddr stackAddrLhs, StackAddr stackAddrRhs)
+    this(const LongInst i, const StackAddr stackAddrLhs, const StackAddr stackAddrRhs, const bool indirect = false) pure
     {
-        lw = i | 1 << 5;
+        lw = i | 1 << 5 | indirect << 6;
         hi = stackAddrLhs.addr | stackAddrRhs.addr << 16;
+    }
+
+    this(const LongInst i, const StackAddr stackAddrLhs, const Imm32 rhs, const bool indirect = false) pure
+    {
+        lw = i | 1 << 5 | indirect << 6 | stackAddrLhs.addr << 16;
+        hi = rhs.imm32;
+
     }
 }
 
@@ -273,6 +221,7 @@ enum BCTypeEnum : ubyte
     Void,
 
     Ptr,
+    i32Ptr,
 
     Char,
     i1,
@@ -305,7 +254,7 @@ const(uint) basicTypeSize(const BCTypeEnum bct) pure
         {
             assert(0, "We should never encounter undef or Void");
         }
-    case Ptr:
+    case i32Ptr, Ptr:
         {
             //TODO add 64bit mode
             return  /* m64 ? 8 :*/ 4;
@@ -561,13 +510,6 @@ struct BCGen
         ip += 2;
     }
 
-    void emitLongInst(LongInstImm32 i)
-    {
-        byteCodeArray[ip] = i.lw;
-        byteCodeArray[ip + 1] = i.hi;
-        ip += 2;
-    }
-
     BCTemporary genTemporary(BCType bct)
     {
         auto tmp = temporarys[temporaryCount] = BCTemporary(BCValue(StackAddr(sp),
@@ -679,170 +621,26 @@ struct BCGen
         ip += 2;
     }
 
-    void emitEq(BCValue lhs, BCValue rhs)
-    {
-        //  assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32, "For now only 32bit is supported");
+    void emitArithInstruction(LongInst inst, BCValue lhs, BCValue rhs) {
+        assert(inst >= LongInst.Add && inst < LongInst.ImmAdd, "Instruction is not in Range for Arith Instructions");
+        assert(lhs.vType.StackValue, "only StackValues are supported as lhs");
+        assert(lhs.type == BCTypeEnum.i32 || lhs.type == BCTypeEnum.i32Ptr, "only i32 or i32Ptr is supported for now not: " ~ to!string(lhs.type.type));
+        assert(rhs.type == BCTypeEnum.i32, "only i32 is supported for now");
 
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmEq, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-
-            emitLongInst(LongInst64(LongInst.Eq, lhs.stackAddr, rhs.stackAddr));
+        immutable bool isIndirect = lhs.type == BCTypeEnum.i32Ptr;
+        if (rhs.vType == BCValueType.Immidiate) {
+            //Change the instruction into the corrosponding Imm Instruction;
+            inst += (LongInst.ImmAdd - LongInst.Add);
+            emitLongInst(LongInst64(inst, lhs.stackAddr, rhs.imm32, isIndirect));
+        } else if (rhs.vType == BCValueType.StackValue) {
+            emitLongInst(LongInst64(inst, lhs.stackAddr, rhs.stackAddr, isIndirect));
+        } else {
+            assert(0);
         }
     }
 
-    void emitGt(BCValue lhs, BCValue rhs)
-    {
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmGt, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-
-            emitLongInst(LongInst64(LongInst.Gt, lhs.stackAddr, rhs.stackAddr));
-        }
-    }
-
-    void emitLt(BCValue lhs, BCValue rhs)
-    {
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmLt, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-
-            emitLongInst(LongInst64(LongInst.Lt, lhs.stackAddr, rhs.stackAddr));
-        }
-    }
-    //TODO compress emitAdd, emitMul, emitDev, emitSub, emitSet
-
-    void emitSet(BCValue lhs, BCValue rhs)
-    {
-        //assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32,
-        //    "for now only 32bit set is supported");
-        //Do not emit redundant self assignments
-        if (rhs == lhs)
-        {
-            return;
-        }
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmSet, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-
-            emitLongInst(LongInst64(LongInst.Set, lhs.stackAddr, rhs.stackAddr));
-        }
-        else
-        {
-            debug if (!__ctfe)
-            {
-                import std.stdio;
-
-                writeln("lhs.vType : ", lhs.vType, "rhs.vType : ", rhs.vType);
-            }
-            assert(0, "Set flavour unsupported");
-        }
-    }
-
-    void emitAdd(BCValue lhs, BCValue rhs)
-    {
-        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmAdd, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-            emitLongInst(LongInst64(LongInst.Add, lhs.stackAddr, rhs.stackAddr));
-        }
-        else
-        {
-            assert(0, "Add flavour unsupported");
-        }
-    }
-
-    void emitSub(BCValue lhs, BCValue rhs)
-    {
-        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmSub, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-            emitLongInst(LongInst64(LongInst.Sub, lhs.stackAddr, rhs.stackAddr));
-        }
-        else
-        {
-            assert(0, "Sub flavour unsupported");
-        }
-    }
-
-    void emitMul(BCValue lhs, BCValue rhs)
-    {
-        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmMul, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-            emitLongInst(LongInst64(LongInst.Mul, lhs.stackAddr, rhs.stackAddr));
-        }
-        else
-        {
-            assert(0, "Mul flavour unsupported");
-        }
-    }
-
-    void emitDiv(BCValue lhs, BCValue rhs)
-    {
-        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmDiv, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-            emitLongInst(LongInst64(LongInst.Div, lhs.stackAddr, rhs.stackAddr));
-        }
-        else
-        {
-            assert(0, "Div flavour unsupported");
-        }
-    }
-
-    void emitAnd(BCValue lhs, BCValue rhs)
-    {
-        assert(rhs.type == BCTypeEnum.i32 && lhs.type == BCTypeEnum.i32);
-        if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.Immidiate)
-        {
-
-            emitLongInst(LongInstImm32(LongInstImm32.ImmAnd, lhs.stackAddr, rhs.imm32));
-        }
-        else if (lhs.vType == BCValueType.StackValue && rhs.vType == BCValueType.StackValue)
-        {
-            emitLongInst(LongInst64(LongInst.And, lhs.stackAddr, rhs.stackAddr));
-        }
-        else
-        {
-            assert(0, "Div flavour unsupported");
-        }
+    void emitSet(BCValue lhs, BCValue rhs) {
+        emitArithInstruction(LongInst.Set, lhs, rhs);
     }
 
     BCValue Lt3(BCValue result, BCValue lhs, BCValue rhs)
@@ -850,7 +648,7 @@ struct BCGen
         assert(result.vType == BCValueType.Unknown
             || result.vType == BCValueType.StackValue,
             "The result for this must be Empty or a StackValue");
-        emitLt(lhs, rhs);
+        emitArithInstruction(LongInst.Lt, lhs, rhs);
         if (result.vType == BCValueType.StackValue)
         {
             emitFlg(result);
@@ -863,7 +661,7 @@ struct BCGen
         assert(result.vType == BCValueType.Unknown
             || result.vType == BCValueType.StackValue,
             "The result for this must be Empty or a StackValue");
-        emitGt(lhs, rhs);
+        emitArithInstruction(LongInst.Gt, lhs, rhs);
         if (result.vType == BCValueType.StackValue)
         {
             emitFlg(result);
@@ -876,7 +674,7 @@ struct BCGen
         assert(result.vType == BCValueType.Unknown
             || result.vType == BCValueType.StackValue,
             "The result for this must be Empty or a StackValue");
-        emitEq(lhs, rhs);
+        emitArithInstruction(LongInst.Eq, lhs, rhs);
         if (result.vType == BCValueType.StackValue)
         {
             emitFlg(result);
@@ -888,11 +686,12 @@ struct BCGen
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot add to Immidiate");
 
+        result = (result ? result : lhs);
         if (lhs != result)
         {
             emitSet(result, lhs);
         }
-        emitAdd(result, rhs);
+        emitArithInstruction(LongInst.Add, result, rhs);
         return result;
     }
 
@@ -900,11 +699,13 @@ struct BCGen
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot sub to Immidiate");
 
+        result = (result ? result : lhs);
         if (lhs != result)
         {
             emitSet(result, lhs);
         }
-        emitSub(result, rhs);
+        emitArithInstruction(LongInst.Sub, result, rhs);
+
         return result;
     }
 
@@ -912,11 +713,12 @@ struct BCGen
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot mul to Immidiate");
 
+        result = (result ? result : lhs);
         if (lhs != result)
         {
             emitSet(result, lhs);
         }
-        emitMul(result, rhs);
+        emitArithInstruction(LongInst.Mul, result, rhs);
         return result;
     }
 
@@ -924,11 +726,12 @@ struct BCGen
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot div to Immidiate");
 
+        result = (result ? result : lhs);
         if (lhs != result)
         {
             emitSet(result, lhs);
         }
-        emitDiv(result, rhs);
+        emitArithInstruction(LongInst.Div, result, rhs);
         return result;
     }
 
@@ -936,13 +739,68 @@ struct BCGen
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot and to Immidiate");
 
+        result = (result ? result : lhs);
         if (lhs != result)
         {
             emitSet(result, lhs);
         }
-        emitAnd(result, rhs);
+        emitArithInstruction(LongInst.And, result, rhs);
         return result;
     }
+
+    BCValue Or3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType != BCValueType.Immidiate, "Cannot or to Immidiate");
+        
+        result = (result ? result : lhs);
+        if (lhs != result)
+        {
+            emitSet(result, lhs);
+        }
+        emitArithInstruction(LongInst.Or, result, rhs);
+        return result;
+    }
+
+    BCValue Lsh3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType != BCValueType.Immidiate, "Cannot lsh to Immidiate");
+        
+        result = (result ? result : lhs);
+        if (lhs != result)
+        {
+            emitSet(result, lhs);
+        }
+        emitArithInstruction(LongInst.Lsh, result, rhs);
+        return result;
+    }
+
+    BCValue Rsh3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType != BCValueType.Immidiate, "Cannot rsh to Immidiate");
+        
+        result = (result ? result : lhs);
+        if (lhs != result)
+        {
+            emitSet(result, lhs);
+        }
+        emitArithInstruction(LongInst.Rsh, result, rhs);
+        return result;
+    }
+
+    BCValue Mod3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType != BCValueType.Immidiate, "Cannot and to Immidiate");
+        
+        result = (result ? result : lhs);
+        if (lhs != result)
+        {
+            emitSet(result, lhs);
+        }
+        emitArithInstruction(LongInst.Mod, result, rhs);
+        return result;
+    }
+
+
 
     BCValue pushOntoStack(BCValue val)
     {
@@ -1051,6 +909,12 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "And SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
                 }
                 break;
+            case LongInst.ImmOr:
+                {
+                    result ~= "Or SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+                }
+                break;
+
             case LongInst.ImmLsh:
                 {
                     result ~= "Lsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
@@ -1061,7 +925,14 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "Rsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
                 }
                 break;
-            case LongInst.ImmEq:
+
+            case LongInst.ImmMod:
+            {
+                result ~= "Mod SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+
+                case LongInst.ImmEq:
                 {
                     result ~= "Eq CF [" ~ to!string((lw & 0xF00) >> 8) ~ "] SP[" ~ to!string(
                         lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
@@ -1102,6 +973,11 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "And SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
                 break;
+            case LongInst.Or:
+                {
+                    result ~= "Or SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+                }
+                break;
             case LongInst.Lsh:
                 {
                     result ~= "Lsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
@@ -1110,6 +986,11 @@ string printInstructions(int* startInstructions, uint length)
             case LongInst.Rsh:
                 {
                     result ~= "Rsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+                }
+                break;
+            case LongInst.Mod :
+                {
+                    result ~= "Mod SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
                 break;
             case LongInst.Eq:
@@ -1369,59 +1250,66 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             uint* lhsRef = (stack.ptr + (lhsOffset / 4));
             uint rhs = *(stack.ptr + (rhsOffset / 4));
             uint* lhsStackRef = (stack.ptr + ((lw >> 16) / 4));
+            bool indirect = !!(lw & IndirectionFlagMask);
 
             switch (cast(LongInst)(lw & InstMask))
             {
             case LongInst.ImmAdd:
                 {
-                    *lhsStackRef += hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) += hi;
                 }
                 break;
 
             case LongInst.ImmSub:
                 {
-                    *lhsStackRef -= hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) -= hi;
                 }
                 break;
 
             case LongInst.ImmMul:
                 {
-                    *lhsStackRef *= hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) *= hi;
                 }
                 break;
 
             case LongInst.ImmDiv:
                 {
-                    *lhsStackRef /= hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) /= hi;
                 }
                 break;
 
             case LongInst.ImmAnd:
                 {
-                    *lhsStackRef &= hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) &= hi;
                 }
                 break;
 
             case LongInst.ImmLsh:
                 {
-                    *lhsStackRef <<= hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) <<= hi;
                 }
                 break;
             case LongInst.ImmRsh:
                 {
-                    *lhsStackRef >>= hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) >>= hi;
+                }
+                break;
+            
+            case LongInst.ImmMod:
+                {
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) %= hi;
                 }
                 break;
 
             case LongInst.ImmSet:
                 {
-                    *lhsStackRef = hi;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) = hi;
                 }
                 break;
             case LongInst.ImmEq:
                 {
 
-                    if (*lhsStackRef == hi)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) == hi)
                     {
                         cond = true;
                     }
@@ -1434,7 +1322,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.ImmLt:
                 {
-                    if (*lhsStackRef < hi)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) < hi)
                     {
                         cond = true;
                     }
@@ -1447,7 +1335,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.ImmGt:
                 {
-                    if (*lhsStackRef > hi)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) > hi)
                     {
                         cond = true;
                     }
@@ -1460,43 +1348,50 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.Add:
                 {
-                    (*lhsRef) += rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) += rhs;
                 }
                 break;
             case LongInst.Sub:
                 {
-                    (*lhsRef) -= rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) -= rhs;
                 }
                 break;
             case LongInst.Mul:
                 {
-                    (*lhsRef) *= rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) *= rhs;
                 }
                 break;
             case LongInst.Div:
                 {
-                    (*lhsRef) /= rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) /= rhs;
                 }
                 break;
             case LongInst.And:
                 {
-                    (*lhsRef) &= rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) &= rhs;
                 }
                 break;
             case LongInst.Lsh:
                 {
 
-                    (*lhsRef) <<= rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) <<= rhs;
                 }
                 break;
             case LongInst.Rsh:
                 {
-                    (*lhsRef) >>= rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) >>= rhs;
                 }
                 break;
+            
+            case LongInst.Mod:
+                {
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) %= rhs;
+                }
+                break;
+
             case LongInst.Eq:
                 {
-                    if ((*lhsRef) == rhs)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) == rhs)
                     {
                         cond = true;
                     }
@@ -1510,13 +1405,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
             case LongInst.Set:
                 {
-                    (*lhsRef) = rhs;
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = rhs;
                 }
                 break;
 
             case LongInst.Lt:
                 {
-                    if ((*lhsRef) < rhs)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) < rhs)
                     {
                         cond = true;
                     }
@@ -1529,7 +1424,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.Gt:
                 {
-                    if ((*lhsRef) > rhs)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) > rhs)
                     {
                         cond = true;
                     }
@@ -1548,7 +1443,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.JmpNZ:
                 {
-                    if ((*lhsRef) != 0)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) != 0)
                     {
                         ip = rhsOffset;
                     }
@@ -1556,7 +1451,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.JmpZ:
                 {
-                    if ((*lhsRef) == 0)
+                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) == 0)
                     {
                         ip = rhsOffset;
                     }
@@ -1581,13 +1476,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
             case LongInst.Lds:
                 {
-                    (*lhsRef) = *(dataSeg + (dataSegHigh | rhs));
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = *(dataSeg + (dataSegHigh | rhs));
                     //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
                 break;
             case LongInst.Lss:
                 {
-                    (*lhsRef) = *(stack.ptr + (rhs / 4));
+                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = *(stack.ptr + (rhs / 4));
                     //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
                 break;
@@ -1605,16 +1500,16 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     final switch (rhs & 3)
                     {
                     case 0:
-                        (*lhsRef) = _dr & 0xFF;
+                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = _dr & 0xFF;
                         break;
                     case 1:
-                        (*lhsRef) = (_dr & 0xFF00) >> 8;
+                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = (_dr & 0xFF00) >> 8;
                         break;
                     case 2:
-                        (*lhsRef) = (_dr & 0xFF0000) >> 16;
+                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = (_dr & 0xFF0000) >> 16;
                         break;
                     case 3:
-                        (*lhsRef) = _dr >> 24;
+                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = _dr >> 24;
                         break;
                     }
 
