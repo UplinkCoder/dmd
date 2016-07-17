@@ -197,9 +197,9 @@ static assert(align4(11) == 12);
 static assert(align4(12) == 12);
 static assert(align4(15) == 16);
 
-uint ShortInst16(const ShortInst i, const short imm) pure
+uint ShortInst16(const ShortInst i, const short imm, const bool indirect = false) pure
 {
-    return i | imm << 16;
+    return i | indirect << 6 | imm << 16;
 }
 
 uint ShortInst16Ex(const ShortInst i, ubyte ex, const short imm) pure
@@ -625,7 +625,7 @@ struct BCGen
         assert(inst >= LongInst.Add && inst < LongInst.ImmAdd, "Instruction is not in Range for Arith Instructions");
         assert(lhs.vType.StackValue, "only StackValues are supported as lhs");
         assert(lhs.type == BCTypeEnum.i32 || lhs.type == BCTypeEnum.i32Ptr, "only i32 or i32Ptr is supported for now not: " ~ to!string(lhs.type.type));
-        assert(rhs.type == BCTypeEnum.i32, "only i32 is supported for now");
+        assert(rhs.type == BCTypeEnum.i32, "only i32 is supported for now, not: " ~ to!string(rhs.type.type));
 
         immutable bool isIndirect = lhs.type == BCTypeEnum.i32Ptr;
         if (rhs.vType == BCValueType.Immidiate) {
@@ -822,7 +822,11 @@ struct BCGen
     void emitReturn(BCValue val)
     {
         assert(val.vType == BCValueType.StackValue); // {
-        byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr);
+        if (!__ctfe )debug {
+            import std.stdio;
+            writeln(val.type == BCTypeEnum.i32Ptr);
+        }
+        byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr, val.type == BCTypeEnum.i32Ptr);
         ip += 2;
         /*} else if (val.vType == BCValueType.Immidiate) {
                         auto sv = pushOntoStack(val);
@@ -861,7 +865,7 @@ string printInstructions(int* startInstructions, uint length)
     while (length--)
     {
         uint lw = arr[pos];
-        result ~= pos.to!string ~ ":\t";
+        result ~= pos.to!string ~ ":\t" ~ (!!(lw & IndirectionFlagMask) ? "* " : "");
         ++pos;
         if (lw == 0)
         {
@@ -1239,6 +1243,11 @@ uint interpret(const int[] byteCode, const BCValue[] args,
         }
         //writeln(stack[0 ..)
         const lw = byteCode[ip++];
+        bool indirect = !!(lw & IndirectionFlagMask);
+        if (!__ctfe) debug {
+            import std.stdio;
+            writeln("indirect: ",indirect);
+        }
         if (lw & InstLengthMask)
         {
             // We have a long instruction
@@ -1250,66 +1259,70 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             uint* lhsRef = (stack.ptr + (lhsOffset / 4));
             uint rhs = *(stack.ptr + (rhsOffset / 4));
             uint* lhsStackRef = (stack.ptr + ((lw >> 16) / 4));
-            bool indirect = !!(lw & IndirectionFlagMask);
+
+            if (indirect) {
+                lhsStackRef = (stack.ptr + ((*lhsStackRef)/4));
+                lhsRef = (stack.ptr + ((*lhsStackRef)/4));
+            }
 
             switch (cast(LongInst)(lw & InstMask))
             {
             case LongInst.ImmAdd:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) += hi;
+                    (*lhsStackRef) += hi;
                 }
                 break;
 
             case LongInst.ImmSub:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) -= hi;
+                    (*lhsStackRef) -= hi;
                 }
                 break;
 
             case LongInst.ImmMul:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) *= hi;
+                    (*lhsStackRef) *= hi;
                 }
                 break;
 
             case LongInst.ImmDiv:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) /= hi;
+                    (*lhsStackRef) /= hi;
                 }
                 break;
 
             case LongInst.ImmAnd:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) &= hi;
+                    (*lhsStackRef) &= hi;
                 }
                 break;
 
             case LongInst.ImmLsh:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) <<= hi;
+                    (*lhsStackRef) <<= hi;
                 }
                 break;
             case LongInst.ImmRsh:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) >>= hi;
+                    (*lhsStackRef) >>= hi;
                 }
                 break;
             
             case LongInst.ImmMod:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) %= hi;
+                    (*lhsStackRef) %= hi;
                 }
                 break;
 
             case LongInst.ImmSet:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) = hi;
+                    (*lhsStackRef) = hi;
                 }
                 break;
             case LongInst.ImmEq:
                 {
 
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) == hi)
+                    if ((*lhsStackRef) == hi)
                     {
                         cond = true;
                     }
@@ -1322,7 +1335,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.ImmLt:
                 {
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) < hi)
+                    if ((*lhsStackRef) < hi)
                     {
                         cond = true;
                     }
@@ -1335,7 +1348,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.ImmGt:
                 {
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsStackRef) > hi)
+                    if ((*lhsStackRef) > hi)
                     {
                         cond = true;
                     }
@@ -1348,50 +1361,50 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.Add:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) += rhs;
+                    (*lhsRef) += rhs;
                 }
                 break;
             case LongInst.Sub:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) -= rhs;
+                    (*lhsRef) -= rhs;
                 }
                 break;
             case LongInst.Mul:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) *= rhs;
+                    (*lhsRef) *= rhs;
                 }
                 break;
             case LongInst.Div:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) /= rhs;
+                    (*lhsRef) /= rhs;
                 }
                 break;
             case LongInst.And:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) &= rhs;
+                    (*lhsRef) &= rhs;
                 }
                 break;
             case LongInst.Lsh:
                 {
 
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) <<= rhs;
+                    (*lhsRef) <<= rhs;
                 }
                 break;
             case LongInst.Rsh:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) >>= rhs;
+                    (*lhsRef) >>= rhs;
                 }
                 break;
             
             case LongInst.Mod:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) %= rhs;
+                    (*lhsRef) %= rhs;
                 }
                 break;
 
             case LongInst.Eq:
                 {
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) == rhs)
+                    if ((*lhsRef) == rhs)
                     {
                         cond = true;
                     }
@@ -1405,13 +1418,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
             case LongInst.Set:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = rhs;
+                    (*lhsRef) = rhs;
                 }
                 break;
 
             case LongInst.Lt:
                 {
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) < rhs)
+                    if ((*lhsRef) < rhs)
                     {
                         cond = true;
                     }
@@ -1424,7 +1437,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.Gt:
                 {
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) > rhs)
+                    if ((*lhsRef) > rhs)
                     {
                         cond = true;
                     }
@@ -1443,7 +1456,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.JmpNZ:
                 {
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) != 0)
+                    if ((*lhsRef) != 0)
                     {
                         ip = rhsOffset;
                     }
@@ -1451,7 +1464,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 break;
             case LongInst.JmpZ:
                 {
-                    if ((indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) == 0)
+                    if ((*lhsRef) == 0)
                     {
                         ip = rhsOffset;
                     }
@@ -1476,13 +1489,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
             case LongInst.Lds:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = *(dataSeg + (dataSegHigh | rhs));
+                    (*lhsRef) = *(dataSeg + (dataSegHigh | rhs));
                     //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
                 break;
             case LongInst.Lss:
                 {
-                    (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = *(stack.ptr + (rhs / 4));
+                    (*lhsRef) = *(stack.ptr + (rhs / 4));
                     //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
                 }
                 break;
@@ -1500,16 +1513,16 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     final switch (rhs & 3)
                     {
                     case 0:
-                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = _dr & 0xFF;
+                        (*lhsRef) = _dr & 0xFF;
                         break;
                     case 1:
-                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = (_dr & 0xFF00) >> 8;
+                        (*lhsRef) = (_dr & 0xFF00) >> 8;
                         break;
                     case 2:
-                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = (_dr & 0xFF0000) >> 16;
+                        (*lhsRef) = (_dr & 0xFF0000) >> 16;
                         break;
                     case 3:
-                        (indirect ? *(stack.ptr + (*lhsRef)/4) : *lhsRef) = _dr >> 24;
+                        (*lhsRef) = _dr >> 24;
                         break;
                     }
 
@@ -1524,7 +1537,10 @@ uint interpret(const int[] byteCode, const BCValue[] args,
         else
         {
             // We have a short instruction
-            auto opRef = (stack.ptr + ((lw >> 16) / 4));
+            auto opRef = stack.ptr + ((lw >> 16) / 4);
+            if (indirect) {
+                opRef = (stack.ptr + ((*opRef)/4));
+            }
 
             final switch (cast(ShortInst)(lw & InstMask))
             {

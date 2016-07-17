@@ -292,7 +292,7 @@ struct SharedCtfeState
         assert(s == &structs[structCount]);
         addStructInProgress = false;
 
-        return BCType(BCType.Struct, structCount++);
+        return BCType(BCTypeEnum.Struct, structCount++);
     }
 
     const(uint) size(const BCType type, const uint elementTypeIndex) const
@@ -300,7 +300,7 @@ struct SharedCtfeState
 
         switch (type)
         {
-        case BCType.Struct:
+        case BCTypeEnum.Struct:
             {
                 uint _size;
                 assert(elementTypeIndex <= structCount);
@@ -844,19 +844,27 @@ public:
 
             writeln(*_struct);
         }
-        assignTo = (assignTo
+        retval = (assignTo
             && assignTo.vType == BCValueType.StackValue) ? assignTo : genTemporary(
-            BCType(BCTypeEnum.i32)).value;
+            BCType(BCTypeEnum.i32Ptr)).value;
 
         auto lhs = genExpr(dve.e1);
 
         assert(lhs.type == BCTypeEnum.Struct);
+        // temporary hack :)
+        lhs.type = BCTypeEnum.i32;
+        
         assert(lhs.vType == BCValueType.StackValue);
         auto offset = BCValue(Imm32(dve.var.isVarDeclaration.offset));
 
-        auto ptr = genTemporary(BCType(BCTypeEnum.i32Ptr)).value;
+        //auto ptr = genTemporary(BCType(BCTypeEnum.i32Ptr)).value;
         /// we have to add the size of the length to the ptr
-        Add3(ptr, lhs, offset);
+        //Add3(ptr, lhs, offset);
+            //HACK to make pointer arith work
+        auto oldType = retval.type.type;
+        retval.type.type = BCTypeEnum.i32;
+        Add3(retval, lhs, offset);
+        retval.type = oldType;
 
         debug
         {
@@ -865,7 +873,7 @@ public:
             writeln("dve.var : ", dve.var.toString);
             writeln(dve.var.isVarDeclaration.offset);
         }
-        retval = assignTo;
+        
         }
          else {
         assert(0, "Can only take members of a struct for now");
@@ -1137,7 +1145,13 @@ public:
         const oldDiscardValue = discardValue;
         discardValue = false;
         auto lhs = genExpr(ae.e1);
+        // another dirty hack.
+        //transforming structs into pointers
+        if (lhs.type == BCTypeEnum.Struct) {
+            lhs.type = BCTypeEnum.i32;
+        }
         assignTo = lhs;
+
         auto rhs = genExpr(ae.e2);
         emitSet(lhs, rhs);
 
