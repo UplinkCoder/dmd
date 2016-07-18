@@ -1440,7 +1440,7 @@ public:
 
         uint oldFixupTableCount = fixupTableCount;
         auto cond = genExpr(fs.condition);
-        auto branch = beginCndJmp();
+        auto branch = fs.condition.op == TOKandand ? typeof(beginCndJmp()).init : beginCndJmp();
         BCBlock ifbody;
         BCBlock elsebody;
         if (fs.ifbody)
