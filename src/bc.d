@@ -579,10 +579,17 @@ struct BCGen
         return at;
     }
 
-    void endCndJmp(BCAddr atIp, BCLabel target, bool ifTrue = false)
+    void endCndJmp(BCAddr atIp, BCLabel target, bool ifTrue = false, BCValue cond = BCValue.init)
     {
-        LongInst64 lj = (ifTrue ? LongInst64(LongInst.JmpTrue,
+        LongInst64 lj;
+        if (cond.vType == BCValueType.StackValue && cond.type == BCType.i32) {
+            lj = (ifTrue ? LongInst64(LongInst.JmpNZ, cond.stackAddr,
+                    target.addr) : LongInst64(LongInst.JmpZ,cond.stackAddr, target.addr));
+        } else {
+            lj = (ifTrue ? LongInst64(LongInst.JmpTrue,
             target.addr) : LongInst64(LongInst.JmpFalse, target.addr));
+        }
+
         byteCodeArray[atIp] = lj.lw;
         byteCodeArray[atIp + 1] = lj.hi;
     }

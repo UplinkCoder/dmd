@@ -90,6 +90,7 @@ struct SwitchFixupEntry
 struct BoolExprFixupEntry
 {
     BCAddr atIp;
+    BCValue cond;
     alias atIp this;
     bool ifTrue;
 }
@@ -510,6 +511,7 @@ public:
         }
 
         expr.accept(this);
+
         debug
         {
             writeln("expr: ", expr.toString, " == ", retval);
@@ -547,6 +549,15 @@ public:
         return result;
     }
 
+/*    static bool chainedBooleanExp(BinExp e) {
+        if (e.op == TOKandand || e.op == TOKoror) {
+            if (e.e1.op == TOKandand || e.e1.op == TOKoror) {
+
+            }
+        }
+
+    }
+*/
     override void visit(BinExp e)
     {
         debug
@@ -653,10 +664,10 @@ public:
                 const oldDiscardValue = discardValue;
                 discardValue = false;
                 auto lhs = genExpr(e.e1);
-                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), false);
+                if (e.e1.op != TOKoror) fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), lhs, true);
                 auto rhs = genExpr(e.e2);
-                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), false);
-                //auto rhsJmp = beginCndJmp();
+                if (e.e2.op != TOKoror) fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), rhs, true);
+
                 assert(!oldDiscardValue, "A lone oror discarding the value is strange");
                 discardValue = oldDiscardValue;
             }
@@ -666,10 +677,10 @@ public:
                 const oldDiscardValue = discardValue;
                 discardValue = false;
                 auto lhs = genExpr(e.e1);
-                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), true);
+                if (e.e1.op != TOKandand) fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), lhs, false);
                 auto rhs = genExpr(e.e2);
-                fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), true);
-                //auto rhsJmp = beginCndJmp();
+                if (e.e2.op != TOKandand) fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(), rhs, false);
+
                 assert(!oldDiscardValue, "A lone andand discarding the value is strange");
                 discardValue = oldDiscardValue;
             }
@@ -1446,16 +1457,30 @@ public:
 
         foreach(fixup;fixupTable[oldFixupTableCount .. fixupTableCount]) {
             if (fixup.ifTrue) {
-                endCndJmp(fixup.atIp, ifbody ? ifbody.begin : genLabel(), false);
+                endCndJmp(fixup.atIp, ifbody ? ifbody.begin : genLabel(), true, fixup.cond);
             } else {
-                endCndJmp(fixup.atIp, elsebody ? elsebody.begin : genLabel(), true);
+                endCndJmp(fixup.atIp, elsebody ? elsebody.begin : genLabel(), false, fixup.cond);
             }
 
             --fixupTableCount;
         }
 
         assert(oldFixupTableCount == fixupTableCount);
-        endCndJmp(branch, elsebody ? elsebody.begin : genLabel());
+        /// NOTE THIS IS A HACK!
+        switch(fs.condition.op) {
+            case TOKoror :
+            {
+                endJmp(branch, elsebody ? elsebody.begin : genLabel());
+            } break;
+            case TOKandand :
+            {
+
+            } break;
+            default :
+            {
+                endCndJmp(branch, elsebody ? elsebody.begin : genLabel());
+            }
+        }
     }
 
     override void visit(ScopeStatement ss)
