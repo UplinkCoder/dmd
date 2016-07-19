@@ -141,7 +141,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         if (fd.parameters)
             foreach (i, p; *(fd.parameters))
             {
-                debug
+                debug(ctfe)
                 {
                     import std.stdio;
 
@@ -150,7 +150,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
                 p.accept(bcv);
             }
         bcv.endParameters();
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -161,7 +161,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         bcv.visit(fbody);
         csw.stop();
 
-        debug
+        debug(ctfe)
         {
             import std.stdio;
             import std.algorithm;
@@ -385,7 +385,7 @@ extern (C++) final class BCV : Visitor
                 return BCType(BCTypeEnum.i64);
             default:
                 IGaveUp = true;
-                debug assert(0, "Type unsupported " ~ (cast(Type)(t)).toString());
+                debug(ctfe) assert(0, "Type unsupported " ~ (cast(Type)(t)).toString());
                 return BCType.init;
             }
         }
@@ -411,7 +411,7 @@ extern (C++) final class BCV : Visitor
 
             IGaveUp = true;
 
-            debug assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
+            debug(ctfe) assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString());
             return BCType.init;
         }
     }
@@ -497,7 +497,7 @@ public:
     BCValue genExpr(Expression expr)
     {
 
-        debug
+        debug(ctfe)
         {
             import std.stdio;
         }
@@ -512,7 +512,7 @@ public:
 
         expr.accept(this);
 
-        debug
+        debug(ctfe)
         {
             writeln("expr: ", expr.toString, " == ", retval);
         }
@@ -560,7 +560,7 @@ public:
 */
     override void visit(BinExp e)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -688,14 +688,14 @@ public:
 
         default:
             IGaveUp = true;
-            debug assert(0, "BinExp.Op " ~ to!string(e.op) ~ " not handeled");
+            debug(ctfe) assert(0, "BinExp.Op " ~ to!string(e.op) ~ " not handeled");
         }
 
     }
 
     override void visit(IndexExp ie)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -725,7 +725,7 @@ public:
         //              writeln("ie.e1: ", genExpr(ie.e1).value.toString);
         //              writeln("ie.e2: ", genExpr(ie.e2).value.toString);
         //IGaveUp = true;
-        //debug assert(0, "IndexExp unsupported");
+        //debug(ctfe) assert(0, "IndexExp unsupported");
     }
 
     BCBlock genBlock(Statement stmt)
@@ -734,7 +734,7 @@ public:
         auto oldBlock = currentBlock;
         const oldBreakFixupsCount = breakFixupsCount;
 
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -758,7 +758,7 @@ public:
 
     override void visit(ForStatement fs)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -825,7 +825,7 @@ public:
 
     override void visit(Expression e)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -849,7 +849,7 @@ public:
             }
         }
         assert(_struct, "We don't know the struct Type");
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -877,7 +877,7 @@ public:
         Add3(retval, lhs, offset);
         retval.type = oldType;
 
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -954,7 +954,7 @@ public:
         }
         assert(sv, "Variable " ~ ve.toString ~ " not in StackFrame");
 
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -971,7 +971,7 @@ public:
         assert(vd, "DeclarationExps are expected to be VariableDeclarations");
         visit(vd);
         auto var = retval;
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -995,7 +995,7 @@ public:
 
     override void visit(VarDeclaration vd)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1012,7 +1012,7 @@ public:
             parameterTypes ~= var.type;
         }
 
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1022,7 +1022,7 @@ public:
 
     override void visit(BinAssignExp e)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1053,7 +1053,7 @@ public:
         default:
             {
                 IGaveUp = true;
-                debug assert(0, "Unsupported for now");
+                debug(ctfe) assert(0, "Unsupported for now");
             }
         }
         //assert(discardValue);
@@ -1065,7 +1065,7 @@ public:
 
     override void visit(IntegerExp ie)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1080,7 +1080,7 @@ public:
 
     override void visit(StringExp se)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1116,7 +1116,7 @@ public:
 
     override void visit(CmpExp ce)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1139,13 +1139,13 @@ public:
 
         default:
             IGaveUp = true;
-            debug assert(0, "Unsupported Operation " ~ to!string(ce.op));
+            debug(ctfe) assert(0, "Unsupported Operation " ~ to!string(ce.op));
         }
     }
 
     override void visit(AssignExp ae)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1177,7 +1177,7 @@ public:
         with (switchState)
         {
             //This Transforms swtich in a series of if else construts.
-            debug
+            debug(ctfe)
             {
                 import std.stdio;
 
@@ -1297,7 +1297,7 @@ public:
 
     override void visit(LabelStatement ls)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1366,7 +1366,7 @@ public:
 
     override void visit(ReturnStatement rs)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1393,7 +1393,7 @@ public:
 
     override void visit(ExpStatement es)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1404,7 +1404,7 @@ public:
         genExpr(es.exp);
         discardValue = oldDiscardValue;
     }
-
+/*
     override void visit(WhileStatement ws)
     {
         auto evalBlockBegin = genLabel();
@@ -1415,23 +1415,23 @@ public:
         auto afterJmp = genLabel();
         endCndJmp(tjmp, afterJmp);
     }
-
+*/
     override void visit(Statement s)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
             writefln("Statement %s", s.toString);
         }
         IGaveUp = true;
-        debug assert(0, "Statement unsupported");
+        debug(ctfe) assert(0, "Statement unsupported");
         //s.accept(this);
     }
 
     override void visit(IfStatement fs)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1467,6 +1467,7 @@ public:
 
         assert(oldFixupTableCount == fixupTableCount);
         /// NOTE THIS IS A HACK!
+        /// It seems to work fine though
         switch(fs.condition.op) {
             case TOKoror :
             {
@@ -1485,7 +1486,7 @@ public:
 
     override void visit(ScopeStatement ss)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 
@@ -1496,7 +1497,7 @@ public:
 
     override void visit(CompoundStatement cs)
     {
-        debug
+        debug(ctfe)
         {
             import std.stdio;
 

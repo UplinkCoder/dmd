@@ -829,7 +829,7 @@ struct BCGen
     void emitReturn(BCValue val)
     {
         assert(val.vType == BCValueType.StackValue); // {
-        if (!__ctfe )debug {
+        if (!__ctfe )debug(bc) {
             import std.stdio;
             writeln(val.type == BCTypeEnum.i32Ptr);
         }
@@ -1236,7 +1236,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
     uint ip = 4;
     bool cond;
 
-    // debug { import std.stdio; writeln("BC.len = ", byteCode.length); }
+    // debug(bc) { import std.stdio; writeln("BC.len = ", byteCode.length); }
     if (byteCode.length == 0 || byteCode.length == 1)
         return typeof(return).init;
 
@@ -1251,7 +1251,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
         //writeln(stack[0 ..)
         const lw = byteCode[ip++];
         bool indirect = !!(lw & IndirectionFlagMask);
-        if (!__ctfe) debug {
+        if (!__ctfe) debug(bc) {
             import std.stdio;
             writeln("indirect: ",indirect);
         }
@@ -1510,7 +1510,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 {
 
                     uint _dr = *(stack.ptr + (rhs / 4));
-                    debug
+                    debug(bc)
                     {
                         import std.stdio;
 
@@ -1553,7 +1553,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             {
             case ShortInst.Ret:
                 {
-                    debug if (!__ctfe)
+                    debug(bc) if (!__ctfe)
                     {
                         printf("Ret: %d".ptr, (*opRef));
                     }
