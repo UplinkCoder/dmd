@@ -1029,12 +1029,16 @@ public:
     override void visit(ArrayLengthExp ale)
     {
         auto array = genExpr(ale.e1);
-        if (array.type.type != BCTypeEnum.String) {
+        if (array.type.type != BCTypeEnum.String)
+        {
             retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value;
             emitLongInst(LongInst64(LongInst.Lss, retval.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
             retval = assignTo;
-        } else {
-            debug (ctfe) assert(0, "We only handle StringLengths for now");
+        }
+        else
+        {
+            debug (ctfe)
+                assert(0, "We only handle StringLengths for now");
             IGaveUp = true;
         }
         //emitSet(, array);
@@ -1253,25 +1257,35 @@ public:
 
             writefln("CmpExp %s discardValue %d", ce.toString, discardValue);
         }
-
-        switch (ce.op)
+        auto lhs = genExpr(ce.e1);
+        auto rhs = genExpr(ce.e2);
+        if (canWorkWithType(lhs.type) && canWorkWithType(rhs.type))
         {
-        case TOK.TOKlt:
+            switch (ce.op)
             {
-                retval = Lt3(assignTo, genExpr(ce.e1), genExpr(ce.e2));
-            }
-            break;
+            case TOK.TOKlt:
+                {
+                    retval = Lt3(assignTo, lhs, rhs);
+                }
+                break;
 
-        case TOK.TOKgt:
-            {
-                retval = Gt3(assignTo, genExpr(ce.e1), genExpr(ce.e2));
-            }
-            break;
+            case TOK.TOKgt:
+                {
+                    retval = Gt3(assignTo, lhs, rhs);
+                }
+                break;
 
-        default:
-            IGaveUp = true;
+            default:
+                IGaveUp = true;
+                debug (ctfe)
+                    assert(0, "Unsupported Operation " ~ to!string(ce.op));
+            }
+        }
+        else
+        {
             debug (ctfe)
-                assert(0, "Unsupported Operation " ~ to!string(ce.op));
+                assert(0, "cannot work with thoose types");
+            IGaveUp = true;
         }
     }
 
