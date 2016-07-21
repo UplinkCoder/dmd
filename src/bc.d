@@ -105,7 +105,7 @@ enum LongInst : ushort
     Lsb, /// load stack byte
 }
 //Imm-Intructuins and corrospinding 2Operand instructions have to be in the same order
-
+pragma(msg, ShortInst.max);
 static assert(LongInst.ImmAdd - LongInst.Add  == LongInst.ImmRsh - LongInst.Rsh);
 static assert(LongInst.ImmAnd - LongInst.And  == LongInst.ImmLt - LongInst.Lt);
 
@@ -381,7 +381,7 @@ struct BCValue
         import std.format : format;
 
         return format("\nvType: %s\tType: %s\tstackAddr: %s\timm32 %s\t",
-            vType, type, stackAddr, imm32);
+            vType, type.type, stackAddr, imm32);
         // return "";
     }
 
@@ -1205,9 +1205,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
     ubyte db; /// current dataByte a slice of the dataRegister with range [0 .. 4]
 
     // first push the args on
+    debug(bc) if(!__ctfe) {
+        import std.stdio;
+        writeln("before pushing args");
+    }
     foreach (arg; args)
     {
-        switch (arg.type)
+        switch (arg.type.type)
         {
         case BCTypeEnum.i32:
             {
@@ -1222,13 +1226,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 stackOffset += uint.sizeof;
             }
             break;
-        case BCTypeEnum.Struct, BCTypeEnum.String:
+        case BCTypeEnum.Struct, BCTypeEnum.String, BCTypeEnum.Array:
             {
 
             }
             break;
         default:
-            return -1;
+            //return -1;
             //       assert(0, "unsupported Type " ~ to!string(arg.type));
         }
     }
@@ -1246,7 +1250,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
         foreach (si; 0 .. stackOffset)
         {
-            // if (!__ctfe) printf("%d : %x".ptr, si, stack[cast(uint) si]);
+             if (!__ctfe) printf("%d : %x".ptr, si, stack[cast(uint) si]);
         }
         //writeln(stack[0 ..)
         const lw = byteCode[ip++];
@@ -1269,7 +1273,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
             if (indirect) {
                 lhsStackRef = (stack.ptr + ((*lhsStackRef)/4));
-                lhsRef = (stack.ptr + ((*lhsStackRef)/4));
+                lhsRef = (stack.ptr + ((*lhsRef)/4));
             }
 
             switch (cast(LongInst)(lw & InstMask))
@@ -1546,7 +1550,17 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             // We have a short instruction
             auto opRef = stack.ptr + ((lw >> 16) / 4);
             if (indirect) {
+                debug {
+                    import std.stdio; 
+                    writeln ("indirect return ", *opRef);
+                }
+
                 opRef = (stack.ptr + ((*opRef)/4));
+                debug {
+                    import std.stdio; 
+                    writeln ("effective return ", *opRef);
+                }
+
             }
 
             final switch (cast(ShortInst)(lw & InstMask))
@@ -1717,6 +1731,28 @@ int[] testDs()
 
 }
 
+int[] testLss()
+{
+    BCGen gen;
+    with (gen)
+    {
+        auto p1 = BCValue(StackAddr(4), BCType(BCTypeEnum.i32));
+        emitSet(BCValue(StackAddr(4), BCType(BCTypeEnum.i32)), BCValue(Imm32(8)));
+        emitSet(BCValue(StackAddr(8), BCType(BCTypeEnum.i32)), BCValue(Imm32(32)));
+        sp += 8;
+
+        auto result = genTemporary(BCType(BCTypeEnum.i32)).value;
+        
+        emitLongInst(LongInst64(LongInst.Lss, result.stackAddr, p1.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
+        
+        emitReturn(result); // return result;
+        
+        return byteCodeArray[0 .. ip].dup;
+    }
+    
+}
+
+
 static assert(interpret(testArith(), []) == 7);
 //pragma(msg, testDs.printInstructions);
 
@@ -1733,3 +1769,5 @@ static assert(interpret(testBC, [BCValue(Imm32(16))]) == 16);
 
 static assert(cast(dchar) testDs.interpret([BCValue(Imm32(1))],
     (cast(uint[]) "hello"d).ptr) == "e"[0]);
+
+pragma(msg, printInstructions(testLss));
