@@ -26,7 +26,7 @@ enum Cond
 enum ShortInst : ubyte
 {
     Prt,
-    Jmp,
+    RelJmp,
     Ret,
     Neg,
     Soh, /// set hi stack addr
@@ -99,15 +99,14 @@ enum LongInst : ushort
     ImmRsh,
     ImmMod,
 
-
     Lds, ///SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])]
     Lss, /// defref pointer on the stack :)
     Lsb, /// load stack byte
 }
 //Imm-Intructuins and corrospinding 2Operand instructions have to be in the same order
 pragma(msg, ShortInst.max);
-static assert(LongInst.ImmAdd - LongInst.Add  == LongInst.ImmRsh - LongInst.Rsh);
-static assert(LongInst.ImmAnd - LongInst.And  == LongInst.ImmLt - LongInst.Lt);
+static assert(LongInst.ImmAdd - LongInst.Add == LongInst.ImmRsh - LongInst.Rsh);
+static assert(LongInst.ImmAnd - LongInst.And == LongInst.ImmLt - LongInst.Lt);
 
 enum InstLengthMask = ubyte(0x20); // check 6th bit
 enum IndirectionFlagMask = ubyte(0x40); // check 7th bit
@@ -134,7 +133,6 @@ enum CondFlagMask = 0b11_0000_0000;
 * [32-64] Imm32 (rhs) 
 */
 
-
 struct LongInst64
 {
     uint lw;
@@ -152,7 +150,8 @@ struct LongInst64
         hi = stackAddrLhs.addr | targetAddr.addr << 16;
     }
 
-    this(const LongInst i, const StackAddr stackAddrLhs, const StackAddr stackAddrRhs, const bool indirect = false) pure
+    this(const LongInst i, const StackAddr stackAddrLhs,
+        const StackAddr stackAddrRhs, const bool indirect = false) pure
     {
         lw = i | 1 << 5 | indirect << 6;
         hi = stackAddrLhs.addr | stackAddrRhs.addr << 16;
@@ -233,7 +232,7 @@ enum BCTypeEnum : ubyte
     //  everything below here is not used by the bc layer.
     String,
     Array,
-    Struct,//Slice,
+    Struct, //Slice,
 
 }
 
@@ -550,7 +549,7 @@ struct BCGen
     {
         if (auto offset = isShortJump(target.addr - atIp))
         {
-            byteCodeArray[atIp] = ShortInst16(ShortInst.Jmp, offset);
+            byteCodeArray[atIp] = ShortInst16(ShortInst.RelJmp, offset);
         }
         else
         {
@@ -582,12 +581,15 @@ struct BCGen
     void endCndJmp(BCAddr atIp, BCLabel target, bool ifTrue = false, BCValue cond = BCValue.init)
     {
         LongInst64 lj;
-        if (cond.vType == BCValueType.StackValue && cond.type == BCType.i32) {
+        if (cond.vType == BCValueType.StackValue && cond.type == BCType.i32)
+        {
             lj = (ifTrue ? LongInst64(LongInst.JmpNZ, cond.stackAddr,
-                    target.addr) : LongInst64(LongInst.JmpZ,cond.stackAddr, target.addr));
-        } else {
+                target.addr) : LongInst64(LongInst.JmpZ, cond.stackAddr, target.addr));
+        }
+        else
+        {
             lj = (ifTrue ? LongInst64(LongInst.JmpTrue,
-            target.addr) : LongInst64(LongInst.JmpFalse, target.addr));
+                target.addr) : LongInst64(LongInst.JmpFalse, target.addr));
         }
 
         byteCodeArray[atIp] = lj.lw;
@@ -628,25 +630,35 @@ struct BCGen
         ip += 2;
     }
 
-    void emitArithInstruction(LongInst inst, BCValue lhs, BCValue rhs) {
-        assert(inst >= LongInst.Add && inst < LongInst.ImmAdd, "Instruction is not in Range for Arith Instructions");
+    void emitArithInstruction(LongInst inst, BCValue lhs, BCValue rhs)
+    {
+        assert(inst >= LongInst.Add && inst < LongInst.ImmAdd,
+            "Instruction is not in Range for Arith Instructions");
         assert(lhs.vType.StackValue, "only StackValues are supported as lhs");
-        assert(lhs.type == BCTypeEnum.i32 || lhs.type == BCTypeEnum.i32Ptr, "only i32 or i32Ptr is supported for now not: " ~ to!string(lhs.type.type));
-        assert(rhs.type == BCTypeEnum.i32, "only i32 is supported for now, not: " ~ to!string(rhs.type.type));
+        assert(lhs.type == BCTypeEnum.i32 || lhs.type == BCTypeEnum.i32Ptr,
+            "only i32 or i32Ptr is supported for now not: " ~ to!string(lhs.type.type));
+        assert(rhs.type == BCTypeEnum.i32,
+            "only i32 is supported for now, not: " ~ to!string(rhs.type.type));
 
         immutable bool isIndirect = lhs.type == BCTypeEnum.i32Ptr;
-        if (rhs.vType == BCValueType.Immidiate) {
+        if (rhs.vType == BCValueType.Immidiate)
+        {
             //Change the instruction into the corrosponding Imm Instruction;
             inst += (LongInst.ImmAdd - LongInst.Add);
             emitLongInst(LongInst64(inst, lhs.stackAddr, rhs.imm32, isIndirect));
-        } else if (rhs.vType == BCValueType.StackValue) {
+        }
+        else if (rhs.vType == BCValueType.StackValue)
+        {
             emitLongInst(LongInst64(inst, lhs.stackAddr, rhs.stackAddr, isIndirect));
-        } else {
+        }
+        else
+        {
             assert(0);
         }
     }
 
-    void emitSet(BCValue lhs, BCValue rhs) {
+    void emitSet(BCValue lhs, BCValue rhs)
+    {
         emitArithInstruction(LongInst.Set, lhs, rhs);
     }
 
@@ -758,7 +770,7 @@ struct BCGen
     BCValue Or3(BCValue result, BCValue lhs, BCValue rhs)
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot or to Immidiate");
-        
+
         result = (result ? result : lhs);
         if (lhs != result)
         {
@@ -771,7 +783,7 @@ struct BCGen
     BCValue Lsh3(BCValue result, BCValue lhs, BCValue rhs)
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot lsh to Immidiate");
-        
+
         result = (result ? result : lhs);
         if (lhs != result)
         {
@@ -784,7 +796,7 @@ struct BCGen
     BCValue Rsh3(BCValue result, BCValue lhs, BCValue rhs)
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot rsh to Immidiate");
-        
+
         result = (result ? result : lhs);
         if (lhs != result)
         {
@@ -797,7 +809,7 @@ struct BCGen
     BCValue Mod3(BCValue result, BCValue lhs, BCValue rhs)
     {
         assert(result.vType != BCValueType.Immidiate, "Cannot and to Immidiate");
-        
+
         result = (result ? result : lhs);
         if (lhs != result)
         {
@@ -806,8 +818,6 @@ struct BCGen
         emitArithInstruction(LongInst.Mod, result, rhs);
         return result;
     }
-
-
 
     BCValue pushOntoStack(BCValue val)
     {
@@ -829,11 +839,15 @@ struct BCGen
     void emitReturn(BCValue val)
     {
         assert(val.vType == BCValueType.StackValue); // {
-        if (!__ctfe )debug(bc) {
-            import std.stdio;
-            writeln(val.type == BCTypeEnum.i32Ptr);
-        }
-        byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr, val.type == BCTypeEnum.i32Ptr);
+        if (!__ctfe)
+            debug (bc)
+            {
+                import std.stdio;
+
+                writeln(val.type == BCTypeEnum.i32Ptr);
+            }
+        byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr,
+            val.type == BCTypeEnum.i32Ptr);
         ip += 2;
         /*} else if (val.vType == BCValueType.Immidiate) {
                         auto sv = pushOntoStack(val);
@@ -938,15 +952,14 @@ string printInstructions(int* startInstructions, uint length)
                 break;
 
             case LongInst.ImmMod:
-            {
-                result ~= "Mod SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-            }
-            break;
-
-                case LongInst.ImmEq:
                 {
-                    result ~= "Eq CF [" ~ to!string((lw & 0xF00) >> 8) ~ "] SP[" ~ to!string(
-                        lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+                    result ~= "Mod SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+                }
+                break;
+
+            case LongInst.ImmEq:
+                {
+                    result ~= "Eq SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
                 }
                 break;
             case LongInst.ImmLt:
@@ -999,7 +1012,7 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "Rsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
                 break;
-            case LongInst.Mod :
+            case LongInst.Mod:
                 {
                     result ~= "Mod SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
                 }
@@ -1034,14 +1047,12 @@ string printInstructions(int* startInstructions, uint length)
 
             case LongInst.JmpFalse:
                 {
-                    result ~= "JmpFalse CF[" ~ to!string((lw & 0xF00) >> 8) ~ "], &" ~ to!string(
-                        (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
+                    result ~= "JmpFalse &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
                 }
                 break;
             case LongInst.JmpTrue:
                 {
-                    result ~= "JmpTrue CF[" ~ to!string((lw & 0xF00) >> 8) ~ "], &" ~ to!string(
-                        (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
+                    result ~= "JmpTrue &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
                 }
                 break;
 
@@ -1095,9 +1106,9 @@ string printInstructions(int* startInstructions, uint length)
                     result ~= "Ret SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
-            case ShortInst.Jmp:
+            case ShortInst.RelJmp:
                 {
-                    result ~= "Jmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 1)) ~ "\n";
+                    result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 1)) ~ "\n";
                 }
                 break;
             case ShortInst.Prt:
@@ -1205,10 +1216,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
     ubyte db; /// current dataByte a slice of the dataRegister with range [0 .. 4]
 
     // first push the args on
-    debug(bc) if(!__ctfe) {
-        import std.stdio;
-        writeln("before pushing args");
-    }
+    debug (bc)
+        if (!__ctfe)
+        {
+            import std.stdio;
+
+            writeln("before pushing args");
+        }
     foreach (arg; args)
     {
         switch (arg.type.type)
@@ -1250,15 +1264,19 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
         foreach (si; 0 .. stackOffset)
         {
-             if (!__ctfe) printf("%d : %x".ptr, si, stack[cast(uint) si]);
+            if (!__ctfe)
+                printf("%d : %x".ptr, si, stack[cast(uint) si]);
         }
         //writeln(stack[0 ..)
         const lw = byteCode[ip++];
         bool indirect = !!(lw & IndirectionFlagMask);
-        if (!__ctfe) debug(bc) {
-            import std.stdio;
-            writeln("indirect: ",indirect);
-        }
+        if (!__ctfe)
+            debug (bc)
+            {
+                import std.stdio;
+
+                writeln("indirect: ", indirect);
+            }
         if (lw & InstLengthMask)
         {
             // We have a long instruction
@@ -1271,9 +1289,10 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             uint rhs = *(stack.ptr + (rhsOffset / 4));
             uint* lhsStackRef = (stack.ptr + ((lw >> 16) / 4));
 
-            if (indirect) {
-                lhsStackRef = (stack.ptr + ((*lhsStackRef)/4));
-                lhsRef = (stack.ptr + ((*lhsRef)/4));
+            if (indirect)
+            {
+                lhsStackRef = (stack.ptr + ((*lhsStackRef) / 4));
+                lhsRef = (stack.ptr + ((*lhsRef) / 4));
             }
 
             switch (cast(LongInst)(lw & InstMask))
@@ -1318,7 +1337,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     (*lhsStackRef) >>= hi;
                 }
                 break;
-            
+
             case LongInst.ImmMod:
                 {
                     (*lhsStackRef) %= hi;
@@ -1406,7 +1425,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     (*lhsRef) >>= rhs;
                 }
                 break;
-            
+
             case LongInst.Mod:
                 {
                     (*lhsRef) %= rhs;
@@ -1514,7 +1533,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 {
 
                     uint _dr = *(stack.ptr + (rhs / 4));
-                    debug(bc)
+                    debug (bc)
                     {
                         import std.stdio;
 
@@ -1549,16 +1568,21 @@ uint interpret(const int[] byteCode, const BCValue[] args,
         {
             // We have a short instruction
             auto opRef = stack.ptr + ((lw >> 16) / 4);
-            if (indirect) {
-                debug {
-                    import std.stdio; 
-                    writeln ("indirect return ", *opRef);
+            if (indirect)
+            {
+                debug
+                {
+                    import std.stdio;
+
+                    writeln("indirect return ", *opRef);
                 }
 
-                opRef = (stack.ptr + ((*opRef)/4));
-                debug {
-                    import std.stdio; 
-                    writeln ("effective return ", *opRef);
+                opRef = (stack.ptr + ((*opRef) / 4));
+                debug
+                {
+                    import std.stdio;
+
+                    writeln("effective return ", *opRef);
                 }
 
             }
@@ -1567,14 +1591,15 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             {
             case ShortInst.Ret:
                 {
-                    debug(bc) if (!__ctfe)
-                    {
-                        printf("Ret: %d".ptr, (*opRef));
-                    }
+                    debug (bc)
+                        if (!__ctfe)
+                        {
+                            printf("Ret: %d".ptr, (*opRef));
+                        }
                     return *opRef;
                 }
 
-            case ShortInst.Jmp:
+            case ShortInst.RelJmp:
                 {
                     ip += (cast(short)(lw >> 16)) - 1;
                 }
@@ -1742,16 +1767,15 @@ int[] testLss()
         sp += 8;
 
         auto result = genTemporary(BCType(BCTypeEnum.i32)).value;
-        
+
         emitLongInst(LongInst64(LongInst.Lss, result.stackAddr, p1.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
-        
+
         emitReturn(result); // return result;
-        
+
         return byteCodeArray[0 .. ip].dup;
     }
-    
-}
 
+}
 
 static assert(interpret(testArith(), []) == 7);
 //pragma(msg, testDs.printInstructions);
