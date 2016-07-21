@@ -1124,7 +1124,7 @@ string printInstructions(int* startInstructions, uint length)
             break;
         case LongInst.RelJmp:
             {
-                result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 1)) ~ "\n";
+                result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 2)) ~ "\n";
             }
             break;
         case LongInst.Prt:
@@ -1606,7 +1606,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
         case LongInst.RelJmp:
             {
-                ip += (cast(short)(lw >> 16)) - 1;
+                ip += (cast(short)(lw >> 16)) - 2;
             }
             break;
         case LongInst.Neg:
