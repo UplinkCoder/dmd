@@ -1029,11 +1029,14 @@ public:
     override void visit(ArrayLengthExp ale)
     {
         auto array = genExpr(ale.e1);
-        assert(array.type == BCType.String, "We only handle StringLengths");
-        assert(array.vType == BCValueType.StackValue, "We only handle StringLengths");
-        retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value;
-        emitLongInst(LongInst64(LongInst.Lss, retval.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
-        retval = assignTo;
+        if (array.type.type != BCTypeEnum.String) {
+            retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.i32)).value;
+            emitLongInst(LongInst64(LongInst.Lss, retval.stackAddr, array.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
+            retval = assignTo;
+        } else {
+            debug (ctfe) assert(0, "We only handle StringLengths for now");
+            IGaveUp = true;
+        }
         //emitSet(, array);
         //emitPrt(retval);
         /*
