@@ -66,7 +66,7 @@ InstKind instKind(LongInst i)
 
     case LongInst.Add, LongInst.Sub, LongInst.Div, LongInst.Mul, LongInst.Eq,
             LongInst.Lt, LongInst.Gt, LongInst.Set, LongInst.And, LongInst.Or,
-            LongInst.Lsh, LongInst.Rsh, LongInst.Mod,// loadOps begin
+            LongInst.Lsh, LongInst.Rsh, LongInst.Mod, // loadOps begin
             LongInst.Lds, LongInst.Lss, LongInst.Lsb:
         {
             return InstKind.LongInst2Stack;
@@ -869,22 +869,26 @@ struct BCGen
 
     void emitReturn(BCValue val)
     {
-        assert(val.vType == BCValueType.StackValue); // {
-        if (!__ctfe)
-            debug (bc)
-            {
-                import std.stdio;
+        if (val.vType == BCValueType.StackValue)
+        {
 
-                writeln(val.type == BCTypeEnum.i32Ptr);
-            }
-        byteCodeArray[ip] = ShortInst16(LongInst.Ret, val.stackAddr, val.type == BCTypeEnum.i32Ptr);
-        ip += 2;
-        /*} else if (val.vType == BCValueType.Immidiate) {
-                        auto sv = pushOntoStack(val);
-                        assert(sv.vType == BCValueType.StackValue);
-                        byteCodeArray[ip] = ShortInst16(LongInst.Ret, sv.stackAddr);
-                        ip += 2;
-                }*/
+            byteCodeArray[ip] = ShortInst16(LongInst.Ret, val.stackAddr,
+                val.type == BCTypeEnum.i32Ptr);
+            ip += 2;
+        }
+        else if (val.vType == BCValueType.Immidiate)
+        {
+            auto sv = pushOntoStack(val);
+            assert(sv.vType == BCValueType.StackValue);
+            byteCodeArray[ip] = ShortInst16(LongInst.Ret, sv.stackAddr);
+            ip += 2;
+        }
+        else
+        {
+            debug (bc)
+                assert(0, "I cannot deal with this type of return");
+
+        }
     }
 
 }
@@ -1280,17 +1284,17 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
         foreach (si; 0 .. stackOffset)
         {
-            debug (bc_stack) if (!__ctfe)
-                printf("%d : %x".ptr, si, stack[cast(uint) si]);
+            debug (bc_stack)
+                if (!__ctfe)
+                    printf("%d : %x".ptr, si, stack[cast(uint) si]);
         }
         //writeln(stack[0 ..)
-//        if (ip >= byteCode.length-1)
-//        {
-//            return -1;
-//        }
+        //        if (ip >= byteCode.length-1)
+        //        {
+        //            return -1;
+        //        }
         const lw = byteCode[ip++];
         const hi = byteCode[ip++];
-       
 
         bool indirect = !!(lw & IndirectionFlagMask);
 
@@ -1769,7 +1773,7 @@ int[] testLss()
         emitSet(BCValue(StackAddr(8), BCType(BCTypeEnum.i32)), BCValue(Imm32(32)));
         sp += 8;
 
-        auto result = BCValue(StackAddr(4) ,BCType(BCTypeEnum.i32Ptr));
+        auto result = BCValue(StackAddr(4), BCType(BCTypeEnum.i32Ptr));
 
         //emitLongInst(LongInst64(LongInst.Lss, result.stackAddr, p1.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
 
@@ -1813,4 +1817,4 @@ static assert(cast(dchar) testDs.interpret([BCValue(Imm32(1))],
     (cast(uint[]) "hello"d).ptr) == "e"[0]);
 
 //pragma(msg, printInstructions(testLss));
-static assert (interpret(testLss(), []) == 32);
+static assert(interpret(testLss(), []) == 32);

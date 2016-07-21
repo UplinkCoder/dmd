@@ -223,7 +223,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
     }
     else
     {
-        debug(ctfe) assert(0, "CTFE Errored");
+        debug (ctfe)
+            assert(0, "CTFE Errored");
         return null;
 
     }
@@ -956,7 +957,8 @@ public:
         }
         else
         {
-            debug(ctfe) assert(0, "Can only take members of a struct for now");
+            debug (ctfe)
+                assert(0, "Can only take members of a struct for now");
             IGaveUp = true;
         }
     }
@@ -1270,7 +1272,7 @@ public:
         }
     }
 
-    static bool canWorkWithType (BCType bct)
+    static bool canWorkWithType(BCType bct)
     {
         return (bct.type == BCTypeEnum.i32 || bct.type == BCTypeEnum.i32Ptr);
     }
@@ -1309,10 +1311,11 @@ public:
         if (canWorkWithType(lhs.type) && canWorkWithType(rhs.type))
         {
             emitSet(lhs, rhs);
-        } 
+        }
         else
         {
-            debug(ctfe) assert(0, "I cannot work with toose types");
+            debug (ctfe)
+                assert(0, "I cannot work with toose types");
             IGaveUp = true;
         }
 
@@ -1499,8 +1502,9 @@ public:
     override void visit(CallExp ce)
     {
         IGaveUp = true;
-        debug (ctfe) assert(inReturnStatement && ce.f == me,
-            "only direct tail recursive calls are supported for now");
+        debug (ctfe)
+            assert(inReturnStatement && ce.f == me,
+                "only direct tail recursive calls are supported for now");
 
         /+
                 //This is experimental do exepect hiccups;
