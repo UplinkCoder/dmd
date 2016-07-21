@@ -14,28 +14,7 @@ enum Cond
     Lt,
 }
 
-/**
- * 32bitInst :
- * [0 .. 6] Instruction
- * [6 .. 8] Flags
- *
- * [8 .. 16] (optional InstData)
- * [16 .. 33] 16BitOperand
- */
 
-enum ShortInst : ubyte
-{
-    Prt,
-    RelJmp,
-    Ret,
-    Neg,
-    Soh, /// set hi stack addr
-    Sdh, /// set hi dataseg addr
-    Flg, // writes the conditionFlag into [lw >> 16]
-    Drb, /// sets db = DS[align4(SP[lw >> 16])[SP[lw >> 16] % 4]]
-    Mod4, ///SP[lw >> 16] = SP[lw >> 16] & 3
-
-}
 /+
 static immutable uint[4] condFlagArr = [(1 << 0 * 8), (1 << 1 * 8), (1 << 2 * 8), (1 << 3 * 8)];
 
@@ -60,15 +39,101 @@ struct BCCondFlag
 
 static assert(BCCondFlag.CF4 == 3);
 +/
+enum InstKind 
+{
+	ShortInst,
+	CndJumpInst,
+
+	LongInst2Stack,
+	LongInstImm32,
+	
+	StackInst,
+}
+
+InstKind instKind (LongInst i)
+{
+	final switch (i)
+	{
+	case LongInst.Prt,
+    LongInst.RelJmp,
+    LongInst.Ret,
+    LongInst.Neg,
+    LongInst.Soh, 
+    LongInst.Sdh, 
+    LongInst.Flg, 
+    LongInst.Drb, 
+    LongInst.Mod4 : {
+		return InstKind.ShortInst;
+	}
+	
+	case LongInst.Jmp,
+    LongInst.JmpFalse,
+    LongInst.JmpTrue,
+    LongInst.JmpZ,
+    LongInst.JmpNZ : {
+		return InstKind.LongInst;
+	}
+	
+	case LongInst.Add,
+    LongInst.Sub,
+    LongInst.Div,
+    LongInst.Mul,
+    LongInst.Eq,
+    LongInst.Lt,
+    LongInst.Gt,
+    LongInst.Set,
+    LongInst.And,
+    LongInst.Or,
+    LongInst.Lsh,
+    LongInst.Rsh,
+    LongInst.Mod,
+	// loadOps begin
+   LongInst.Lds,
+   LongInst.Lss,
+   LongInst.Lsb : {
+			return InstKind.LongInst2Stack;
+	}
+	
+    case LongInst.ImmAdd,
+    LongInst.ImmSub,
+    LongInst.ImmDiv,
+    LongInst.ImmMul,
+    LongInst.ImmEq,
+    LongInst.ImmLt,
+    LongInst.ImmGt,
+    LongInst.ImmSet,
+    LongInst.ImmAnd,
+    LongInst.ImmOr,
+    LongInst.ImmLsh,
+    LongInst.ImmRsh,
+    LongInst.ImmMod : {
+		return InstKind.LongInstImm32;
+	}
+
+
+	}
+}
+
 enum LongInst : ushort
 {
-
+	//Former LongInst.
+    Prt,
+    RelJmp,
+    Ret,
+    Neg,
+    Soh, /// set hi stack addr
+    Sdh, /// set hi dataseg addr
+    Flg, // writes the conditionFlag into [lw >> 16]
+    Drb, /// sets db = DS[align4(SP[lw >> 16])[SP[lw >> 16] % 4]]
+    Mod4, ///SP[lw >> 16] = SP[lw >> 16] & 3
+	//End Former ShortInst
+	
     Jmp,
     JmpFalse,
     JmpTrue,
     JmpZ,
     JmpNZ,
-
+	
     // 2 StackOperands
     Add,
     Sub,
@@ -104,14 +169,13 @@ enum LongInst : ushort
     Lsb, /// load stack byte
 }
 //Imm-Intructuins and corrospinding 2Operand instructions have to be in the same order
-pragma(msg, ShortInst.max);
+pragma(msg, LongInst.max);
 static assert(LongInst.ImmAdd - LongInst.Add == LongInst.ImmRsh - LongInst.Rsh);
 static assert(LongInst.ImmAnd - LongInst.And == LongInst.ImmLt - LongInst.Lt);
 
-enum InstLengthMask = ubyte(0x20); // check 6th bit
 enum IndirectionFlagMask = ubyte(0x40); // check 7th bit
 
-enum InstMask = ubyte(0x1F); // mask for bit 0-5
+enum InstMask = ubyte(0x3F); // mask for bit 0-5
 //enum CondFlagMask = ~ushort(0x2FF); // mask for 8-10th bit
 enum CondFlagMask = 0b11_0000_0000;
 /*
@@ -140,33 +204,32 @@ struct LongInst64
 
     this(const LongInst i, BCAddr addr) pure
     {
-        lw = i | 1 << 5;
+        lw = i;
         hi = addr.addr;
     }
 
     this(const LongInst i, const StackAddr stackAddrLhs, const BCAddr targetAddr) pure
     {
-        lw = i | 1 << 5;
+        lw = i;
         hi = stackAddrLhs.addr | targetAddr.addr << 16;
     }
 
     this(const LongInst i, const StackAddr stackAddrLhs,
         const StackAddr stackAddrRhs, const bool indirect = false) pure
     {
-        lw = i | 1 << 5 | indirect << 6;
+        lw = i | indirect << 6;
         hi = stackAddrLhs.addr | stackAddrRhs.addr << 16;
     }
 
     this(const LongInst i, const StackAddr stackAddrLhs, const Imm32 rhs, const bool indirect = false) pure
     {
-        lw = i | 1 << 5 | indirect << 6 | stackAddrLhs.addr << 16;
+        lw = i | indirect << 6 | stackAddrLhs.addr << 16;
         hi = rhs.imm32;
 
     }
 }
 
-static assert(ShortInst.max < 0x20, "Instruction do not fit in 6 byte anymore");
-static assert(ShortInst.max < 64);
+static assert(LongInst.max < 0x3F, "Instruction do not fit in 6 bit anymore");
 
 static short isShortJump(const int offset) pure
 {
@@ -196,20 +259,20 @@ static assert(align4(11) == 12);
 static assert(align4(12) == 12);
 static assert(align4(15) == 16);
 
-uint ShortInst16(const ShortInst i, const short imm, const bool indirect = false) pure
+uint ShortInst16(const LongInst i, const short imm, const bool indirect = false) pure
 {
     return i | indirect << 6 | imm << 16;
 }
 
-uint ShortInst16Ex(const ShortInst i, ubyte ex, const short imm) pure
+uint ShortInst16Ex(const LongInst i, ubyte ex, const short imm) pure
 {
     return i | ex << 8 | imm << 16;
 }
 
-uint ShortInst24(const ShortInst i, const uint imm) pure
+uint ShortInst24(const LongInst i, const uint imm) pure
 {
     assert(imm == (imm & 0xFFFFFF));
-    assert(i == ShortInst.Soh || i == ShortInst.Sdh);
+    assert(i == LongInst.Soh || i == LongInst.Sdh);
     return i | imm << 8;
 }
 
@@ -549,7 +612,7 @@ struct BCGen
     {
         if (auto offset = isShortJump(target.addr - atIp))
         {
-            byteCodeArray[atIp] = ShortInst16(ShortInst.RelJmp, offset);
+            byteCodeArray[atIp] = ShortInst16(LongInst.RelJmp, offset);
         }
         else
         {
@@ -562,7 +625,7 @@ struct BCGen
     void emitPrt(BCValue val)
     {
         assert(val.vType == BCValueType.StackValue);
-        byteCodeArray[ip] = ShortInst16(ShortInst.Prt, val.stackAddr);
+        byteCodeArray[ip] = ShortInst16(LongInst.Prt, val.stackAddr);
         ip += 2;
     }
 
@@ -626,7 +689,7 @@ struct BCGen
     void emitFlg(BCValue lhs)
     {
         assert(lhs.vType == BCValueType.StackValue, "Can only store flags in Stack Values");
-        byteCodeArray[ip] = ShortInst16(ShortInst.Flg, lhs.stackAddr.addr);
+        byteCodeArray[ip] = ShortInst16(LongInst.Flg, lhs.stackAddr.addr);
         ip += 2;
     }
 
@@ -846,13 +909,13 @@ struct BCGen
 
                 writeln(val.type == BCTypeEnum.i32Ptr);
             }
-        byteCodeArray[ip] = ShortInst16(ShortInst.Ret, val.stackAddr,
+        byteCodeArray[ip] = ShortInst16(LongInst.Ret, val.stackAddr,
             val.type == BCTypeEnum.i32Ptr);
         ip += 2;
         /*} else if (val.vType == BCValueType.Immidiate) {
                         auto sv = pushOntoStack(val);
                         assert(sv.vType == BCValueType.StackValue);
-                        byteCodeArray[ip] = ShortInst16(ShortInst.Ret, sv.stackAddr);
+                        byteCodeArray[ip] = ShortInst16(LongInst.Ret, sv.stackAddr);
                         ip += 2;
                 }*/
     }
@@ -894,8 +957,6 @@ string printInstructions(int* startInstructions, uint length)
             continue;
         }
 
-        if (lw & InstLengthMask)
-        {
             // We have a long instruction
 
             --length;
@@ -1087,68 +1148,56 @@ string printInstructions(int* startInstructions, uint length)
                 }
                 break;
 
-                /*
-            default:
-                {
-                    result ~= "Unkown LongInst \n" ~ to!string(cast(LongInst)(lw & InstMask));
-                }
-                break;*/
-            }
-        }
-        else
-        {
             // We have a short instruction
 
-            final switch (cast(ShortInst)(lw & InstMask))
-            {
-            case ShortInst.Ret:
+            case LongInst.Ret:
                 {
                     result ~= "Ret SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
-            case ShortInst.RelJmp:
+            case LongInst.RelJmp:
                 {
                     result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 1)) ~ "\n";
                 }
                 break;
-            case ShortInst.Prt:
+            case LongInst.Prt:
                 {
                     result ~= "Prt SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
-            case ShortInst.Soh: // Set StackOffset high
+            case LongInst.Soh: // Set StackOffset high
             {
                     result ~= "Soh #" ~ to!string((lw & ~0xFF)) ~ "\n";
                 }
                 break;
-            case ShortInst.Sdh: // Set DataSegmentOffset high
+            case LongInst.Sdh: // Set DataSegmentOffset high
             {
                     result ~= "Sdh #" ~ to!string((lw & ~0xFF)) ~ "\n";
                 }
                 break;
-            case ShortInst.Neg:
+            case LongInst.Neg:
                 {
                     result ~= "Neg SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
 
-            case ShortInst.Mod4:
+            case LongInst.Mod4:
                 {
                     result ~= "Mod4 SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
-            case ShortInst.Flg:
+            case LongInst.Flg:
                 {
                     result ~= "Flg SP[" ~ to!string(lw >> 16) ~ "] \n";
                 }
                 break;
 
-            case ShortInst.Drb:
+            case LongInst.Drb:
                 result ~= "Drb" ~ to!string(
                     (lw & 0x0F00) >> 8) ~ " SP[" ~ to!string(cast(short)(lw >> 16)) ~ "]" ~ "\n";
                 //                      ((lw & ~0xFF) << 24);
             }
-        }
+     
     }
     return result ~ "\n EndInstructionDump";
 }
@@ -1268,34 +1317,36 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 printf("%d : %x".ptr, si, stack[cast(uint) si]);
         }
         //writeln(stack[0 ..)
-        const lw = byteCode[ip++];
+        const lw = byteCode[ip];
+		const hi = byteCode[ip+1];
+		ip += 2;
+
         bool indirect = !!(lw & IndirectionFlagMask);
-        if (!__ctfe)
-            debug (bc)
+        
+            debug (bc) if (!__ctfe)
             {
                 import std.stdio;
 
                 writeln("indirect: ", indirect);
             }
-        if (lw & InstLengthMask)
-        {
-            // We have a long instruction
-
-            uint hi = byteCode[ip++];
-
+       
+            
             auto lhsOffset = hi & 0xFFFF;
             auto rhsOffset = (hi >> 16);
             uint* lhsRef = (stack.ptr + (lhsOffset / 4));
             uint rhs = *(stack.ptr + (rhsOffset / 4));
             uint* lhsStackRef = (stack.ptr + ((lw >> 16) / 4));
+			auto opRef = stack.ptr + ((lw >> 16) / 4);
 
             if (indirect)
             {
                 lhsStackRef = (stack.ptr + ((*lhsStackRef) / 4));
                 lhsRef = (stack.ptr + ((*lhsRef) / 4));
+				opRef = (stack.ptr + ((*opRef) / 4));
+	
             }
 
-            switch (cast(LongInst)(lw & InstMask))
+            final switch (cast(LongInst)(lw & InstMask))
             {
             case LongInst.ImmAdd:
                 {
@@ -1324,6 +1375,11 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             case LongInst.ImmAnd:
                 {
                     (*lhsStackRef) &= hi;
+                }
+                break;
+			case LongInst.ImmOr:
+                {
+                    (*lhsStackRef) |= hi;
                 }
                 break;
 
@@ -1414,6 +1470,12 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     (*lhsRef) &= rhs;
                 }
                 break;
+           case LongInst.Or:
+                {
+                    (*lhsRef) |= rhs;
+                }
+                break;
+ 
             case LongInst.Lsh:
                 {
 
@@ -1558,38 +1620,10 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
                 }
                 break;
-            default:
-                {
-                    assert(0, "Unkown LongInst." ~ to!string(cast(LongInst)(lw & InstMask)) ~ " \n");
-                }
-            }
-        }
-        else
-        {
+        
             // We have a short instruction
-            auto opRef = stack.ptr + ((lw >> 16) / 4);
-            if (indirect)
-            {
-                debug
-                {
-                    import std.stdio;
-
-                    writeln("indirect return ", *opRef);
-                }
-
-                opRef = (stack.ptr + ((*opRef) / 4));
-                debug
-                {
-                    import std.stdio;
-
-                    writeln("effective return ", *opRef);
-                }
-
-            }
-
-            final switch (cast(ShortInst)(lw & InstMask))
-            {
-            case ShortInst.Ret:
+            
+            case LongInst.Ret:
                 {
                     debug (bc)
                         if (!__ctfe)
@@ -1599,18 +1633,18 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     return *opRef;
                 }
 
-            case ShortInst.RelJmp:
+            case LongInst.RelJmp:
                 {
                     ip += (cast(short)(lw >> 16)) - 1;
                 }
                 break;
-            case ShortInst.Neg:
+            case LongInst.Neg:
                 {
 
                     (*opRef) = -(*opRef);
                 }
                 break;
-            case ShortInst.Prt:
+            case LongInst.Prt:
                 {
                     if (!__ctfe)
                     {
@@ -1618,17 +1652,17 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     }
                 }
                 break;
-            case ShortInst.Soh:
+            case LongInst.Soh:
                 {
                     stackOffset = (lw & ~0xFF) << 24;
                 }
                 break;
-            case ShortInst.Sdh:
+            case LongInst.Sdh:
                 {
                     dataSegHigh = ulong(lw & ~0xFF) << 32L;
                 }
                 break;
-            case ShortInst.Drb:
+            case LongInst.Drb:
                 const DsIdx = *(stack.ptr + ((lw >> 16) / 4));
                 const alignedIdx = (DsIdx & ~3);
                 if (drOffset != alignedIdx)
@@ -1652,13 +1686,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                     break;
                 }
                 break;
-            case ShortInst.Flg:
+            case LongInst.Flg:
                 {
                     (*opRef) = cond;
                 }
                 break;
 
-            case ShortInst.Mod4:
+            case LongInst.Mod4:
                 {
                     (*opRef) &= 3;
                 }
@@ -1666,7 +1700,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             }
         }
     }
-}
+
 
 int[] testArith()
 {
