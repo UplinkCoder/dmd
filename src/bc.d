@@ -61,7 +61,7 @@ InstKind instKind(LongInst i)
 
     case LongInst.Jmp, LongInst.JmpFalse, LongInst.JmpTrue, LongInst.JmpZ, LongInst.JmpNZ:
         {
-            return InstKind.LongInst;
+            return InstKind.CndJumpInst;
         }
 
     case LongInst.Add, LongInst.Sub, LongInst.Div, LongInst.Mul, LongInst.Eq,
@@ -1284,9 +1284,13 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 printf("%d : %x".ptr, si, stack[cast(uint) si]);
         }
         //writeln(stack[0 ..)
-        const lw = byteCode[ip];
-        const hi = byteCode[ip + 1];
-        ip += 2;
+        if (ip >= byteCode.length-1)
+        {
+            return -1;
+        }
+        const lw = byteCode[ip++];
+        const hi = byteCode[ip++];
+       
 
         bool indirect = !!(lw & IndirectionFlagMask);
 
@@ -1761,14 +1765,13 @@ int[] testLss()
     BCGen gen;
     with (gen)
     {
-        auto p1 = BCValue(StackAddr(4), BCType(BCTypeEnum.i32));
         emitSet(BCValue(StackAddr(4), BCType(BCTypeEnum.i32)), BCValue(Imm32(8)));
         emitSet(BCValue(StackAddr(8), BCType(BCTypeEnum.i32)), BCValue(Imm32(32)));
         sp += 8;
 
-        auto result = genTemporary(BCType(BCTypeEnum.i32)).value;
+        auto result = BCValue(StackAddr(4) ,BCType(BCTypeEnum.i32Ptr));
 
-        emitLongInst(LongInst64(LongInst.Lss, result.stackAddr, p1.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
+        //emitLongInst(LongInst64(LongInst.Lss, result.stackAddr, p1.stackAddr)); // *lhsRef = DS[aligin4(rhs)]
 
         emitReturn(result); // return result;
 
@@ -1786,12 +1789,13 @@ static assert(!interpret(testLt(), [BCValue(Imm32(25)), BCValue(Imm32(25))]));
 
 //pragma(msg, testLt.printInstructions);
 
-static assert(interpret(testBC, [BCValue(Imm32(12))]) == 24);
-static assert(interpret(testBC, [BCValue(Imm32(16))]) == 16);
+static assert(interpret(testBC(), [BCValue(Imm32(12))]) == 24);
+static assert(interpret(testBC(), [BCValue(Imm32(16))]) == 16);
 
 //pragma(msg, testBC.printInstructions);
 
 static assert(cast(dchar) testDs.interpret([BCValue(Imm32(1))],
     (cast(uint[]) "hello"d).ptr) == "e"[0]);
 
-pragma(msg, printInstructions(testLss));
+//pragma(msg, printInstructions(testLss));
+static assert (interpret(testLss(), []) == 32);
