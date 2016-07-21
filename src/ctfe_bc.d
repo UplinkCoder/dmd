@@ -223,8 +223,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
     }
     else
     {
-        assert(0, "CTFE Errored");
-        //return null;
+        debug(ctfe) assert(0, "CTFE Errored");
+        return null;
 
     }
 
@@ -896,9 +896,11 @@ public:
             import std.stdio;
 
             writefln("Expression %s", e.toString);
-        }
 
-        assert(0, "Cannot handleExpression");
+            assert(0, "Cannot handleExpression");
+        }
+        IGaveUp = true;
+
     }
 
     override void visit(DotVarExp dve)
@@ -954,7 +956,8 @@ public:
         }
         else
         {
-            assert(0, "Can only take members of a struct for now");
+            debug(ctfe) assert(0, "Can only take members of a struct for now");
+            IGaveUp = true;
         }
     }
 
@@ -1267,6 +1270,11 @@ public:
         }
     }
 
+    static bool canWorkWithType (BCType bct)
+    {
+        return (bct.type == BCTypeEnum.i32 || bct.type == BCTypeEnum.i32Ptr);
+    }
+
     override void visit(AssignExp ae)
     {
         debug (ctfe)
@@ -1298,7 +1306,15 @@ public:
             writeln("lhs :", lhs);
             writeln("rhs :", rhs);
         }
-        emitSet(lhs, rhs);
+        if (canWorkWithType(lhs.type) && canWorkWithType(rhs.type))
+        {
+            emitSet(lhs, rhs);
+        } 
+        else
+        {
+            debug(ctfe) assert(0, "I cannot work with toose types");
+            IGaveUp = true;
+        }
 
         retval = oldDiscardValue ? oldRetval : retval;
         assignTo = oldAssignTo;
@@ -1482,7 +1498,8 @@ public:
 
     override void visit(CallExp ce)
     {
-        assert(inReturnStatement && ce.f == me,
+        IGaveUp = true;
+        debug (ctfe) assert(inReturnStatement && ce.f == me,
             "only direct tail recursive calls are supported for now");
 
         /+
