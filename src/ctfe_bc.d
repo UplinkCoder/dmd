@@ -747,6 +747,12 @@ public:
 
     override void visit(IndexExp ie)
     {
+        debug (ctfe) {}
+        else
+        {
+            IGaveUp = true;
+            return ;
+        }
         debug (ctfe)
         {
             import std.stdio;
@@ -784,7 +790,7 @@ public:
 
         emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, ptr.stackAddr));
 
-        assert(idx.type == BCType(BCTypeEnum.i32));
+        //if (idx.type == BCType(BCTypeEnum.i32))
         //emitLongInst(LongInst64(LongInst.Lss, assignTo.stackAddr, ptr.stackAddr));
         // *lhsRef = DS[aligin4(rhs)]
         retval = assignTo;
