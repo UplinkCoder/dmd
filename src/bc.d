@@ -162,7 +162,7 @@ enum CondFlagMask = 0b11_0000_0000;
 * [8-12] CondFlag (or Padding)
 * [12-16] Padding
 * [16-32] StackOffset (lhs)
-* [32-64] Imm32 (rhs) 
+* [32-64] Imm32 (rhs)
 */
 
 struct LongInst64
@@ -509,7 +509,7 @@ bool isBasicBCType(BCTypeEnum bct)
 
 struct BCGen
 {
-    //SharedState 
+    //SharedState
     // The following is shared between ALL BC generator instances in a given run
 
     /////////////////////////////////////////////
@@ -545,7 +545,7 @@ struct BCGen
         auto tmp = temporarys[temporaryCount] = BCTemporary(BCValue(StackAddr(sp),
             bct), temporaryCount);
         //make BCTypeEnum a struct
-        //FIXE make the typeIndex a part of BCTypeEnum. 
+        //FIXE make the typeIndex a part of BCTypeEnum.
 
         sp += align4(isBasicBCType(bct) ? basicTypeSize(bct) : 0); //sharedState.size(bct.type, typeIndex));
         ++temporaryCount;
@@ -1791,7 +1791,7 @@ int[] testLss()
 //        2:  Set SP[12], #2
 //        4:  Eq SP[12], #12
 //        6:  JmpFalse &10
-//            8:  Ret SP[12] 
+//            8:  Ret SP[12]
 //    10: Add SP[12], #1
 //        12: RelJmp &4
 //            14: RelJmp &2

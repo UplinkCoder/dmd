@@ -1037,7 +1037,7 @@ public:
         //emitSet(, array);
         //emitPrt(retval);
         /*
-        uint_32 length 
+        uint_32 length
         uint_32 [length/4+1] chars;
          */
     }
