@@ -14,7 +14,6 @@ enum Cond
     Lt,
 }
 
-
 /+
 static immutable uint[4] condFlagArr = [(1 << 0 * 8), (1 << 1 * 8), (1 << 2 * 8), (1 << 3 * 8)];
 
@@ -39,84 +38,53 @@ struct BCCondFlag
 
 static assert(BCCondFlag.CF4 == 3);
 +/
-enum InstKind 
+enum InstKind
 {
-	ShortInst,
-	CndJumpInst,
+    ShortInst,
+    CndJumpInst,
 
-	LongInst2Stack,
-	LongInstImm32,
-	
-	StackInst,
+    LongInst2Stack,
+    LongInstImm32,
+
+    StackInst,
 }
 
-InstKind instKind (LongInst i)
+InstKind instKind(LongInst i)
 {
-	final switch (i)
-	{
-	case LongInst.Prt,
-    LongInst.RelJmp,
-    LongInst.Ret,
-    LongInst.Neg,
-    LongInst.Soh, 
-    LongInst.Sdh, 
-    LongInst.Flg, 
-    LongInst.Drb, 
-    LongInst.Mod4 : {
-		return InstKind.ShortInst;
-	}
-	
-	case LongInst.Jmp,
-    LongInst.JmpFalse,
-    LongInst.JmpTrue,
-    LongInst.JmpZ,
-    LongInst.JmpNZ : {
-		return InstKind.LongInst;
-	}
-	
-	case LongInst.Add,
-    LongInst.Sub,
-    LongInst.Div,
-    LongInst.Mul,
-    LongInst.Eq,
-    LongInst.Lt,
-    LongInst.Gt,
-    LongInst.Set,
-    LongInst.And,
-    LongInst.Or,
-    LongInst.Lsh,
-    LongInst.Rsh,
-    LongInst.Mod,
-	// loadOps begin
-   LongInst.Lds,
-   LongInst.Lss,
-   LongInst.Lsb : {
-			return InstKind.LongInst2Stack;
-	}
-	
-    case LongInst.ImmAdd,
-    LongInst.ImmSub,
-    LongInst.ImmDiv,
-    LongInst.ImmMul,
-    LongInst.ImmEq,
-    LongInst.ImmLt,
-    LongInst.ImmGt,
-    LongInst.ImmSet,
-    LongInst.ImmAnd,
-    LongInst.ImmOr,
-    LongInst.ImmLsh,
-    LongInst.ImmRsh,
-    LongInst.ImmMod : {
-		return InstKind.LongInstImm32;
-	}
+    final switch (i)
+    {
+    case LongInst.Prt, LongInst.RelJmp, LongInst.Ret, LongInst.Neg,
+            LongInst.Soh, LongInst.Sdh, LongInst.Flg, LongInst.Drb, LongInst.Mod4:
+        {
+            return InstKind.ShortInst;
+        }
 
+    case LongInst.Jmp, LongInst.JmpFalse, LongInst.JmpTrue, LongInst.JmpZ, LongInst.JmpNZ:
+        {
+            return InstKind.LongInst;
+        }
 
-	}
+    case LongInst.Add, LongInst.Sub, LongInst.Div, LongInst.Mul, LongInst.Eq,
+            LongInst.Lt, LongInst.Gt, LongInst.Set, LongInst.And, LongInst.Or,
+            LongInst.Lsh, LongInst.Rsh, LongInst.Mod,// loadOps begin
+            LongInst.Lds, LongInst.Lss, LongInst.Lsb:
+        {
+            return InstKind.LongInst2Stack;
+        }
+
+    case LongInst.ImmAdd, LongInst.ImmSub, LongInst.ImmDiv, LongInst.ImmMul,
+            LongInst.ImmEq, LongInst.ImmLt, LongInst.ImmGt, LongInst.ImmSet,
+            LongInst.ImmAnd, LongInst.ImmOr, LongInst.ImmLsh, LongInst.ImmRsh, LongInst.ImmMod:
+        {
+            return InstKind.LongInstImm32;
+        }
+
+    }
 }
 
 enum LongInst : ushort
 {
-	//Former LongInst.
+    //Former ShortInst
     Prt,
     RelJmp,
     Ret,
@@ -126,14 +94,14 @@ enum LongInst : ushort
     Flg, // writes the conditionFlag into [lw >> 16]
     Drb, /// sets db = DS[align4(SP[lw >> 16])[SP[lw >> 16] % 4]]
     Mod4, ///SP[lw >> 16] = SP[lw >> 16] & 3
-	//End Former ShortInst
-	
+    //End Former ShortInst
+
     Jmp,
     JmpFalse,
     JmpTrue,
     JmpZ,
     JmpNZ,
-	
+
     // 2 StackOperands
     Add,
     Sub,
@@ -909,8 +877,7 @@ struct BCGen
 
                 writeln(val.type == BCTypeEnum.i32Ptr);
             }
-        byteCodeArray[ip] = ShortInst16(LongInst.Ret, val.stackAddr,
-            val.type == BCTypeEnum.i32Ptr);
+        byteCodeArray[ip] = ShortInst16(LongInst.Ret, val.stackAddr, val.type == BCTypeEnum.i32Ptr);
         ip += 2;
         /*} else if (val.vType == BCValueType.Immidiate) {
                         auto sv = pushOntoStack(val);
@@ -957,247 +924,247 @@ string printInstructions(int* startInstructions, uint length)
             continue;
         }
 
-            // We have a long instruction
+        // We have a long instruction
 
-            --length;
-            uint hi = arr[pos++];
+        --length;
+        uint hi = arr[pos++];
 
-            final switch (cast(LongInst)(lw & InstMask))
+        final switch (cast(LongInst)(lw & InstMask))
+        {
+        case LongInst.ImmSet:
             {
-            case LongInst.ImmSet:
-                {
-                    result ~= "Set SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmAdd:
-                {
-                    result ~= "Add SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmSub:
-                {
-                    result ~= "Sub SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmMul:
-                {
-                    result ~= "Mul SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmDiv:
-                {
-                    result ~= "Div SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
+                result ~= "Set SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmAdd:
+            {
+                result ~= "Add SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmSub:
+            {
+                result ~= "Sub SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmMul:
+            {
+                result ~= "Mul SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmDiv:
+            {
+                result ~= "Div SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
 
-            case LongInst.ImmAnd:
-                {
-                    result ~= "And SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmOr:
-                {
-                    result ~= "Or SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
+        case LongInst.ImmAnd:
+            {
+                result ~= "And SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmOr:
+            {
+                result ~= "Or SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
 
-            case LongInst.ImmLsh:
-                {
-                    result ~= "Lsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmRsh:
-                {
-                    result ~= "Rsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
+        case LongInst.ImmLsh:
+            {
+                result ~= "Lsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmRsh:
+            {
+                result ~= "Rsh SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
 
-            case LongInst.ImmMod:
-                {
-                    result ~= "Mod SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
+        case LongInst.ImmMod:
+            {
+                result ~= "Mod SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
 
-            case LongInst.ImmEq:
-                {
-                    result ~= "Eq SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmLt:
-                {
-                    result ~= "Lt SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.ImmGt:
-                {
-                    result ~= "Gt SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
-                }
-                break;
-            case LongInst.Add:
-                {
-                    result ~= "Add SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Sub:
-                {
-                    result ~= "Sub SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Mul:
-                {
-                    result ~= "Mul SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Div:
-                {
-                    result ~= "Div SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.And:
-                {
-                    result ~= "And SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Or:
-                {
-                    result ~= "Or SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Lsh:
-                {
-                    result ~= "Lsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Rsh:
-                {
-                    result ~= "Rsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Mod:
-                {
-                    result ~= "Mod SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Eq:
-                {
-                    result ~= "Eq SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
+        case LongInst.ImmEq:
+            {
+                result ~= "Eq SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmLt:
+            {
+                result ~= "Lt SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmGt:
+            {
+                result ~= "Gt SP[" ~ to!string(lw >> 16) ~ "], #" ~ to!string(hi) ~ "\n";
+            }
+            break;
+        case LongInst.Add:
+            {
+                result ~= "Add SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Sub:
+            {
+                result ~= "Sub SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Mul:
+            {
+                result ~= "Mul SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Div:
+            {
+                result ~= "Div SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.And:
+            {
+                result ~= "And SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Or:
+            {
+                result ~= "Or SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Lsh:
+            {
+                result ~= "Lsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Rsh:
+            {
+                result ~= "Rsh SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Mod:
+            {
+                result ~= "Mod SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Eq:
+            {
+                result ~= "Eq SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
 
-            case LongInst.Set:
-                {
-                    result ~= "Set SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
+        case LongInst.Set:
+            {
+                result ~= "Set SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
 
-            case LongInst.Lt:
-                {
-                    result ~= "Lt SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Gt:
-                {
-                    result ~= "Gt SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Jmp:
-                {
-                    result ~= "Jmp &" ~ to!string(hi) ~ "\n";
-                }
-                break;
+        case LongInst.Lt:
+            {
+                result ~= "Lt SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Gt:
+            {
+                result ~= "Gt SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Jmp:
+            {
+                result ~= "Jmp &" ~ to!string(hi) ~ "\n";
+            }
+            break;
 
-            case LongInst.JmpFalse:
-                {
-                    result ~= "JmpFalse &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
-                }
-                break;
-            case LongInst.JmpTrue:
-                {
-                    result ~= "JmpTrue &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
-                }
-                break;
+        case LongInst.JmpFalse:
+            {
+                result ~= "JmpFalse &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
+            }
+            break;
+        case LongInst.JmpTrue:
+            {
+                result ~= "JmpTrue &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
+            }
+            break;
 
-            case LongInst.JmpNZ:
-                {
-                    result ~= "JmpNZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(
-                        (has4ByteOffset ? (hi >> 16) - 4 : hi >> 16)) ~ "\n";
-                }
-                break;
+        case LongInst.JmpNZ:
+            {
+                result ~= "JmpNZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(
+                    (has4ByteOffset ? (hi >> 16) - 4 : hi >> 16)) ~ "\n";
+            }
+            break;
 
-            case LongInst.JmpZ:
-                {
-                    result ~= "JmpZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(
-                        (has4ByteOffset ? (hi >> 16) - 4 : hi >> 16)) ~ "\n";
-                }
-                break;
+        case LongInst.JmpZ:
+            {
+                result ~= "JmpZ SP[" ~ to!string(hi & 0xFFFF) ~ "], &" ~ to!string(
+                    (has4ByteOffset ? (hi >> 16) - 4 : hi >> 16)) ~ "\n";
+            }
+            break;
 
-            case LongInst.Lds:
-                {
-                    result ~= "Lds SP[" ~ to!string(hi & 0xFFFF) ~ "], DS[align4(SP[" ~ to!string(
-                        hi >> 16) ~ "])]\n";
-                }
-                break;
-            case LongInst.Lss:
-                {
-                    result ~= "Lss SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
-            case LongInst.Lsb:
-                {
-                    result ~= "Lsb SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
-                }
-                break;
+        case LongInst.Lds:
+            {
+                result ~= "Lds SP[" ~ to!string(hi & 0xFFFF) ~ "], DS[align4(SP[" ~ to!string(
+                    hi >> 16) ~ "])]\n";
+            }
+            break;
+        case LongInst.Lss:
+            {
+                result ~= "Lss SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
+        case LongInst.Lsb:
+            {
+                result ~= "Lsb SP[" ~ to!string(hi & 0xFFFF) ~ "], SP[" ~ to!string(hi >> 16) ~ "]\n";
+            }
+            break;
 
             // We have a short instruction
 
-            case LongInst.Ret:
-                {
-                    result ~= "Ret SP[" ~ to!string(lw >> 16) ~ "] \n";
-                }
-                break;
-            case LongInst.RelJmp:
-                {
-                    result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 1)) ~ "\n";
-                }
-                break;
-            case LongInst.Prt:
-                {
-                    result ~= "Prt SP[" ~ to!string(lw >> 16) ~ "] \n";
-                }
-                break;
-            case LongInst.Soh: // Set StackOffset high
+        case LongInst.Ret:
             {
-                    result ~= "Soh #" ~ to!string((lw & ~0xFF)) ~ "\n";
-                }
-                break;
-            case LongInst.Sdh: // Set DataSegmentOffset high
-            {
-                    result ~= "Sdh #" ~ to!string((lw & ~0xFF)) ~ "\n";
-                }
-                break;
-            case LongInst.Neg:
-                {
-                    result ~= "Neg SP[" ~ to!string(lw >> 16) ~ "] \n";
-                }
-                break;
-
-            case LongInst.Mod4:
-                {
-                    result ~= "Mod4 SP[" ~ to!string(lw >> 16) ~ "] \n";
-                }
-                break;
-            case LongInst.Flg:
-                {
-                    result ~= "Flg SP[" ~ to!string(lw >> 16) ~ "] \n";
-                }
-                break;
-
-            case LongInst.Drb:
-                result ~= "Drb" ~ to!string(
-                    (lw & 0x0F00) >> 8) ~ " SP[" ~ to!string(cast(short)(lw >> 16)) ~ "]" ~ "\n";
-                //                      ((lw & ~0xFF) << 24);
+                result ~= "Ret SP[" ~ to!string(lw >> 16) ~ "] \n";
             }
-     
+            break;
+        case LongInst.RelJmp:
+            {
+                result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 1)) ~ "\n";
+            }
+            break;
+        case LongInst.Prt:
+            {
+                result ~= "Prt SP[" ~ to!string(lw >> 16) ~ "] \n";
+            }
+            break;
+        case LongInst.Soh: // Set StackOffset high
+        {
+                result ~= "Soh #" ~ to!string((lw & ~0xFF)) ~ "\n";
+            }
+            break;
+        case LongInst.Sdh: // Set DataSegmentOffset high
+        {
+                result ~= "Sdh #" ~ to!string((lw & ~0xFF)) ~ "\n";
+            }
+            break;
+        case LongInst.Neg:
+            {
+                result ~= "Neg SP[" ~ to!string(lw >> 16) ~ "] \n";
+            }
+            break;
+
+        case LongInst.Mod4:
+            {
+                result ~= "Mod4 SP[" ~ to!string(lw >> 16) ~ "] \n";
+            }
+            break;
+        case LongInst.Flg:
+            {
+                result ~= "Flg SP[" ~ to!string(lw >> 16) ~ "] \n";
+            }
+            break;
+
+        case LongInst.Drb:
+            result ~= "Drb" ~ to!string(
+                (lw & 0x0F00) >> 8) ~ " SP[" ~ to!string(cast(short)(lw >> 16)) ~ "]" ~ "\n";
+            //                      ((lw & ~0xFF) << 24);
+        }
+
     }
     return result ~ "\n EndInstructionDump";
 }
@@ -1318,389 +1285,388 @@ uint interpret(const int[] byteCode, const BCValue[] args,
         }
         //writeln(stack[0 ..)
         const lw = byteCode[ip];
-		const hi = byteCode[ip+1];
-		ip += 2;
+        const hi = byteCode[ip + 1];
+        ip += 2;
 
         bool indirect = !!(lw & IndirectionFlagMask);
-        
-            debug (bc) if (!__ctfe)
+
+        debug (bc)
+            if (!__ctfe)
             {
                 import std.stdio;
 
                 writeln("indirect: ", indirect);
             }
-       
-            
-            auto lhsOffset = hi & 0xFFFF;
-            auto rhsOffset = (hi >> 16);
-            uint* lhsRef = (stack.ptr + (lhsOffset / 4));
-            uint rhs = *(stack.ptr + (rhsOffset / 4));
-            uint* lhsStackRef = (stack.ptr + ((lw >> 16) / 4));
-			auto opRef = stack.ptr + ((lw >> 16) / 4);
 
-            if (indirect)
+        auto lhsOffset = hi & 0xFFFF;
+        auto rhsOffset = (hi >> 16);
+        uint* lhsRef = (stack.ptr + (lhsOffset / 4));
+        uint rhs = *(stack.ptr + (rhsOffset / 4));
+        uint* lhsStackRef = (stack.ptr + ((lw >> 16) / 4));
+        auto opRef = stack.ptr + ((lw >> 16) / 4);
+
+        if (indirect)
+        {
+            lhsStackRef = (stack.ptr + ((*lhsStackRef) / 4));
+            lhsRef = (stack.ptr + ((*lhsRef) / 4));
+            opRef = (stack.ptr + ((*opRef) / 4));
+
+        }
+
+        final switch (cast(LongInst)(lw & InstMask))
+        {
+        case LongInst.ImmAdd:
             {
-                lhsStackRef = (stack.ptr + ((*lhsStackRef) / 4));
-                lhsRef = (stack.ptr + ((*lhsRef) / 4));
-				opRef = (stack.ptr + ((*opRef) / 4));
-	
+                (*lhsStackRef) += hi;
             }
+            break;
 
-            final switch (cast(LongInst)(lw & InstMask))
+        case LongInst.ImmSub:
             {
-            case LongInst.ImmAdd:
-                {
-                    (*lhsStackRef) += hi;
-                }
-                break;
+                (*lhsStackRef) -= hi;
+            }
+            break;
 
-            case LongInst.ImmSub:
-                {
-                    (*lhsStackRef) -= hi;
-                }
-                break;
+        case LongInst.ImmMul:
+            {
+                (*lhsStackRef) *= hi;
+            }
+            break;
 
-            case LongInst.ImmMul:
-                {
-                    (*lhsStackRef) *= hi;
-                }
-                break;
+        case LongInst.ImmDiv:
+            {
+                (*lhsStackRef) /= hi;
+            }
+            break;
 
-            case LongInst.ImmDiv:
-                {
-                    (*lhsStackRef) /= hi;
-                }
-                break;
+        case LongInst.ImmAnd:
+            {
+                (*lhsStackRef) &= hi;
+            }
+            break;
+        case LongInst.ImmOr:
+            {
+                (*lhsStackRef) |= hi;
+            }
+            break;
 
-            case LongInst.ImmAnd:
-                {
-                    (*lhsStackRef) &= hi;
-                }
-                break;
-			case LongInst.ImmOr:
-                {
-                    (*lhsStackRef) |= hi;
-                }
-                break;
+        case LongInst.ImmLsh:
+            {
+                (*lhsStackRef) <<= hi;
+            }
+            break;
+        case LongInst.ImmRsh:
+            {
+                (*lhsStackRef) >>= hi;
+            }
+            break;
 
-            case LongInst.ImmLsh:
-                {
-                    (*lhsStackRef) <<= hi;
-                }
-                break;
-            case LongInst.ImmRsh:
-                {
-                    (*lhsStackRef) >>= hi;
-                }
-                break;
+        case LongInst.ImmMod:
+            {
+                (*lhsStackRef) %= hi;
+            }
+            break;
 
-            case LongInst.ImmMod:
-                {
-                    (*lhsStackRef) %= hi;
-                }
-                break;
+        case LongInst.ImmSet:
+            {
+                (*lhsStackRef) = hi;
+            }
+            break;
+        case LongInst.ImmEq:
+            {
 
-            case LongInst.ImmSet:
+                if ((*lhsStackRef) == hi)
                 {
-                    (*lhsStackRef) = hi;
+                    cond = true;
                 }
-                break;
-            case LongInst.ImmEq:
+                else
                 {
-
-                    if ((*lhsStackRef) == hi)
-                    {
-                        cond = true;
-                    }
-                    else
-                    {
-                        cond = false;
-                    }
-
-                }
-                break;
-            case LongInst.ImmLt:
-                {
-                    if ((*lhsStackRef) < hi)
-                    {
-                        cond = true;
-                    }
-                    else
-                    {
-                        cond = false;
-                    }
-
-                }
-                break;
-            case LongInst.ImmGt:
-                {
-                    if ((*lhsStackRef) > hi)
-                    {
-                        cond = true;
-                    }
-                    else
-                    {
-                        cond = false;
-                    }
-
-                }
-                break;
-            case LongInst.Add:
-                {
-                    (*lhsRef) += rhs;
-                }
-                break;
-            case LongInst.Sub:
-                {
-                    (*lhsRef) -= rhs;
-                }
-                break;
-            case LongInst.Mul:
-                {
-                    (*lhsRef) *= rhs;
-                }
-                break;
-            case LongInst.Div:
-                {
-                    (*lhsRef) /= rhs;
-                }
-                break;
-            case LongInst.And:
-                {
-                    (*lhsRef) &= rhs;
-                }
-                break;
-           case LongInst.Or:
-                {
-                    (*lhsRef) |= rhs;
-                }
-                break;
- 
-            case LongInst.Lsh:
-                {
-
-                    (*lhsRef) <<= rhs;
-                }
-                break;
-            case LongInst.Rsh:
-                {
-                    (*lhsRef) >>= rhs;
-                }
-                break;
-
-            case LongInst.Mod:
-                {
-                    (*lhsRef) %= rhs;
-                }
-                break;
-
-            case LongInst.Eq:
-                {
-                    if ((*lhsRef) == rhs)
-                    {
-                        cond = true;
-                    }
-                    else
-                    {
-                        cond = false;
-                    }
-
-                }
-                break;
-
-            case LongInst.Set:
-                {
-                    (*lhsRef) = rhs;
-                }
-                break;
-
-            case LongInst.Lt:
-                {
-                    if ((*lhsRef) < rhs)
-                    {
-                        cond = true;
-                    }
-                    else
-                    {
-                        cond = false;
-                    }
-
-                }
-                break;
-            case LongInst.Gt:
-                {
-                    if ((*lhsRef) > rhs)
-                    {
-                        cond = true;
-                    }
-                    else
-                    {
-                        cond = false;
-                    }
-
-                }
-                break;
-
-            case LongInst.Jmp:
-                {
-                    ip = hi;
-                }
-                break;
-            case LongInst.JmpNZ:
-                {
-                    if ((*lhsRef) != 0)
-                    {
-                        ip = rhsOffset;
-                    }
-                }
-                break;
-            case LongInst.JmpZ:
-                {
-                    if ((*lhsRef) == 0)
-                    {
-                        ip = rhsOffset;
-                    }
-                }
-                break;
-            case LongInst.JmpFalse:
-                {
-                    if (!cond)
-                    {
-                        ip = (hi);
-                    }
-                }
-                break;
-            case LongInst.JmpTrue:
-                {
-                    if (cond)
-                    {
-                        ip = (hi);
-                    }
-                }
-                break;
-
-            case LongInst.Lds:
-                {
-                    (*lhsRef) = *(dataSeg + (dataSegHigh | rhs));
-                    //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
-                }
-                break;
-            case LongInst.Lss:
-                {
-                    (*lhsRef) = *(stack.ptr + (rhs / 4));
-                    //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
-                }
-                break;
-            case LongInst.Lsb:
-                {
-
-                    uint _dr = *(stack.ptr + (rhs / 4));
-                    debug (bc)
-                    {
-                        import std.stdio;
-
-                        writeln("Lsb_ _dr:", _dr, "  rhs: ", rhs, " rhs/4: ",
-                            rhs / 4, " rhs & 3: ", rhs & 3);
-                    }
-                    final switch (rhs & 3)
-                    {
-                    case 0:
-                        (*lhsRef) = _dr & 0xFF;
-                        break;
-                    case 1:
-                        (*lhsRef) = (_dr & 0xFF00) >> 8;
-                        break;
-                    case 2:
-                        (*lhsRef) = (_dr & 0xFF0000) >> 16;
-                        break;
-                    case 3:
-                        (*lhsRef) = _dr >> 24;
-                        break;
-                    }
-
-                }
-                break;
-        
-            // We have a short instruction
-            
-            case LongInst.Ret:
-                {
-                    debug (bc)
-                        if (!__ctfe)
-                        {
-                            printf("Ret: %d".ptr, (*opRef));
-                        }
-                    return *opRef;
+                    cond = false;
                 }
 
-            case LongInst.RelJmp:
+            }
+            break;
+        case LongInst.ImmLt:
+            {
+                if ((*lhsStackRef) < hi)
                 {
-                    ip += (cast(short)(lw >> 16)) - 1;
+                    cond = true;
                 }
-                break;
-            case LongInst.Neg:
+                else
                 {
+                    cond = false;
+                }
 
-                    (*opRef) = -(*opRef);
-                }
-                break;
-            case LongInst.Prt:
+            }
+            break;
+        case LongInst.ImmGt:
+            {
+                if ((*lhsStackRef) > hi)
                 {
-                    if (!__ctfe)
-                    {
-                        printf("SP[%d](%d)".ptr, (lw >> 16), (*opRef));
-                    }
+                    cond = true;
                 }
-                break;
-            case LongInst.Soh:
+                else
                 {
-                    stackOffset = (lw & ~0xFF) << 24;
+                    cond = false;
                 }
-                break;
-            case LongInst.Sdh:
+
+            }
+            break;
+        case LongInst.Add:
+            {
+                (*lhsRef) += rhs;
+            }
+            break;
+        case LongInst.Sub:
+            {
+                (*lhsRef) -= rhs;
+            }
+            break;
+        case LongInst.Mul:
+            {
+                (*lhsRef) *= rhs;
+            }
+            break;
+        case LongInst.Div:
+            {
+                (*lhsRef) /= rhs;
+            }
+            break;
+        case LongInst.And:
+            {
+                (*lhsRef) &= rhs;
+            }
+            break;
+        case LongInst.Or:
+            {
+                (*lhsRef) |= rhs;
+            }
+            break;
+
+        case LongInst.Lsh:
+            {
+
+                (*lhsRef) <<= rhs;
+            }
+            break;
+        case LongInst.Rsh:
+            {
+                (*lhsRef) >>= rhs;
+            }
+            break;
+
+        case LongInst.Mod:
+            {
+                (*lhsRef) %= rhs;
+            }
+            break;
+
+        case LongInst.Eq:
+            {
+                if ((*lhsRef) == rhs)
                 {
-                    dataSegHigh = ulong(lw & ~0xFF) << 32L;
+                    cond = true;
                 }
-                break;
-            case LongInst.Drb:
-                const DsIdx = *(stack.ptr + ((lw >> 16) / 4));
-                const alignedIdx = (DsIdx & ~3);
-                if (drOffset != alignedIdx)
+                else
                 {
-                    dr = *(dataSeg + (dataSegHigh | alignedIdx));
-                    drOffset = alignedIdx;
+                    cond = false;
                 }
-                final switch (DsIdx & 3)
+
+            }
+            break;
+
+        case LongInst.Set:
+            {
+                (*lhsRef) = rhs;
+            }
+            break;
+
+        case LongInst.Lt:
+            {
+                if ((*lhsRef) < rhs)
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+
+            }
+            break;
+        case LongInst.Gt:
+            {
+                if ((*lhsRef) > rhs)
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+
+            }
+            break;
+
+        case LongInst.Jmp:
+            {
+                ip = hi;
+            }
+            break;
+        case LongInst.JmpNZ:
+            {
+                if ((*lhsRef) != 0)
+                {
+                    ip = rhsOffset;
+                }
+            }
+            break;
+        case LongInst.JmpZ:
+            {
+                if ((*lhsRef) == 0)
+                {
+                    ip = rhsOffset;
+                }
+            }
+            break;
+        case LongInst.JmpFalse:
+            {
+                if (!cond)
+                {
+                    ip = (hi);
+                }
+            }
+            break;
+        case LongInst.JmpTrue:
+            {
+                if (cond)
+                {
+                    ip = (hi);
+                }
+            }
+            break;
+
+        case LongInst.Lds:
+            {
+                (*lhsRef) = *(dataSeg + (dataSegHigh | rhs));
+                //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
+            }
+            break;
+        case LongInst.Lss:
+            {
+                (*lhsRef) = *(stack.ptr + (rhs / 4));
+                //{ SP[hi & 0xFFFF] = DS[align4(SP[hi >> 16])] }
+            }
+            break;
+        case LongInst.Lsb:
+            {
+
+                uint _dr = *(stack.ptr + (rhs / 4));
+                debug (bc)
+                {
+                    import std.stdio;
+
+                    writeln("Lsb_ _dr:", _dr, "  rhs: ", rhs, " rhs/4: ",
+                        rhs / 4, " rhs & 3: ", rhs & 3);
+                }
+                final switch (rhs & 3)
                 {
                 case 0:
-                    db = dr & 0x00FF;
+                    (*lhsRef) = _dr & 0xFF;
                     break;
                 case 1:
-                    db = (dr & 0xFF00) >> 8;
+                    (*lhsRef) = (_dr & 0xFF00) >> 8;
                     break;
                 case 2:
-                    db = (dr & 0xFF0000) >> 16;
+                    (*lhsRef) = (_dr & 0xFF0000) >> 16;
                     break;
                 case 3:
-                    db = dr >> 24;
+                    (*lhsRef) = _dr >> 24;
                     break;
                 }
-                break;
-            case LongInst.Flg:
-                {
-                    (*opRef) = cond;
-                }
-                break;
 
-            case LongInst.Mod4:
+            }
+            break;
+
+            // We have a short instruction
+
+        case LongInst.Ret:
+            {
+                debug (bc)
+                    if (!__ctfe)
+                    {
+                        printf("Ret: %d".ptr, (*opRef));
+                    }
+                return *opRef;
+            }
+
+        case LongInst.RelJmp:
+            {
+                ip += (cast(short)(lw >> 16)) - 1;
+            }
+            break;
+        case LongInst.Neg:
+            {
+
+                (*opRef) = -(*opRef);
+            }
+            break;
+        case LongInst.Prt:
+            {
+                if (!__ctfe)
                 {
-                    (*opRef) &= 3;
+                    printf("SP[%d](%d)".ptr, (lw >> 16), (*opRef));
                 }
+            }
+            break;
+        case LongInst.Soh:
+            {
+                stackOffset = (lw & ~0xFF) << 24;
+            }
+            break;
+        case LongInst.Sdh:
+            {
+                dataSegHigh = ulong(lw & ~0xFF) << 32L;
+            }
+            break;
+        case LongInst.Drb:
+            const DsIdx = *(stack.ptr + ((lw >> 16) / 4));
+            const alignedIdx = (DsIdx & ~3);
+            if (drOffset != alignedIdx)
+            {
+                dr = *(dataSeg + (dataSegHigh | alignedIdx));
+                drOffset = alignedIdx;
+            }
+            final switch (DsIdx & 3)
+            {
+            case 0:
+                db = dr & 0x00FF;
+                break;
+            case 1:
+                db = (dr & 0xFF00) >> 8;
+                break;
+            case 2:
+                db = (dr & 0xFF0000) >> 16;
+                break;
+            case 3:
+                db = dr >> 24;
                 break;
             }
+            break;
+        case LongInst.Flg:
+            {
+                (*opRef) = cond;
+            }
+            break;
+
+        case LongInst.Mod4:
+            {
+                (*opRef) &= 3;
+            }
+            break;
         }
     }
-
+}
 
 int[] testArith()
 {
