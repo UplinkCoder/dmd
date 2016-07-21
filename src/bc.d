@@ -381,7 +381,7 @@ struct BCValue
                 return this.stackAddr == rhs.stackAddr;
 
             case BCValueType.Immidiate:
-                switch (this.type)
+                switch (this.type.type)
                 {
                 case BCTypeEnum.i32:
                     {
@@ -1280,14 +1280,14 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
         foreach (si; 0 .. stackOffset)
         {
-            if (!__ctfe)
+            debug (bc_stack) if (!__ctfe)
                 printf("%d : %x".ptr, si, stack[cast(uint) si]);
         }
         //writeln(stack[0 ..)
-        if (ip >= byteCode.length-1)
-        {
-            return -1;
-        }
+//        if (ip >= byteCode.length-1)
+//        {
+//            return -1;
+//        }
         const lw = byteCode[ip++];
         const hi = byteCode[ip++];
        
@@ -1779,6 +1779,21 @@ int[] testLss()
     }
 
 }
+
+//int[] testGoto()
+//{
+//    /*
+//    0:  RelJmp &14
+//        2:  Set SP[12], #2
+//        4:  Eq SP[12], #12
+//        6:  JmpFalse &10
+//            8:  Ret SP[12] 
+//    10: Add SP[12], #1
+//        12: RelJmp &4
+//            14: RelJmp &2
+//*/
+//
+//}
 
 static assert(interpret(testArith(), []) == 7);
 //pragma(msg, testDs.printInstructions);
