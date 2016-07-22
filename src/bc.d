@@ -1321,10 +1321,14 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 				rhs = hi;
 				goto case InstKind.ShortInst;
 			case InstKind.ShortInst :
-				lhsRef = indirect ? stack.ptr + *(stack.ptr + (lwOffset / 4)) : stack.ptr + (lwOffset / 4);
+				uint a = lwOffset;
+				uint b = (*(stack.ptr + (lwOffset / 4)) / 4);
+				uint* c = (stack.ptr + 2);
+				lhsRef = indirect ? stack.ptr + (*(stack.ptr + (lwOffset / 4)) / 4)
+				: stack.ptr + (lwOffset / 4);
 			break;
 			case InstKind.LongInst2Stack, InstKind.StackInst, InstKind.CndJumpInst : {
-				lhsRef = indirect ? stack.ptr + *(stack.ptr + (lhsOffset / 4)) : stack.ptr + (lhsOffset / 4);
+				lhsRef = indirect ? stack.ptr + (*(stack.ptr + (lhsOffset / 4)) / 4) : stack.ptr + (lhsOffset / 4);
 				rhs = *(stack.ptr + (rhsOffset / 4));
 			} break;
 			
@@ -1841,6 +1845,6 @@ static assert(cast(dchar) testDs.interpret([BCValue(Imm32(1))],
     (cast(uint[]) "hello"d).ptr) == "e"[0]);
 
 pragma(msg, printInstructions(testIndirectReturn));
-pragma(msg, (interpret(testIndirectReturn(), [])));
+pragma(msg, (interpret(testIndirectReturn(), [])) );
 static assert(interpret(testRelJmp(), []) == 12);
 pragma(msg, printInstructions(testRelJmp()));
