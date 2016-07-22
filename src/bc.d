@@ -447,7 +447,8 @@ struct BCValue
 }
 
 pragma(msg, "Sizeof BCValue: ", BCValue.sizeof);
-__gshared static bcOne = BCValue(Imm32(1));
+enum bcOne = BCValue(Imm32(1));
+enum bcNone = BCValue.init;
 
 struct BCAddr
 {
@@ -1305,85 +1306,94 @@ uint interpret(const int[] byteCode, const BCValue[] args,
 
                 writeln("indirect: ", indirect);
             }
-
-        auto lhsOffset = hi & 0xFFFF;
-        auto rhsOffset = (hi >> 16);
-        uint* lhsRef = (stack.ptr + (lhsOffset / 4));
-        uint rhs = *(stack.ptr + (rhsOffset / 4));
-        uint* lhsStackRef = (stack.ptr + ((lw >> 16) / 4));
-        auto opRef = stack.ptr + ((lw >> 16) / 4);
-
-        if (indirect)
-        {
-            lhsStackRef = (stack.ptr + ((*lhsStackRef) / 4));
-            lhsRef = (stack.ptr + ((*lhsRef) / 4));
-            opRef = (stack.ptr + ((*opRef) / 4));
-
-        }
-
-        final switch (cast(LongInst)(lw & InstMask))
+		
+        ushort lwOffset = (lw >> 16)  & 0xFFFF;
+		ushort lhsOffset = hi & 0xFFFF;
+        ushort rhsOffset = (hi >> 16) & 0xFFFF;
+		
+        uint* lhsRef; ///= (stack.ptr + (lhsOffset / 4));
+        uint rhs; /// = *(stack.ptr + (rhsOffset / 4));
+		
+		LongInst inst = cast(LongInst)(lw & InstMask);
+		
+		final switch(inst.instKind) {
+			case InstKind.LongInstImm32 :  
+				rhs = hi;
+				goto case InstKind.ShortInst;
+			case InstKind.ShortInst :
+				lhsRef = indirect ? stack.ptr + *(stack.ptr + (lwOffset / 4)) : stack.ptr + (lwOffset / 4);
+			break;
+			case InstKind.LongInst2Stack, InstKind.StackInst, InstKind.CndJumpInst : {
+				lhsRef = indirect ? stack.ptr + *(stack.ptr + (lhsOffset / 4)) : stack.ptr + (lhsOffset / 4);
+				rhs = *(stack.ptr + (rhsOffset / 4));
+			} break;
+			
+				
+		}
+		
+        final switch (inst)
         {
         case LongInst.ImmAdd:
             {
-                (*lhsStackRef) += hi;
+                (*lhsRef) += hi;
             }
             break;
 
         case LongInst.ImmSub:
             {
-                (*lhsStackRef) -= hi;
+                (*lhsRef) -= hi;
             }
             break;
 
         case LongInst.ImmMul:
             {
-                (*lhsStackRef) *= hi;
+                (*lhsRef) *= hi;
             }
             break;
 
         case LongInst.ImmDiv:
             {
-                (*lhsStackRef) /= hi;
+                (*lhsRef) /= hi;
             }
             break;
 
         case LongInst.ImmAnd:
             {
-                (*lhsStackRef) &= hi;
+                (*lhsRef) &= hi;
             }
             break;
         case LongInst.ImmOr:
             {
-                (*lhsStackRef) |= hi;
+                (*lhsRef) |= hi;
             }
             break;
 
         case LongInst.ImmLsh:
             {
-                (*lhsStackRef) <<= hi;
+                (*lhsRef) <<= hi;
             }
             break;
         case LongInst.ImmRsh:
             {
-                (*lhsStackRef) >>= hi;
+                (*lhsRef) >>= hi;
             }
             break;
 
         case LongInst.ImmMod:
             {
-                (*lhsStackRef) %= hi;
+                (*lhsRef) %= hi;
             }
             break;
 
         case LongInst.ImmSet:
             {
-                (*lhsStackRef) = hi;
+                (*lhsRef) = hi;
             }
             break;
         case LongInst.ImmEq:
             {
 
-                if ((*lhsStackRef) == hi)
+                if ((*lhsRef) == hi)
                 {
                     cond = true;
                 }
@@ -1396,7 +1406,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             break;
         case LongInst.ImmLt:
             {
-                if ((*lhsStackRef) < hi)
+                if ((*lhsRef) < hi)
                 {
                     cond = true;
                 }
@@ -1409,7 +1419,7 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             break;
         case LongInst.ImmGt:
             {
-                if ((*lhsStackRef) > hi)
+                if ((*lhsRef) > hi)
                 {
                     cond = true;
                 }
@@ -1603,9 +1613,9 @@ uint interpret(const int[] byteCode, const BCValue[] args,
                 debug (bc)
                     if (!__ctfe)
                     {
-                        printf("Ret: %d".ptr, (*opRef));
+                        printf("Ret: %d".ptr, (*lhsRef));
                     }
-                return *opRef;
+                return *lhsRef;
             }
 
         case LongInst.RelJmp:
@@ -1616,14 +1626,14 @@ uint interpret(const int[] byteCode, const BCValue[] args,
         case LongInst.Neg:
             {
 
-                (*opRef) = -(*opRef);
+                (*lhsRef) = -(*lhsRef);
             }
             break;
         case LongInst.Prt:
             {
                 if (!__ctfe)
                 {
-                    printf("SP[%d](%d)".ptr, (lw >> 16), (*opRef));
+                    printf("SP[%d](%d)".ptr, (lw >> 16), (*lhsRef));
                 }
             }
             break;
@@ -1663,17 +1673,18 @@ uint interpret(const int[] byteCode, const BCValue[] args,
             break;
         case LongInst.Flg:
             {
-                (*opRef) = cond;
+                (*lhsRef) = cond;
             }
             break;
 
         case LongInst.Mod4:
             {
-                (*opRef) &= 3;
+                (*lhsRef) &= 3;
             }
             break;
         }
     }
+	assert(0, "We can never get here");
 }
 
 int[] testArith()
@@ -1764,7 +1775,7 @@ int[] testDs()
 
 }
 
-int[] testLss()
+int[] testIndirectReturn()
 {
     BCGen gen;
     with (gen)
@@ -1784,20 +1795,33 @@ int[] testLss()
 
 }
 
-//int[] testGoto()
-//{
-//    /*
-//    0:  RelJmp &14
-//        2:  Set SP[12], #2
-//        4:  Eq SP[12], #12
-//        6:  JmpFalse &10
-//            8:  Ret SP[12]
-//    10: Add SP[12], #1
-//        12: RelJmp &4
-//            14: RelJmp &2
-//*/
-//
-//}
+int[] testRelJmp()
+{
+   BCGen gen; 
+   with(gen) {
+		ip += 2;
+		auto result = genTemporary(BCType(BCTypeEnum.i32)).value;
+		emitSet(result, BCValue(Imm32(2)));
+		auto evalCond = genLabel();	   
+		Eq3(bcNone, result, BCValue(Imm32(12)));
+		auto cndJmp = beginCndJmp();
+		emitReturn(result);
+		endCndJmp(cndJmp, genLabel());
+		Add3(result, result, bcOne); 
+ 		genJump(evalCond);
+		
+		return byteCodeArray[0 .. ip].dup;
+	}
+/*       2:  Set SP[12], #2
+       4:  Eq SP[12], #12
+       6:  JmpFalse &10
+           8:  Ret SP[12]
+   10: Add SP[12], #1
+       12: RelJmp &4
+           
+*/
+
+}
 
 static assert(interpret(testArith(), []) == 7);
 //pragma(msg, testDs.printInstructions);
@@ -1816,5 +1840,7 @@ static assert(interpret(testBC(), [BCValue(Imm32(16))]) == 16);
 static assert(cast(dchar) testDs.interpret([BCValue(Imm32(1))],
     (cast(uint[]) "hello"d).ptr) == "e"[0]);
 
-//pragma(msg, printInstructions(testLss));
-static assert(interpret(testLss(), []) == 32);
+pragma(msg, printInstructions(testIndirectReturn));
+pragma(msg, (interpret(testIndirectReturn(), [])));
+static assert(interpret(testRelJmp(), []) == 12);
+pragma(msg, printInstructions(testRelJmp()));
