@@ -212,6 +212,8 @@ struct Global
 
     uint errorLimit;
 
+    ulong t0;               /// ticks elapsed at the point of startup
+
     /* Start gagging. Return the current number of gagged errors
      */
     extern (C++) uint startGagging()
@@ -247,6 +249,8 @@ struct Global
 
     extern (C++) void _init()
     {
+        import core.time : MonoTime;
+        t0 = MonoTime.currTime().ticks;
         inifilename = null;
         mars_ext = "d";
         hdr_ext = "di";

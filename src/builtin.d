@@ -172,6 +172,14 @@ extern (C++) Expression eval_yl2xp1(Loc loc, FuncDeclaration fd, Expressions* ar
     return new RealExp(loc, result, arg0.type);
 }
 
+extern (C++) Expression builtin_ctfeTickMs(Loc loc, FuncDeclaration fd, Expressions* arguments)
+{
+    import core.time : MonoTime;
+    assert(arguments.dim == 0);
+    auto now = cast(uint) ((MonoTime.currTime().ticks - global.t0) / (MonoTime.currTime.ticksPerSecond / 1000));
+    return new IntegerExp(loc, now, Type.tint32);
+}
+
 public extern (C++) void builtin_init()
 {
     builtins._init(47);
