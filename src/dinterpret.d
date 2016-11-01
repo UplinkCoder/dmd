@@ -812,6 +812,12 @@ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expres
     // CTFE-compile the function
     if (!fd.ctfeCode)
         ctfeCompile(fd);
+    // try the bc engine
+    import ddmd.ctfe.bc_ctfe;
+    if (auto e = evaluateFunction(fd, arguments, thisarg))
+    {
+        return e;
+    }
 
     Type tb = fd.type.toBasetype();
     assert(tb.ty == Tfunction);
