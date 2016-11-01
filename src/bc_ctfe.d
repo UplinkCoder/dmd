@@ -130,7 +130,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression th
 import ddmd.ctfe.bc_common;
 
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 
 static if (UseLLVMBackend)
@@ -194,7 +194,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
     writeln("Generting bc for ", fd.ident.toString, " took " ~ csw.peek.usecs.to!string ~ "usecs");
     if (csw.peek.usecs > 500)
     {
-        writeln(fd.fbody.toString);
+    //    writeln(fd.fbody.toString);
     }
 
     debug (ctfe)
@@ -287,9 +287,13 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
     }
     else
     {
-        //debug (ctfe)
-        //    assert(0, "CTFE Errored");
-        return null;
+		static if (UsePrinterBackend)
+		{
+			auto retval = BCValue.init;
+			writeln(bcv.result);
+			return null;
+		}
+		return null;
 
     }
 
@@ -636,12 +640,15 @@ Expression toExpression(const BCValue value, Type expressionType,
 
         }
 
-        //char[] str = (heapPtr._heap.ptr + offset + 1)
+		auto length = heapPtr._heap.ptr[offset];
+		//TODO consider to use allocmemory directly instead of going through druntime.
 
-        result = new StringExp(Loc(),
-            (cast(char*)(heapPtr._heap.ptr + offset + 1)), heapPtr._heap[offset]);
+		auto resultString = (cast(void*)(heapPtr._heap.ptr + offset + 1))[0 .. length].dup;
+		result = new StringExp(Loc(), resultString.ptr, length);
+
         //HACK to avoid TypePainting!
         result.type = expressionType;
+
     }
     else
         switch (expressionType.ty)
@@ -962,7 +969,7 @@ public:
            //     auto bc = _sharedCtfeState.functions[i - 1].byteCode;
           //      this.byteCodeArray[0 .. bc.length] = bc;
          //       this.ip = cast(uint) bc.length;
-                return;
+         //       return;
             }
         }
 
@@ -2099,19 +2106,19 @@ public:
 		{
 			import std.stdio;
 			
-			writefln("RealExp %s", ie.toString);
+			writefln("RealExp %s", re.toString);
 		}
 		
 		IGaveUp = true;
 	}
 
-	override void visit(ComplexExp re)
+	override void visit(ComplexExp ce)
 	{
 		debug (ctfe)
 		{
 			import std.stdio;
 			
-			writefln("ComplexExp %s", ie.toString);
+			writefln("ComplexExp %s", ce.toString);
 		}
 		
 		IGaveUp = true;
@@ -2760,10 +2767,9 @@ public:
         {
 			debug (ctfe)
 			{
+				import std.stdio;
 				writeln("breakFixupCount: ", breakFixupsCount);
 			}
-			IGaveUp = true;
-			return ;
             unrolledLoopState.breakFixups[unrolledLoopState.breakFixupCount++] = beginJmp();
 
         }
