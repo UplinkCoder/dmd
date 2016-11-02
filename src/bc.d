@@ -395,7 +395,12 @@ struct BCGen
 
     void endJmp(BCAddr atIp, BCLabel target)
     {
-        if (auto offset = isShortJump(target.addr - atIp))
+
+		if ((target.addr - atIp) == 0)
+		{
+			byteCodeArray[atIp] = 0;
+		}
+		else if (auto offset = isShortJump(target.addr - atIp))
         {
             byteCodeArray[atIp] = ShortInst16(LongInst.RelJmp, offset);
         }

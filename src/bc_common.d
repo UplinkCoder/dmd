@@ -149,16 +149,14 @@ const(ubyte) toParamCode(const BCValue val) pure @safe @nogc
 
 struct BCHeap
 {
-    static struct HeapEntry {
-        uint address;
-        BCType type;
-        uint size;
-    }
-
-    HeapEntry[] entries;
     uint[] _heap = new uint[](2 ^^ 16); // a 16k*4 Heap should do it :)
     enum heapMax = 2 ^^ 15;
     uint heapSize;
+
+//	ubyte opIndex(uint pos)
+//	{
+//		return _heap[
+//	}
 
     HeapAddr pushString(const char* _string, const uint size) pure
     {
@@ -282,8 +280,8 @@ struct BCValue
         HeapAddr dataSegAddr;
         Imm32 imm32;
         Imm64 imm64;
-        // instead of void*
-        int vs_offset;
+
+        void* voidStar;
     }
 
 @safe pure :

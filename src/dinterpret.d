@@ -814,9 +814,13 @@ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expres
         ctfeCompile(fd);
     // try the bc engine
     import ddmd.ctfe.bc_ctfe;
-    if (auto e = evaluateFunction(fd, arguments, thisarg))
+    if (!istate && !thisarg) 
     {
-        return e;
+        //dont try to interpret is the other engine has already started.
+        if (auto e = evaluateFunction(fd, arguments, thisarg))
+        {
+            return e;
+        }
     }
 
     Type tb = fd.type.toBasetype();

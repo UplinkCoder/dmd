@@ -56,11 +56,7 @@ void StringCat3Macro(BCGen)(BCGen* gen, BCValue result, BCValue lhs, BCValue rhs
 		Store32(result, combinedLength);
 		auto position = genTemporary(i32Type);
 		Add3(position, result, bcFour);
-
-
 		auto resultPos = genTemporary(BCValue(BCTypeEnum.i32));
-
-
 	}
 }
 
@@ -98,7 +94,7 @@ void StringEq3Macro(BCGen)(BCGen* gen, BCValue _result, BCValue lhs, BCValue rhs
 		auto p1 = lhs.i32;//SP[4]
 		auto p2 = rhs.i32;//SP[8]
 		auto p3 = genTemporary(BCType(BCTypeEnum.i32));//SP[12]
-		auto p4 = _result;//SP[16]
+		auto p4 = _result.i32;//SP[16]
 		Set(p4, BCValue(Imm32(0)));
 		auto tmp1 = genTemporary(BCType(BCTypeEnum.i32));//SP[20]
 		auto tmp2 = genTemporary(BCType(BCTypeEnum.i32));//SP[24]

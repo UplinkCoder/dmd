@@ -24,6 +24,9 @@ else
     import ddmd.ctfe.bc_common;
     import std.conv;
 
+//	string source;
+
+
     mixin(llvm_imports);
 
     bool sameLabel = true;
@@ -117,8 +120,9 @@ else
         else if (v.type.type == BCTypeEnum.Slice)
             v = v.i32;
 
-        assert(v.type.type == BCTypeEnum.i32 || v.type.type == BCTypeEnum.i32Ptr,
-            "i32 or i32Ptr expected not: " ~ to!string(v.type.type));
+        assert(v.type.type == BCTypeEnum.i32 || v.type.type == BCTypeEnum.i32Ptr ||
+			v.type.type == BCTypeEnum.i64,
+			"i32 or i32Ptr expected not: " ~ to!string(v.type.type));
 
         if (v.type.type == BCTypeEnum.i32Ptr)
         {
@@ -138,7 +142,14 @@ else
         }
         else if (v.vType == BCValueType.Immediate)
         {
-            return LLVMConstInt(LLVMInt32Type(), v.imm32, false);
+			if (v.type.type == BCTypeEnum.i64)
+			{
+                return LLVMConstInt(LLVMInt32Type(), v.imm64, false);
+			}
+			else
+			{
+				return LLVMConstInt(LLVMInt32Type(), v.imm32, false);
+			}
         }
         else
         {
@@ -206,7 +217,7 @@ else
         }
         LLVMAddGlobalMapping(engine, heapTop, &heapPtr.heapSize);
         LLVMAddGlobalMapping(engine, heap, &heapPtr._heap[0]);
-        LLVMPassManagerRef pass = LLVMCreatePassManager();
+        //LLVMPassManagerRef pass = LLVMCreatePassManager();
         //LLVMAddTargetData(LLVMGetExecutionEngineTargetData(engine), pass);
         //      LLVMAddConstantPropagationPass(pass);
         //    LLVMAddInstructionCombiningPass(pass);
@@ -214,7 +225,7 @@ else
         //    LLVMAddPromoteMemoryToRegisterPass(pass);
         //  LLVMAddGVNPass(pass);
         //LLVMAddCFGSimplificationPass(pass);
-        LLVMRunPassManager(pass, mod);
+        //LLVMRunPassManager(pass, mod);
 
         LLVMGenericValueRef[] gv_args;
         foreach (arg; args)
@@ -225,8 +236,8 @@ else
             cast(uint) args.length, gv_args.ptr);
         auto res = cast(int) LLVMGenericValueToInt(exec_res, 1);
         auto ret = BCValue(Imm32(res));
-        LLVMDisposePassManager(pass);
-        //        LLVMDisposeBuilder(builder);
+        //LLVMDisposePassManager(pass);
+        LLVMDisposeBuilder(builder);
         LLVMDisposeExecutionEngine(engine);
         return ret;
     }
@@ -300,7 +311,9 @@ else
     {
         if (!cond)
         {
-            cond.vs_offset = cast(int)(cast(void*) ccond - cast(void*) fn);
+			LLVMDumpModule(mod);
+			assert(ccond !is null);
+            cond.voidStar = cast(void*) ccond;
         }
         newBlock();
         return CndJmpBegin(BCAddr(blockCount - 2), cond, ifTrue);
@@ -313,25 +326,28 @@ else
 		LLVMPositionBuilderAtEnd(builder, blocks[jmp.at]);
 		if (!jmp.cond)
         {
-            assert(jmp.cond.vs_offset);
-            cond = cast(LLVMValueRef)((cast(void*) fn) + jmp.cond.vs_offset);
+            assert(jmp.cond.voidStar !is null);
+            cond = (cast(LLVMValueRef)(jmp.cond.voidStar));
+			assert(cond);
         }
         else
         {
             cond = LLVMBuildICmp(builder, LLVMIntPredicate.NE,
                 toLLVMValueRef(jmp.cond), LLVMConstInt(LLVMInt32Type(), 0, false),
                 "");
+			assert(cond);
         }
         
 
         assert(cond);
-        assert(blocks[jmp.at + 1]);
+        if (!blocks[jmp.at + 1])
         {
             import std.stdio;
-
+			LLVMDumpModule(mod);
             writeln("BlockCount :", blockCount);
+			assert(0);
         }
-        LLVMDumpModule(mod);
+        
         assert(blocks[target.addr]);
 
         if (jmp.ifTrue)
