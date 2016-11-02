@@ -33,7 +33,9 @@ struct C_BCGen
 
         // first we generate the signature
         return (
-            ((fname is null) ? "((BCValue[] args, BCHeap* heapPtr) @safe {\n" : "BCValue " ~ fname ~ "(BCValue[] args) {\n")  ~  intrinsicFunctions ~ "\n\tint stackOffset;\n\tBCValue retval;\n\tint[" ~ to!string(
+            (
+            (fname is null) ? "((BCValue[] args, BCHeap* heapPtr) @safe {\n"
+            : "BCValue " ~ fname ~ "(BCValue[] args) {\n") ~ intrinsicFunctions ~ "\n\tint stackOffset;\n\tBCValue retval;\n\tint[" ~ to!string(
             align4(sp + 400)) ~ "] stack;\n\tint cond;\n\n" ~ q{
         foreach(i, arg;args)
         {
@@ -65,7 +67,7 @@ struct C_BCGen
 }};
 
     char[] code;
-pure :
+pure:
     bool requireIntrinsics;
     uint labelCount;
     bool sameLabel;
@@ -100,11 +102,10 @@ pure :
     {
     }
 
-    BCValue genTemporary(/*BCValue size*/BCType bct)
+    BCValue genTemporary( /*BCValue size*/ BCType bct)
     {
-        auto tmp = BCValue(StackAddr(sp),
-            bct, temporaryCount++);
-       //assert(size.vType == BCValueType.Immidiate);
+        auto tmp = BCValue(StackAddr(sp), bct, temporaryCount++);
+        //assert(size.vType == BCValueType.Immidiate);
         sp += align4(basicTypeSize(bct)); //sharedState.size(bct.type, typeIndex));
 
         return tmp;
@@ -195,12 +196,15 @@ pure :
     BCLabel genLabel()
     {
         import std.format;
+
         if (!sameLabel)
         {
             code ~= format("label_%04d", ++labelCount) ~ ":\n";
             sameLabel = true;
             return BCLabel(BCAddr(labelCount));
-        } else {
+        }
+        else
+        {
             return BCLabel(BCAddr(labelCount));
         }
     }
@@ -266,7 +270,7 @@ pure :
         case CInst.Neq:
             code ~= "cond = (" ~ toCode(lhs) ~ " != " ~ toCode(rhs) ~ ");\n";
             break;
-            case CInst.Lt:
+        case CInst.Lt:
             code ~= "cond = (" ~ toCode(lhs) ~ " < " ~ toCode(rhs) ~ ");\n";
             break;
         case CInst.Gt:
@@ -281,6 +285,7 @@ pure :
     void Alloc(BCValue heapPtr, BCValue size)
     {
         import std.format;
+
         code ~= format(q{
         if ((heapPtr.heapSize + (%s)) < heapPtr.heapMax) {
             (%s) = heapPtr.heapSize;
@@ -288,7 +293,8 @@ pure :
         } else {
             assert(0, "HEAP OVERFLOW!");
         }
-        }, toCode(size), toCode(heapPtr), toCode(size));
+        },
+            toCode(size), toCode(heapPtr), toCode(size));
     }
 
     void Load32(BCValue to, BCValue from)
@@ -303,6 +309,7 @@ pure :
         sameLabel = false;
         code ~= "\theapPtr._heap[" ~ toCode(to) ~ "] = " ~ toCode(from) ~ ";\n";
     }
+
     void emitFlg(BCValue result)
     {
         sameLabel = false;
@@ -513,8 +520,9 @@ pure :
 
     void Byte3(BCValue result, BCValue word, BCValue idx)
     {
-    requireIntrinsics = true;
-        code ~= "\t" ~ toCode(result) ~ " = intrin_Byte3(" ~ toCode(word) ~ ", " ~ toCode(idx) ~ ");\n";    }
+        requireIntrinsics = true;
+        code ~= "\t" ~ toCode(result) ~ " = intrin_Byte3(" ~ toCode(word) ~ ", " ~ toCode(idx) ~ ");\n";
+    }
 
     void Call(BCValue result, BCValue fn, BCValue[] args)
     {
@@ -532,14 +540,16 @@ pure :
     {
         assert(result.vType == BCValueType.StackValue);
         string resultString = (result ? toCode(result) ~ " = " : "");
-        switch(fn) {
-            case BCBuiltin.StringCat :
+        switch (fn)
+        {
+        case BCBuiltin.StringCat:
             {
 
             }
-            default : assert(0, "Unsupported builtin " ~ to!string(fn));
+        default:
+            assert(0, "Unsupported builtin " ~ to!string(fn));
         }
-       //emitLongInst(LongInst64(LongInst.BuiltinCall, StackAddr(cast(short)fn), StackAddr(cast(short)args.length)));
+        //emitLongInst(LongInst64(LongInst.BuiltinCall, StackAddr(cast(short)fn), StackAddr(cast(short)args.length)));
     }
 
     void Cat(BCValue result, BCValue lhs, BCValue rhs, const uint size)
@@ -552,5 +562,7 @@ int interpret(const C_BCGen gen)(BCValue[] args)
     auto fn = mixin(gen.functionalize(null));
     return fn(args);
 }
+
 import bc_test;
+
 static assert(bc_test.test!C_BCGen);

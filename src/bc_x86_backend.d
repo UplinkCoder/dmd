@@ -26,7 +26,7 @@ struct X86_BCGen
     CndJmpBegin beginCndJmp(BCValue cond = BCValue.init, bool ifTrue = false);
     void setb_al()
     {
-        emit([ 0x0f, 0x92, 0xc0, ]);
+        emit([0x0f, 0x92, 0xc0,]);
     }
 
     void endCndJmp(CndJmpBegin jmp, BCLabel target);
@@ -39,6 +39,7 @@ struct X86_BCGen
         //negl(edi)
         //[0xf7, 0x1f]
     }
+
     void Set(BCValue lhs, BCValue rhs);
     void StoreStack(BCValue value, BCValue addr);
     void Lt3(BCValue _result, BCValue lhs, BCValue rhs);
@@ -49,15 +50,18 @@ struct X86_BCGen
     {
         //01 0e                   add    %ecx,(%esi)
     }
+
     void Sub3(BCValue _result, BCValue lhs, BCValue rhs)
     {
         //29 0e                   sub    %ecx,(%esi)
     }
+
     void Mul3(BCValue _result, BCValue lhs, BCValue rhs)
     {
         //0f af 0e                imul   (%esi),%ecx
         //89 0e                   mov    %ecx,(%esi)
     }
+
     void Div3(BCValue _result, BCValue lhs, BCValue rhs)
     {
         // 8b 06                   mov    (%esi),%eax
@@ -65,14 +69,17 @@ struct X86_BCGen
         // f7 f1                   div    %ecx
         // 89 06                   mov    %eax,(%esi)
     }
+
     void And3(BCValue _result, BCValue lhs, BCValue rhs)
     {
         //21 0e                   and    %ecx,(%esi)
     }
+
     void Or3(BCValue _result, BCValue lhs, BCValue rhs)
     {
         //09 0e                   or     %ecx,(%esi)
     }
+
     void Xor3(BCValue _result, BCValue lhs, BCValue rhs);
     void Lsh3(BCValue _result, BCValue lhs, BCValue rhs);
     void Rsh3(BCValue _result, BCValue lhs, BCValue rhs);

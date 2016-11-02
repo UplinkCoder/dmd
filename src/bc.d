@@ -1,6 +1,5 @@
 module ddmd.ctfe.bc;
 import ddmd.ctfe.bc_common;
-import ddmd.ctfe.bc_builtins;
 import ddmd.ctfe.bc_macro;
 import core.stdc.stdio;
 import std.conv;
@@ -303,7 +302,7 @@ struct BCFunction
 
 struct BCGen
 {
-    int[ushort.max*2] byteCodeArray;
+    int[ushort.max * 2] byteCodeArray;
     /// ip starts at 4 because 0 should be an invalid address;
     BCAddr ip = BCAddr(4);
     StackAddr sp = StackAddr(4);
@@ -328,10 +327,13 @@ struct BCGen
 
     void emitLongInst(LongInst64 i)
     {
-		debug {
-			import std.stdio;
-			if (!__ctfe) writeln("ip: ", ip);
-		}
+        debug
+        {
+            import std.stdio;
+
+            if (!__ctfe)
+                writeln("ip: ", ip);
+        }
         byteCodeArray[ip] = i.lw;
         byteCodeArray[ip + 1] = i.hi;
         ip += 2;
@@ -358,7 +360,7 @@ struct BCGen
 
     void Finalize()
     {
-		this = this.init;
+        this = this.init;
     }
 
     void beginFunction()
@@ -396,11 +398,11 @@ struct BCGen
     void endJmp(BCAddr atIp, BCLabel target)
     {
 
-		if ((target.addr - atIp) == 0)
-		{
-			byteCodeArray[atIp] = 0;
-		}
-		else if (auto offset = isShortJump(target.addr - atIp))
+        if ((target.addr - atIp) == 0)
+        {
+            byteCodeArray[atIp] = 0;
+        }
+        else if (auto offset = isShortJump(target.addr - atIp))
         {
             byteCodeArray[atIp] = ShortInst16(LongInst.RelJmp, offset);
         }
@@ -483,25 +485,24 @@ struct BCGen
 
     void emitArithInstruction(LongInst inst, BCValue lhs, BCValue rhs)
     {
-		immutable bool isIndirect = lhs.type == BCTypeEnum.i32Ptr;
-		if (inst == inst.Set && rhs.type.type == BCTypeEnum.Null)
-		{
-			emitLongInst(LongInst64(inst.ImmSet, lhs.stackAddr, bcZero.imm32, isIndirect));
-			return ;
-		}
+        immutable bool isIndirect = lhs.type == BCTypeEnum.i32Ptr;
+        if (inst == inst.Set && rhs.type.type == BCTypeEnum.Null)
+        {
+            emitLongInst(LongInst64(inst.ImmSet, lhs.stackAddr, bcZero.imm32, isIndirect));
+            return;
+        }
         assert(inst >= LongInst.Add && inst < LongInst.ImmAdd,
             "Instruction is not in Range for Arith Instructions");
         assert(lhs.vType.StackValue, "only StackValues are supported as lhs");
         // FIXME remove the lhs.type == BCTypeEnum.Char as soon as we convert correctly.
         assert(lhs.type == BCTypeEnum.i32 || lhs.type == BCTypeEnum.i32Ptr
             || lhs.type == BCTypeEnum.Char || lhs.type == BCTypeEnum.i1
-			|| lhs.type == BCTypeEnum.i64, 
+            || lhs.type == BCTypeEnum.i64,
             "only i32 or i32Ptr is supported for now not: " ~ to!string(lhs.type.type));
         assert(rhs.type == BCTypeEnum.i32 || lhs.type == BCTypeEnum.Char
             || rhs.type == BCTypeEnum.i64,
             "only i32 is supported for now, not: " ~ to!string(rhs.type.type));
 
-        
         if (rhs.vType == BCValueType.Immediate)
         {
             //Change the instruction into the corrosponding Imm Instruction;
@@ -752,11 +753,11 @@ struct BCGen
         Set(result.i32, BCValue(oldSp, i32Type));
     }
 
-    void CallBuiltin(BCValue result, BCBuiltin fn, BCValue[] args)
+    /*void CallBuiltin(BCValue result, BCBuiltin fn, BCValue[] args)
     {
         emitLongInst(LongInst64(LongInst.BuiltinCall, StackAddr(cast(short) fn),
             StackAddr(cast(short) args.length)));
-    }
+    }*/
 
     void Load32(BCValue _to, BCValue from)
     {
@@ -1812,17 +1813,18 @@ BCValue interpret_(const int[] byteCode, const BCValue[] args,
             break;
         case LongInst.BuiltinCall:
             {
-                switch (cast(BCBuiltin)*opRef)
+                /*  switch (cast(BCBuiltin)*opRef)
                 {
                 case BCBuiltin.NextChar:
                     {
                         //      returnValue = nextChar(heapPtr, stack.ptr + rhsOffset);
                     }
                     break;
-                default:
+                default: 
                     assert(0, "Unsupported right now: " ~ to!string(cast(BCBuiltin)*opRef));
                 }
-
+            */
+                assert(0);
             }
             break;
         case LongInst.Call:

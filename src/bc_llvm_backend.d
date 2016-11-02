@@ -24,8 +24,7 @@ else
     import ddmd.ctfe.bc_common;
     import std.conv;
 
-//	string source;
-
+    //	string source;
 
     mixin(llvm_imports);
 
@@ -75,7 +74,7 @@ else
 
     void Finalize()
     {
-		LLVMDumpModule(mod);
+        LLVMDumpModule(mod);
         LLVMPassManagerRef pass = LLVMCreatePassManager();
         LLVMAddConstantPropagationPass(pass);
         LLVMAddInstructionCombiningPass(pass);
@@ -104,7 +103,7 @@ else
     void newBlock()
     {
         blocks[blockCount] = LLVMAppendBasicBlock(fn, ("Block_" ~ to!string(blockCount)).ptr);
-/*        if (!LLVMGetBasicBlockTerminator(blocks[blockCount - 1]))
+        /*        if (!LLVMGetBasicBlockTerminator(blocks[blockCount - 1]))
         {
             LLVMBuildBr(builder, blocks[blockCount]);
         } */
@@ -120,9 +119,9 @@ else
         else if (v.type.type == BCTypeEnum.Slice)
             v = v.i32;
 
-        assert(v.type.type == BCTypeEnum.i32 || v.type.type == BCTypeEnum.i32Ptr ||
-			v.type.type == BCTypeEnum.i64,
-			"i32 or i32Ptr expected not: " ~ to!string(v.type.type));
+        assert(v.type.type == BCTypeEnum.i32 || v.type.type == BCTypeEnum.i32Ptr
+            || v.type.type == BCTypeEnum.i64,
+            "i32 or i32Ptr expected not: " ~ to!string(v.type.type));
 
         if (v.type.type == BCTypeEnum.i32Ptr)
         {
@@ -142,14 +141,14 @@ else
         }
         else if (v.vType == BCValueType.Immediate)
         {
-			if (v.type.type == BCTypeEnum.i64)
-			{
+            if (v.type.type == BCTypeEnum.i64)
+            {
                 return LLVMConstInt(LLVMInt32Type(), v.imm64, false);
-			}
-			else
-			{
-				return LLVMConstInt(LLVMInt32Type(), v.imm32, false);
-			}
+            }
+            else
+            {
+                return LLVMConstInt(LLVMInt32Type(), v.imm32, false);
+            }
         }
         else
         {
@@ -311,8 +310,8 @@ else
     {
         if (!cond)
         {
-			LLVMDumpModule(mod);
-			assert(ccond !is null);
+            LLVMDumpModule(mod);
+            assert(ccond !is null);
             cond.voidStar = cast(void*) ccond;
         }
         newBlock();
@@ -321,33 +320,33 @@ else
 
     void endCndJmp(CndJmpBegin jmp, BCLabel target)
     {
-		sameLabel = false;
+        sameLabel = false;
         LLVMValueRef cond;
-		LLVMPositionBuilderAtEnd(builder, blocks[jmp.at]);
-		if (!jmp.cond)
+        LLVMPositionBuilderAtEnd(builder, blocks[jmp.at]);
+        if (!jmp.cond)
         {
             assert(jmp.cond.voidStar !is null);
             cond = (cast(LLVMValueRef)(jmp.cond.voidStar));
-			assert(cond);
+            assert(cond);
         }
         else
         {
             cond = LLVMBuildICmp(builder, LLVMIntPredicate.NE,
                 toLLVMValueRef(jmp.cond), LLVMConstInt(LLVMInt32Type(), 0, false),
                 "");
-			assert(cond);
+            assert(cond);
         }
-        
 
         assert(cond);
         if (!blocks[jmp.at + 1])
         {
             import std.stdio;
-			LLVMDumpModule(mod);
+
+            LLVMDumpModule(mod);
             writeln("BlockCount :", blockCount);
-			assert(0);
+            assert(0);
         }
-        
+
         assert(blocks[target.addr]);
 
         if (jmp.ifTrue)
@@ -363,13 +362,13 @@ else
 
     void genJump(BCLabel target)
     {
-		sameLabel = false;
+        sameLabel = false;
         LLVMBuildBr(builder, blocks[target.addr]);
     }
 
     void emitFlg(BCValue lhs)
     {
-		sameLabel = false;
+        sameLabel = false;
         StoreStack(LLVMBuildIntCast(builder, ccond, LLVMInt32Type(), ""), lhs);
     }
 
@@ -389,7 +388,8 @@ else
     void Set(BCValue lhs, BCValue rhs)
     {
         sameLabel = false;
-        assert(lhs.vType == BCValueType.StackValue || lhs.vType == BCValueType.Parameter, to!string(lhs.vType));
+        assert(lhs.vType == BCValueType.StackValue
+            || lhs.vType == BCValueType.Parameter, to!string(lhs.vType));
         StoreStack(toLLVMValueRef(rhs), lhs);
     }
 
@@ -421,7 +421,7 @@ else
 
     void StoreStack(LLVMValueRef value, BCValue addr)
     {
-		sameLabel = false;
+        sameLabel = false;
         LLVMBuildStore(builder, value, stackGEP(addr));
     }
 
@@ -745,7 +745,7 @@ else
                 h1.pushString("This is the world we live in.".ptr,
                     cast(uint) "This is the World we live in.".length);
                 return h1;
-                        }())) == BCValue(Imm32(166784)));
+            }())) == BCValue(Imm32(166784)));
             r.stop();
             writeln(r.peek.usecs, " us");
         }

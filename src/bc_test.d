@@ -302,8 +302,9 @@ bool test(BCGenT)()
     });
 
     static assert(testString([], ({
-        BCHeap *h1 = new BCHeap();
-        h1.pushString("This is the world we live in.".ptr, cast(uint)"This is the World we live in.".length);
+        BCHeap* h1 = new BCHeap();
+        h1.pushString("This is the world we live in.".ptr,
+            cast(uint) "This is the World we live in.".length);
         return h1;
     }())) == BCValue(Imm32(166784)));
     return true;

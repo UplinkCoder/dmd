@@ -4,17 +4,17 @@ import ddmd.ctfe.bc_common;
 
 enum BCFunctionTypeEnum : byte
 {
-	undef,
-	Builtin,
-	Bytecode,
-	Compiled,
+    undef,
+    Builtin,
+    Bytecode,
+    Compiled,
 }
 
 struct BCFunction
 {
-	void* funcDecl;
-	BCFunctionTypeEnum type;
-	int nr;
+    void* funcDecl;
+    BCFunctionTypeEnum type;
+    int nr;
 }
 
 struct Print_BCGen
@@ -47,7 +47,7 @@ struct Print_BCGen
     }
 
     alias currentFunctionState this;
-   
+
     string result = "\n";
 
     string print(BCLabel label)
@@ -77,10 +77,10 @@ struct Print_BCGen
                 {
                     result ~= "Imm64(" ~ to!string(val.imm32.imm32) ~ ")";
                 }
-				else if (val.type == BCTypeEnum.Null)
-				{
-					result ~= "Imm32(0/*null*/)";
-				}
+                else if (val.type == BCTypeEnum.Null)
+                {
+                    result ~= "Imm32(0/*null*/)";
+                }
                 else
                 {
                     assert(0, "Unexpeced Immediate of Type" ~ to!string(val.type.type));
@@ -90,7 +90,7 @@ struct Print_BCGen
 
         case BCValueType.StackValue:
             {
-                if(val.tmpIndex)
+                if (val.tmpIndex)
                 {
                     return "tmp" ~ to!string(val.tmpIndex) ~ functionSuffix;
                 }
@@ -161,7 +161,7 @@ struct Print_BCGen
     {
         sameLabel = false;
         currentFunctionStateNumber++;
-        result ~= "    beginFunction(" ~ ");//fn("~ to!string(currentFunctionStateNumber) ~"\n";
+        result ~= "    beginFunction(" ~ ");//fn(" ~ to!string(currentFunctionStateNumber) ~ "\n";
     }
 
     void endFunction()
@@ -173,17 +173,17 @@ struct Print_BCGen
     BCValue genParameter(BCType bct)
     {
         currentFunctionStateNumber++;
-        if(!parameterCount)
+        if (!parameterCount)
         {
             //write a newline when we effectivly begin a new function;
             result ~= "\n";
         }
-        result ~= "    auto p" ~ to!string(++parameterCount) ~ functionSuffix ~ " = genParameter(" ~ print(bct) ~ ");//SP[" ~ to!string(sp) ~ "]\n";
+        result ~= "    auto p" ~ to!string(++parameterCount) ~ functionSuffix ~ " = genParameter(" ~ print(
+            bct) ~ ");//SP[" ~ to!string(sp) ~ "]\n";
         currentFunctionStateNumber--;
         sp += 4;
         return BCValue(BCParameter(parameterCount, bct));
     }
-
 
     BCValue genTemporary(BCType bct)
     {
@@ -191,8 +191,8 @@ struct Print_BCGen
         auto tmpAddr = sp.addr;
         sp += align4(basicTypeSize(bct));
 
-        result ~= "    auto tmp" ~ to!string(++temporaryCount) ~ functionSuffix ~ " = genTemporary(" ~ print(bct) ~ ");//SP[" ~ to!string(
-            tmpAddr) ~ "]\n";
+        result ~= "    auto tmp" ~ to!string(++temporaryCount) ~ functionSuffix ~ " = genTemporary(" ~ print(
+            bct) ~ ");//SP[" ~ to!string(tmpAddr) ~ "]\n";
         return BCValue(StackAddr(tmpAddr), bct, temporaryCount);
     }
 
@@ -211,8 +211,8 @@ struct Print_BCGen
 
     void genJump(BCLabel target)
     {
-		sameLabel = false;
-        result ~= "    genJump(" ~ print (target) ~ ");\n";
+        sameLabel = false;
+        result ~= "    genJump(" ~ print(target) ~ ");\n";
     }
 
     CndJmpBegin beginCndJmp(BCValue cond = BCValue.init, bool ifTrue = false)
@@ -347,6 +347,7 @@ struct Print_BCGen
     {
         import std.algorithm : map;
         import std.range : join;
+
         sameLabel = false;
 
         result ~= "    Call(" ~ print(_result) ~ ", " ~ print(fn) ~ ", [" ~ args.map!(
@@ -386,7 +387,8 @@ struct Print_BCGen
     void Cat(BCValue _result, BCValue lhs, BCValue rhs, const uint elmSize)
     {
         sameLabel = false;
-        result ~= "    Cat(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ", " ~ to!string(elmSize) ~ ");\n";
+        result ~= "    Cat(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ", " ~ to!string(
+            elmSize) ~ ");\n";
     }
 }
 
@@ -398,7 +400,7 @@ enum genString = q{
     Ret(tmp1);
 };
 
-static assert (() {
+static assert(() {
     Print_BCGen gen;
     with (gen)
     {

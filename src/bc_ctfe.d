@@ -254,9 +254,10 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         }
         else
         {
-           // debug (ctfe)
+            // debug (ctfe)
             {
                 import std.stdio;
+
                 writeln("I have ", _sharedCtfeState.functionCount, " functions!");
                 bcv.gen.byteCodeArray[0 .. bcv.ip].printInstructions.writeln();
             }
@@ -501,10 +502,10 @@ struct SharedCtfeState(BCGenT)
         //register structType
         scope bcv = new BCV!BCGenT(null, null);
         auto oldStructCount = structCount;
-		debug (ctfe)
-        	bcv.visit(sd);
-		else
-			return 0;
+        debug (ctfe)
+            bcv.visit(sd);
+            else
+                return 0;
         //assert(oldStructCount < structCount);
         //return structCount;
     }
@@ -585,14 +586,15 @@ struct SharedCtfeState(BCGenT)
                 uint _size;
                 assert(type.typeIndex <= structCount);
                 BCStruct _struct = structs[type.typeIndex];
-				
+
                 foreach (i, memberType; _struct.memberTypes[0 .. _struct.memberTypeCount])
                 {
-                    if (memberType == type) 
-                        // bail out on recursion.
+                    if (memberType == type) // bail out on recursion.
                         return 0;
 
-                    _size += align4(isBasicBCType(memberType) ? basicTypeSize(memberType) : this.size(memberType));
+                    _size += align4(
+                        isBasicBCType(memberType) ? basicTypeSize(memberType) : this.size(
+                        memberType));
                 }
 
                 return _size;
@@ -713,12 +715,12 @@ Expression toExpression(const BCValue value, Type expressionType,
     case Tbool:
         {
             assert(value.imm32 == 0 || value.imm32 == 1, "Not a valid bool");
-            result =  new IntegerExp(value.imm32);
+            result = new IntegerExp(value.imm32);
         }
         break;
     case Tint32, Tuns32, Tint16, Tuns16, Tint8, Tuns8:
         {
-           result = new IntegerExp(value.imm32);
+            result = new IntegerExp(value.imm32);
         }
         break;
     default:
@@ -883,9 +885,10 @@ public:
         this.parent = parent;
         if (_this)
             this._this = _this;
-		import std.stdio;
-		if (fd && fd.ident)
-			writeln(fd.fbody.toString);
+        import std.stdio;
+
+        if (fd && fd.ident)
+            writeln(fd.fbody.toString);
     }
 
     void beginParameters()
@@ -1737,13 +1740,13 @@ public:
 
         auto sd = sle.sd;
         auto idx = _sharedCtfeState.getStructIndex(sd);
-		debug (ctfe)
-        	assert(idx);
-		else if (!idx)
-		{
-			IGaveUp = true;
-			return ;
-		}
+        debug (ctfe)
+            assert(idx);
+            else if (!idx)
+            {
+                IGaveUp = true;
+                return;
+            }
         BCStruct _struct = _sharedCtfeState.structs[idx - 1];
 
         foreach (ty; _struct.memberTypes[0 .. _struct.memberTypeCount])
@@ -2048,7 +2051,6 @@ public:
                     /*
                  * TODO scope(exit) { removeTempoary .... }
                  */
-                    import ddmd.ctfe.bc_builtins;
 
                     static if (UsePrinterBackend)
                     {
@@ -2057,7 +2059,6 @@ public:
                     {
                         //StringCat(lhs, lhs, rhs);
                     }
-                    //CallBuiltin(Bultin.StringConcat, [lhs, rhs]);
                     //Alloc(lhs, combinedLength);
 
                     //_sharedCtfeState.heap.heapSize
@@ -2119,16 +2120,16 @@ public:
         auto bct = toBCType(ie.type);
 
         //assert(bct == BCType.i32, "only 32bit is suppoorted for now");
-		if (bct == BCTypeEnum.i64)
-		{
-			retval = BCValue(Imm64(ie.value));
-		}
-		else
-		{
-			retval = BCValue(Imm32(cast(uint)ie.value));
-		}
-		//auto value = evaluateUlong(ie);
-		//retval = value <= int.max ? BCValue(Imm32(cast(uint) value)) : BCValue(Imm64(value));
+        if (bct == BCTypeEnum.i64)
+        {
+            retval = BCValue(Imm64(ie.value));
+        }
+        else
+        {
+            retval = BCValue(Imm32(cast(uint) ie.value));
+        }
+        //auto value = evaluateUlong(ie);
+        //retval = value <= int.max ? BCValue(Imm32(cast(uint) value)) : BCValue(Imm64(value));
         assert(retval.vType == BCValueType.Immediate);
     }
 
@@ -2353,13 +2354,13 @@ public:
             }
             auto structDeclPtr = ((cast(TypeStruct) dve.e1.type).sym);
             auto structTypeIndex = _sharedCtfeState.getStructIndex(structDeclPtr);
-			debug (ctfe)
-            	assert(structTypeIndex, "could not get StructType");
-			else if (!structTypeIndex)
-			{
-				IGaveUp = true;
-				return ;
-			}
+            debug (ctfe)
+                assert(structTypeIndex, "could not get StructType");
+        else if (!structTypeIndex)
+                {
+                    IGaveUp = true;
+                    return;
+                }
             BCStruct bcStructType = _sharedCtfeState.structs[structTypeIndex - 1];
             auto vd = dve.var.isVarDeclaration();
             assert(vd);
@@ -2905,13 +2906,13 @@ public:
         if (rs.exp !is null)
         {
             auto retval = genExpr(rs.exp);
-			if (canWorkWithType(retval.type) || retval.type == BCTypeEnum.String)
-            	Ret(retval);
-			else
-			{
-				IGaveUp  = true;
-				return ;
-			}
+            if (canWorkWithType(retval.type) || retval.type == BCTypeEnum.String)
+                Ret(retval);
+            else
+            {
+                IGaveUp = true;
+                return;
+            }
         }
         else
         {
