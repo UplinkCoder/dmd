@@ -130,7 +130,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression th
 import ddmd.ctfe.bc_common;
 
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 
 static if (UseLLVMBackend)
@@ -1154,6 +1154,13 @@ public:
             {
                 auto ce = cast(CondExp) e;
                 auto cond = genExpr(ce.econd);
+				debug (ctfe)
+					assert(cond);
+				else if (!cond)
+				{
+					IGaveUp = true;
+					return ;
+				}
 
                 auto cj = beginCndJmp(cond ? cond.i32 : cond, false);
                 auto lhsEval = genLabel();
@@ -1500,8 +1507,16 @@ public:
         if (fs.condition !is null && fs._body !is null)
         {
             BCLabel condEval = genLabel();
-            BCValue condExpr = genExpr(fs.condition);
-            auto condJmp = beginCndJmp(condExpr);
+            BCValue cond = genExpr(fs.condition);
+			debug (ctfe)
+				assert(cond);
+			else if (!cond)
+			{
+				IGaveUp = true;
+				return ;
+			}
+
+            auto condJmp = beginCndJmp(cond);
 
             auto _body = genBlock(fs._body);
             if (fs.increment)
@@ -2952,7 +2967,14 @@ public:
         }
         auto doBlock = genBlock(ds._body);
         auto cond = genExpr(ds.condition);
-        auto cj = beginCndJmp(cond);
+		debug (ctfe)
+			assert(cond);
+		else if (!cond)
+		{
+			IGaveUp = true;
+			return ;
+		}
+		auto cj = beginCndJmp(cond);
 
         endCndJmp(cj, doBlock.begin);
     }
@@ -3009,7 +3031,16 @@ public:
 
         uint oldFixupTableCount = fixupTableCount;
         auto cond = genExpr(fs.condition);
+		debug (ctfe)
+			assert(cond);
+		else if (!cond)
+		{
+			IGaveUp = true;
+			return ;
+		}
+
         auto cj = beginCndJmp(cond);
+
         BCBlock ifbody = fs.ifbody ? genBlock(fs.ifbody) : BCBlock.init;
         auto to_end = beginJmp();
         auto elseLabel = genLabel();
