@@ -885,10 +885,6 @@ public:
         this.parent = parent;
         if (_this)
             this._this = _this;
-        import std.stdio;
-
-        if (fd && fd.ident)
-            writeln(fd.fbody.toString);
     }
 
     void beginParameters()
@@ -974,7 +970,7 @@ public:
     override void visit(FuncDeclaration fd)
     {
 		import ddmd.identifier;
-		if (fd.ident == Identifier.idPool("isRooted"))
+		if (fd.ident == Identifier.idPool("isRooted") || fd.ident == Identifier.idPool("__lambda2") || fd.ident == Identifier.idPool("divideRoundUp") || fd.ident == Identifier.idPool("isSameLength") || fd.ident == Identifier.idPool("wrapperParameters") || fd.ident == Identifier.idPool("wrap") || fd.ident == Identifier.idPool("args"))
 		{
 			IGaveUp = true;
 			return ;
