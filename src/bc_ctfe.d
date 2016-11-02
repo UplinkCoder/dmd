@@ -973,6 +973,13 @@ public:
 
     override void visit(FuncDeclaration fd)
     {
+		import ddmd.identifier;
+		if (fd.ident == Identifier.idPool("isRooted"))
+		{
+			IGaveUp = true;
+			return ;
+		}
+
         static if (is(typeof(_sharedCtfeState.functionCount)))
         {
             if (auto i = _sharedCtfeState.getFunctionIndex(fd))

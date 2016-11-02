@@ -75,7 +75,7 @@ struct Print_BCGen
                 }
                 else if (val.type == BCTypeEnum.i64)
                 {
-                    result ~= "Imm64(" ~ to!string(val.imm32.imm32) ~ ")";
+                    result ~= "Imm64(" ~ to!string(val.imm64.imm64) ~ ")";
                 }
                 else if (val.type == BCTypeEnum.Null)
                 {
