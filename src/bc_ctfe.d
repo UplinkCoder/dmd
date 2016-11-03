@@ -2524,6 +2524,8 @@ public:
                 _uls.breakFixupCount = 0;
             }
         }
+
+		unrolledLoopState = null;
     }
 
     override void visit(ImportStatement _is)
