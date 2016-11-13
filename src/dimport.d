@@ -53,6 +53,8 @@ extern (C++) final class Import : Dsymbol
 
     extern (D) this(Loc loc, Identifiers* packages, Identifier id, Identifier aliasId, int isstatic)
     {
+	if(auto _s = "Import" in _classStats) { (*_s)++; } 
+	else { _classStats["Import"] = 1; }
         super(null);
         assert(id);
         version (none)

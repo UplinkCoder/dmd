@@ -1570,6 +1570,11 @@ Language changes listed by -transition=id:
             }
         }
     }
+	
+		import std.stdio;
+		writeln(_classStats);
+	
+	
     return status;
 }
 
@@ -1616,6 +1621,7 @@ int main()
 
     auto args = Runtime.cArgs();
     return tryMain(args.argc, cast(const(char)**)args.argv);
+
 }
 
 

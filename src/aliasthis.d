@@ -33,6 +33,8 @@ extern (C++) final class AliasThis : Dsymbol
 
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "AliasThis" in _classStats) { (*_s)++; } 
+	else { _classStats["AliasThis"] = 1; }
         super(null);    // it's anonymous (no identifier)
         this.loc = loc;
         this.ident = ident;

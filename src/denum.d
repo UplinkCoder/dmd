@@ -50,6 +50,8 @@ extern (C++) final class EnumDeclaration : ScopeDsymbol
 
     extern (D) this(Loc loc, Identifier id, Type memtype)
     {
+	if(auto _s = "EnumDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["EnumDeclaration"] = 1; }
         super(id);
         //printf("EnumDeclaration() %s\n", toChars());
         this.loc = loc;
@@ -522,6 +524,8 @@ extern (C++) final class EnumMember : VarDeclaration
 
     extern (D) this(Loc loc, Identifier id, Expression value, Type origType)
     {
+	if(auto _s = "EnumMember" in _classStats) { (*_s)++; } 
+	else { _classStats["EnumMember"] = 1; }
         super(loc, null, id ? id : Id.empty, new ExpInitializer(loc, value));
         this.origValue = value;
         this.origType = origType;

@@ -449,3 +449,4 @@ alias PINLINEalways = PINLINE.always;
 alias StorageClass = uinteger_t;
 
 extern (C++) __gshared Global global;
+extern (D) __gshared uint[string] _classStats;

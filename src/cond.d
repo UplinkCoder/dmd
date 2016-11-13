@@ -40,6 +40,8 @@ extern (C++) abstract class Condition : RootObject
 
     final extern (D) this(Loc loc)
     {
+	if(auto _s = "Condition" in _classStats) { (*_s)++; } 
+	else { _classStats["Condition"] = 1; }
         this.loc = loc;
     }
 
@@ -68,6 +70,8 @@ extern (C++) class DVCondition : Condition
 
     final extern (D) this(Module mod, uint level, Identifier ident)
     {
+	if(auto _s = "DVCondition" in _classStats) { (*_s)++; } 
+	else { _classStats["DVCondition"] = 1; }
         super(Loc());
         this.mod = mod;
         this.level = level;
@@ -148,6 +152,8 @@ extern (C++) final class DebugCondition : DVCondition
      */
     extern (D) this(Module mod, uint level, Identifier ident)
     {
+	if(auto _s = "DebugCondition" in _classStats) { (*_s)++; } 
+	else { _classStats["DebugCondition"] = 1; }
         super(mod, level, ident);
     }
 
@@ -424,6 +430,8 @@ extern (C++) final class VersionCondition : DVCondition
      */
     extern (D) this(Module mod, uint level, Identifier ident)
     {
+	if(auto _s = "VersionCondition" in _classStats) { (*_s)++; } 
+	else { _classStats["VersionCondition"] = 1; }
         super(mod, level, ident);
     }
 
@@ -482,6 +490,8 @@ extern (C++) final class StaticIfCondition : Condition
 
     extern (D) this(Loc loc, Expression exp)
     {
+	if(auto _s = "StaticIfCondition" in _classStats) { (*_s)++; } 
+	else { _classStats["StaticIfCondition"] = 1; }
         super(loc);
         this.exp = exp;
     }

@@ -140,6 +140,8 @@ extern (C++) abstract class Statement : RootObject
 
     final extern (D) this(Loc loc)
     {
+	if(auto _s = "Statement" in _classStats) { (*_s)++; } 
+	else { _classStats["Statement"] = 1; }
         this.loc = loc;
         // If this is an in{} contract scope statement (skip for determining
         //  inlineStatus of a function body for header content)
@@ -915,6 +917,8 @@ extern (C++) final class ErrorStatement : Statement
 {
     extern (D) this()
     {
+	if(auto _s = "ErrorStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["ErrorStatement"] = 1; }
         super(Loc());
         assert(global.gaggedErrors || global.errors);
     }
@@ -1108,6 +1112,8 @@ extern (C++) class ExpStatement : Statement
 
     final extern (D) this(Loc loc, Expression exp)
     {
+	if(auto _s = "ExpStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["ExpStatement"] = 1; }
         super(loc);
         this.exp = exp;
     }
@@ -1211,6 +1217,8 @@ extern (C++) final class DtorExpStatement : ExpStatement
 
     extern (D) this(Loc loc, Expression exp, VarDeclaration v)
     {
+	if(auto _s = "DtorExpStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["DtorExpStatement"] = 1; }
         super(loc, exp);
         this.var = v;
     }
@@ -1239,6 +1247,8 @@ extern (C++) final class CompileStatement : Statement
 
     extern (D) this(Loc loc, Expression exp)
     {
+	if(auto _s = "CompileStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["CompileStatement"] = 1; }
         super(loc);
         this.exp = exp;
     }
@@ -1304,6 +1314,8 @@ extern (C++) class CompoundStatement : Statement
      */
     final extern (D) this(Loc loc, Statements* s)
     {
+	if(auto _s = "CompoundStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["CompoundStatement"] = 1; }
         super(loc);
         statements = s;
     }
@@ -1465,6 +1477,8 @@ extern (C++) final class ScopeStatement : Statement
 
     extern (D) this(Loc loc, Statement s, Loc endloc)
     {
+	if(auto _s = "ScopeStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["ScopeStatement"] = 1; }
         super(loc);
         this.statement = s;
         this.endloc = endloc;
@@ -1514,6 +1528,8 @@ extern (C++) final class WhileStatement : Statement
 
     extern (D) this(Loc loc, Expression c, Statement b, Loc endloc)
     {
+	if(auto _s = "DoStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["DoStatement"] = 1; }
         super(loc);
         condition = c;
         _body = b;
@@ -1554,6 +1570,8 @@ extern (C++) final class DoStatement : Statement
 
     extern (D) this(Loc loc, Statement b, Expression c, Loc endloc)
     {
+	if(auto _s = "ForStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["ForStatement"] = 1; }
         super(loc);
         _body = b;
         condition = c;
@@ -1668,6 +1686,8 @@ extern (C++) final class ForeachStatement : Statement
 
     extern (D) this(Loc loc, TOK op, Parameters* parameters, Expression aggr, Statement _body, Loc endloc)
     {
+	if(auto _s = "ForeachStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["ForeachStatement"] = 1; }
         super(loc);
         this.op = op;
         this.parameters = parameters;
@@ -1731,6 +1751,8 @@ extern (C++) final class ForeachRangeStatement : Statement
 
     extern (D) this(Loc loc, TOK op, Parameter prm, Expression lwr, Expression upr, Statement _body, Loc endloc)
     {
+	if(auto _s = "IfStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["IfStatement"] = 1; }
         super(loc);
         this.op = op;
         this.prm = prm;
@@ -1774,6 +1796,8 @@ extern (C++) final class IfStatement : Statement
 
     extern (D) this(Loc loc, Parameter prm, Expression condition, Statement ifbody, Statement elsebody, Loc endloc)
     {
+	if(auto _s = "ConditionalStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["ConditionalStatement"] = 1; }
         super(loc);
         this.prm = prm;
         this.condition = condition;
@@ -1813,6 +1837,8 @@ extern (C++) final class ConditionalStatement : Statement
 
     extern (D) this(Loc loc, Condition condition, Statement ifbody, Statement elsebody)
     {
+	if(auto _s = "PragmaStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["PragmaStatement"] = 1; }
         super(loc);
         this.condition = condition;
         this.ifbody = ifbody;
@@ -1861,6 +1887,8 @@ extern (C++) final class PragmaStatement : Statement
 
     extern (D) this(Loc loc, Identifier ident, Expressions* args, Statement _body)
     {
+	if(auto _s = "SwitchStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["SwitchStatement"] = 1; }
         super(loc);
         this.ident = ident;
         this.args = args;
@@ -1993,6 +2021,8 @@ extern (C++) final class CaseStatement : Statement
 
     extern (D) this(Loc loc, Expression exp, Statement s)
     {
+	if(auto _s = "DefaultStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["DefaultStatement"] = 1; }
         super(loc);
         this.exp = exp;
         this.statement = s;
@@ -2031,6 +2061,8 @@ extern (C++) final class CaseRangeStatement : Statement
 
     extern (D) this(Loc loc, Expression first, Expression last, Statement s)
     {
+	if(auto _s = "GotoCaseStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["GotoCaseStatement"] = 1; }
         super(loc);
         this.first = first;
         this.last = last;
@@ -2057,6 +2089,8 @@ extern (C++) final class DefaultStatement : Statement
 
     extern (D) this(Loc loc, Statement s)
     {
+	if(auto _s = "SwitchErrorStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["SwitchErrorStatement"] = 1; }
         super(loc);
         this.statement = s;
     }
@@ -2139,6 +2173,8 @@ extern (C++) final class SwitchErrorStatement : Statement
 {
     extern (D) this(Loc loc)
     {
+	if(auto _s = "SynchronizedStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["SynchronizedStatement"] = 1; }
         super(loc);
     }
 
@@ -2185,6 +2221,8 @@ extern (C++) final class BreakStatement : Statement
 
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "WithStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["WithStatement"] = 1; }
         super(loc);
         this.ident = ident;
     }
@@ -2213,6 +2251,8 @@ extern (C++) final class ContinueStatement : Statement
 
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "TryCatchStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["TryCatchStatement"] = 1; }
         super(loc);
         this.ident = ident;
     }
@@ -2237,6 +2277,8 @@ extern (C++) final class SynchronizedStatement : Statement
 
     extern (D) this(Loc loc, Expression exp, Statement _body)
     {
+	if(auto _s = "Catch" in _classStats) { (*_s)++; } 
+	else { _classStats["Catch"] = 1; }
         super(loc);
         this.exp = exp;
         this._body = _body;
@@ -2274,6 +2316,8 @@ extern (C++) final class WithStatement : Statement
 
     extern (D) this(Loc loc, Expression exp, Statement _body, Loc endloc)
     {
+	if(auto _s = "TryFinallyStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["TryFinallyStatement"] = 1; }
         super(loc);
         this.exp = exp;
         this._body = _body;
@@ -2344,6 +2388,8 @@ extern (C++) final class Catch : RootObject
 
     extern (D) this(Loc loc, Type t, Identifier id, Statement handler)
     {
+	if(auto _s = "OnScopeStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["OnScopeStatement"] = 1; }
         //printf("Catch(%s, loc = %s)\n", id->toChars(), loc.toChars());
         this.loc = loc;
         this.type = t;
@@ -2408,6 +2454,8 @@ extern (C++) final class OnScopeStatement : Statement
 
     extern (D) this(Loc loc, TOK tok, Statement statement)
     {
+	if(auto _s = "DebugStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["DebugStatement"] = 1; }
         super(loc);
         this.tok = tok;
         this.statement = statement;
@@ -2481,6 +2529,8 @@ extern (C++) final class ThrowStatement : Statement
 
     extern (D) this(Loc loc, Expression exp)
     {
+	if(auto _s = "GotoStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["GotoStatement"] = 1; }
         super(loc);
         this.exp = exp;
     }
@@ -2546,6 +2596,8 @@ extern (C++) final class GotoStatement : Statement
 
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "LabelStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["LabelStatement"] = 1; }
         super(loc);
         this.ident = ident;
     }
@@ -2634,6 +2686,8 @@ extern (C++) final class LabelStatement : Statement
 
     extern (D) this(Loc loc, Identifier ident, Statement statement)
     {
+	if(auto _s = "CompoundAsmStatement" in _classStats) { (*_s)++; } 
+	else { _classStats["CompoundAsmStatement"] = 1; }
         super(loc);
         this.ident = ident;
         this.statement = statement;

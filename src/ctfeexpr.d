@@ -57,6 +57,8 @@ extern (C++) final class ClassReferenceExp : Expression
 
     extern (D) this(Loc loc, StructLiteralExp lit, Type type)
     {
+	if(auto _s = "ClassReferenceExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ClassReferenceExp"] = 1; }
         super(loc, TOKclassreference, __traits(classInstanceSize, ClassReferenceExp));
         assert(lit && lit.sd && lit.sd.isClassDeclaration());
         this.value = lit;
@@ -126,6 +128,8 @@ extern (C++) final class VoidInitExp : Expression
 
     extern (D) this(VarDeclaration var, Type type)
     {
+	if(auto _s = "VoidInitExp" in _classStats) { (*_s)++; } 
+	else { _classStats["VoidInitExp"] = 1; }
         super(var.loc, TOKvoid, __traits(classInstanceSize, VoidInitExp));
         this.var = var;
         this.type = var.type;
@@ -164,6 +168,8 @@ extern (C++) final class ThrownExceptionExp : Expression
 
     extern (D) this(Loc loc, ClassReferenceExp victim)
     {
+	if(auto _s = "ThrownExceptionExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ThrownExceptionExp"] = 1; }
         super(loc, TOKthrownexception, __traits(classInstanceSize, ThrownExceptionExp));
         this.thrown = victim;
         this.type = victim.type;
@@ -201,6 +207,8 @@ extern (C++) final class CTFEExp : Expression
 {
     extern (D) this(TOK tok)
     {
+	if(auto _s = "CTFEExp" in _classStats) { (*_s)++; } 
+	else { _classStats["CTFEExp"] = 1; }
         super(Loc(), tok, __traits(classInstanceSize, CTFEExp));
         type = Type.tvoid;
     }

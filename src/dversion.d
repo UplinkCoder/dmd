@@ -31,6 +31,8 @@ extern (C++) final class DebugSymbol : Dsymbol
 
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "DebugSymbol" in _classStats) { (*_s)++; } 
+	else { _classStats["DebugSymbol"] = 1; }
         super(ident);
         this.loc = loc;
     }
@@ -125,6 +127,8 @@ extern (C++) final class VersionSymbol : Dsymbol
 
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "VersionSymbol" in _classStats) { (*_s)++; } 
+	else { _classStats["VersionSymbol"] = 1; }
         super(ident);
         this.loc = loc;
     }

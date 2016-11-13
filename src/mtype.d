@@ -596,6 +596,8 @@ extern (C++) abstract class Type : RootObject
 
     final extern (D) this(TY ty)
     {
+	if(auto _s = "Type" in _classStats) { (*_s)++; } 
+	else { _classStats["Type"] = 1; }
         this.ty = ty;
     }
 
@@ -3071,6 +3073,8 @@ extern (C++) final class TypeError : Type
 {
     extern (D) this()
     {
+	if(auto _s = "TypeError" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeError"] = 1; }
         super(Terror);
     }
 
@@ -3119,6 +3123,8 @@ extern (C++) abstract class TypeNext : Type
 
     final extern (D) this(TY ty, Type next)
     {
+	if(auto _s = "TypeNext" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeNext"] = 1; }
         super(ty);
         this.next = next;
     }
@@ -3419,6 +3425,8 @@ extern (C++) final class TypeBasic : Type
 
     extern (D) this(TY ty)
     {
+	if(auto _s = "TypeBasic" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeBasic"] = 1; }
         super(ty);
         const(char)* d;
         uint flags = 0;
@@ -4318,6 +4326,8 @@ extern (C++) final class TypeVector : Type
 
     extern (D) this(Loc loc, Type basetype)
     {
+	if(auto _s = "TypeVector" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeVector"] = 1; }
         super(Tvector);
         this.basetype = basetype;
     }
@@ -4492,6 +4502,8 @@ extern (C++) class TypeArray : TypeNext
 {
     final extern (D) this(TY ty, Type next)
     {
+	if(auto _s = "TypeArray" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeArray"] = 1; }
         super(ty, next);
     }
 
@@ -4645,6 +4657,8 @@ extern (C++) final class TypeSArray : TypeArray
 
     extern (D) this(Type t, Expression dim)
     {
+	if(auto _s = "TypeSArray" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeSArray"] = 1; }
         super(Tsarray, t);
         //printf("TypeSArray(%s)\n", dim->toChars());
         this.dim = dim;
@@ -5100,6 +5114,8 @@ extern (C++) final class TypeDArray : TypeArray
 {
     extern (D) this(Type t)
     {
+	if(auto _s = "TypeDArray" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeDArray"] = 1; }
         super(Tarray, t);
         //printf("TypeDArray(t = %p)\n", t);
     }
@@ -5313,6 +5329,8 @@ extern (C++) final class TypeAArray : TypeArray
 
     extern (D) this(Type t, Type index)
     {
+	if(auto _s = "TypeAArray" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeAArray"] = 1; }
         super(Taarray, t);
         this.index = index;
     }
@@ -5682,6 +5700,8 @@ extern (C++) final class TypePointer : TypeNext
 {
     extern (D) this(Type t)
     {
+	if(auto _s = "TypePointer" in _classStats) { (*_s)++; } 
+	else { _classStats["TypePointer"] = 1; }
         super(Tpointer, t);
     }
 
@@ -5865,6 +5885,8 @@ extern (C++) final class TypeReference : TypeNext
 {
     extern (D) this(Type t)
     {
+	if(auto _s = "TypeReference" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeReference"] = 1; }
         super(Treference, t);
         // BUG: what about references to static arrays?
     }
@@ -6003,6 +6025,8 @@ extern (C++) final class TypeFunction : TypeNext
 
     extern (D) this(Parameters* parameters, Type treturn, int varargs, LINK linkage, StorageClass stc = 0)
     {
+	if(auto _s = "TypeFunction" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeFunction"] = 1; }
         super(Tfunction, treturn);
         //if (!treturn) *(char*)0=0;
         //    assert(treturn);
@@ -7058,6 +7082,8 @@ extern (C++) final class TypeDelegate : TypeNext
 
     extern (D) this(Type t)
     {
+	if(auto _s = "TypeDelegate" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeDelegate"] = 1; }
         super(Tfunction, t);
         ty = Tdelegate;
     }
@@ -7223,6 +7249,8 @@ extern (C++) abstract class TypeQualified : Type
 
     final extern (D) this(TY ty, Loc loc)
     {
+	if(auto _s = "TypeQualified" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeQualified"] = 1; }
         super(ty);
         this.loc = loc;
     }
@@ -7638,6 +7666,8 @@ extern (C++) final class TypeIdentifier : TypeQualified
 
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "TypeIdentifier" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeIdentifier"] = 1; }
         super(Tident, loc);
         this.ident = ident;
     }
@@ -7771,6 +7801,8 @@ extern (C++) final class TypeInstance : TypeQualified
 
     extern (D) this(Loc loc, TemplateInstance tempinst)
     {
+	if(auto _s = "TypeInstance" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeInstance"] = 1; }
         super(Tinstance, loc);
         this.tempinst = tempinst;
     }
@@ -7872,6 +7904,8 @@ extern (C++) final class TypeTypeof : TypeQualified
 
     extern (D) this(Loc loc, Expression exp)
     {
+	if(auto _s = "TypeTypeof" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeTypeof"] = 1; }
         super(Ttypeof, loc);
         this.exp = exp;
     }
@@ -8036,6 +8070,8 @@ extern (C++) final class TypeReturn : TypeQualified
 {
     extern (D) this(Loc loc)
     {
+	if(auto _s = "TypeReturn" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeReturn"] = 1; }
         super(Treturn, loc);
     }
 
@@ -8158,6 +8194,8 @@ extern (C++) final class TypeStruct : Type
 
     extern (D) this(StructDeclaration sym)
     {
+	if(auto _s = "TypeStruct" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeStruct"] = 1; }
         super(Tstruct);
         this.sym = sym;
     }
@@ -8735,6 +8773,8 @@ extern (C++) final class TypeEnum : Type
 
     extern (D) this(EnumDeclaration sym)
     {
+	if(auto _s = "TypeEnum" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeEnum"] = 1; }
         super(Tenum);
         this.sym = sym;
     }
@@ -8994,6 +9034,8 @@ extern (C++) final class TypeClass : Type
 
     extern (D) this(ClassDeclaration sym)
     {
+	if(auto _s = "TypeClass" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeClass"] = 1; }
         super(Tclass);
         this.sym = sym;
     }
@@ -9616,6 +9658,8 @@ extern (C++) final class TypeTuple : Type
 
     extern (D) this(Parameters* arguments)
     {
+	if(auto _s = "TypeTuple" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeTuple"] = 1; }
         super(Ttuple);
         //printf("TypeTuple(this = %p)\n", this);
         this.arguments = arguments;
@@ -9795,6 +9839,8 @@ extern (C++) final class TypeSlice : TypeNext
 
     extern (D) this(Type next, Expression lwr, Expression upr)
     {
+	if(auto _s = "TypeSlice" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeSlice"] = 1; }
         super(Tslice, next);
         //printf("TypeSlice[%s .. %s]\n", lwr->toChars(), upr->toChars());
         this.lwr = lwr;
@@ -9938,6 +9984,8 @@ extern (C++) final class TypeNull : Type
 {
     extern (D) this()
     {
+	if(auto _s = "Parameter" in _classStats) { (*_s)++; } 
+	else { _classStats["Parameter"] = 1; }
         super(Tnull);
     }
 

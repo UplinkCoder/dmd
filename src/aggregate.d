@@ -102,6 +102,8 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
 
     final extern (D) this(Loc loc, Identifier id)
     {
+	if(auto _s = "AggregateDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["AggregateDeclaration"] = 1; }
         super(id);
         this.loc = loc;
         protection = Prot(PROTpublic);

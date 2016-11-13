@@ -29,6 +29,8 @@ extern (C++) final class StaticAssert : Dsymbol
 
     extern (D) this(Loc loc, Expression exp, Expression msg)
     {
+	if(auto _s = "StaticAssert" in _classStats) { (*_s)++; } 
+	else { _classStats["StaticAssert"] = 1; }
         super(Id.empty);
         this.loc = loc;
         this.exp = exp;

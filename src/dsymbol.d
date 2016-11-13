@@ -210,6 +210,8 @@ extern (C++) class Dsymbol : RootObject
 
     final extern (D) this()
     {
+	if(auto _s = "Dsymbol" in _classStats) { (*_s)++; } 
+	else { _classStats["Dsymbol"] = 1; }
         //printf("Dsymbol::Dsymbol(%p)\n", this);
         this.semanticRun = PASSinit;
     }
@@ -1271,6 +1273,8 @@ private:
 public:
     final extern (D) this()
     {
+	if(auto _s = "ScopeDsymbol" in _classStats) { (*_s)++; } 
+	else { _classStats["ScopeDsymbol"] = 1; }
     }
 
     final extern (D) this(Identifier id)
@@ -1707,6 +1711,8 @@ extern (C++) final class WithScopeSymbol : ScopeDsymbol
 
     extern (D) this(WithStatement withstate)
     {
+	if(auto _s = "WithScopeSymbol" in _classStats) { (*_s)++; } 
+	else { _classStats["WithScopeSymbol"] = 1; }
         this.withstate = withstate;
     }
 
@@ -1767,6 +1773,8 @@ extern (C++) final class ArrayScopeSymbol : ScopeDsymbol
 
     extern (D) this(Scope* sc, Expression e)
     {
+	if(auto _s = "ArrayScopeSymbol" in _classStats) { (*_s)++; } 
+	else { _classStats["ArrayScopeSymbol"] = 1; }
         assert(e.op == TOKindex || e.op == TOKslice || e.op == TOKarray);
         exp = e;
         this.sc = sc;
@@ -1976,6 +1984,8 @@ extern (C++) final class OverloadSet : Dsymbol
 
     extern (D) this(Identifier ident, OverloadSet os = null)
     {
+	if(auto _s = "OverloadSet" in _classStats) { (*_s)++; } 
+	else { _classStats["OverloadSet"] = 1; }
         super(ident);
         if (os)
         {

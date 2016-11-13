@@ -29,6 +29,8 @@ extern (C++) final class Nspace : ScopeDsymbol
 {
     extern (D) this(Loc loc, Identifier ident, Dsymbols* members)
     {
+	if(auto _s = "Nspace" in _classStats) { (*_s)++; } 
+	else { _classStats["Nspace"] = 1; }
         super(ident);
         //printf("Nspace::Nspace(ident = %s)\n", ident->toChars());
         this.loc = loc;

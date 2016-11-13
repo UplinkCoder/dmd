@@ -132,6 +132,8 @@ extern (C++) class Package : ScopeDsymbol
 
     final extern (D) this(Identifier ident)
     {
+	if(auto _s = "Package" in _classStats) { (*_s)++; } 
+	else { _classStats["Package"] = 1; }
         super(ident);
         this.isPkgMod = PKGunknown;
         __gshared uint packageTag;
@@ -374,6 +376,8 @@ extern (C++) final class Module : Package
 
     extern (D) this(const(char)* filename, Identifier ident, int doDocComment, int doHdrGen)
     {
+	if(auto _s = "Module" in _classStats) { (*_s)++; } 
+	else { _classStats["Module"] = 1; }
         super(ident);
         const(char)* srcfilename;
         //printf("Module::Module(filename = '%s', ident = '%s')\n", filename, ident->toChars());

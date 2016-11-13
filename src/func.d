@@ -491,6 +491,8 @@ extern (C++) class FuncDeclaration : Declaration
 
     final extern (D) this(Loc loc, Loc endloc, Identifier id, StorageClass storage_class, Type type)
     {
+	if(auto _s = "FuncDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["FuncDeclaration"] = 1; }
         super(id);
         objc = Objc_FuncDeclaration(this);
         //printf("FuncDeclaration(id = '%s', type = %p)\n", id->toChars(), type);
@@ -4522,6 +4524,8 @@ extern (C++) final class FuncAliasDeclaration : FuncDeclaration
 
     extern (D) this(Identifier ident, FuncDeclaration funcalias, bool hasOverloads = true)
     {
+	if(auto _s = "FuncAliasDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["FuncAliasDeclaration"] = 1; }
         super(funcalias.loc, funcalias.endloc, ident, funcalias.storage_class, funcalias.type);
         assert(funcalias != this);
         this.funcalias = funcalias;
@@ -4574,6 +4578,8 @@ extern (C++) final class FuncLiteralDeclaration : FuncDeclaration
 
     extern (D) this(Loc loc, Loc endloc, Type type, TOK tok, ForeachStatement fes, Identifier id = null)
     {
+	if(auto _s = "FuncLiteralDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["FuncLiteralDeclaration"] = 1; }
         super(loc, endloc, null, STCundefined, type);
         this.ident = id ? id : Id.empty;
         this.tok = tok;
@@ -4700,6 +4706,8 @@ extern (C++) final class CtorDeclaration : FuncDeclaration
 {
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Type type)
     {
+	if(auto _s = "CtorDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["CtorDeclaration"] = 1; }
         super(loc, endloc, Id.ctor, stc, type);
         //printf("CtorDeclaration(loc = %s) %s\n", loc.toChars(), toChars());
     }
@@ -4833,6 +4841,8 @@ extern (C++) final class PostBlitDeclaration : FuncDeclaration
 {
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Identifier id)
     {
+	if(auto _s = "PostBlitDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["PostBlitDeclaration"] = 1; }
         super(loc, endloc, id, stc, null);
     }
 
@@ -4917,6 +4927,8 @@ extern (C++) final class DtorDeclaration : FuncDeclaration
 {
     extern (D) this(Loc loc, Loc endloc)
     {
+	if(auto _s = "DtorDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["DtorDeclaration"] = 1; }
         super(loc, endloc, Id.dtor, STCundefined, null);
     }
 
@@ -5017,6 +5029,8 @@ extern (C++) class StaticCtorDeclaration : FuncDeclaration
 {
     final extern (D) this(Loc loc, Loc endloc, StorageClass stc)
     {
+	if(auto _s = "StaticCtorDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["StaticCtorDeclaration"] = 1; }
         super(loc, endloc, Identifier.generateId("_staticCtor"), STCstatic | stc, null);
     }
 
@@ -5142,6 +5156,8 @@ extern (C++) final class SharedStaticCtorDeclaration : StaticCtorDeclaration
 {
     extern (D) this(Loc loc, Loc endloc, StorageClass stc)
     {
+	if(auto _s = "StaticDtorDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["StaticDtorDeclaration"] = 1; }
         super(loc, endloc, "_sharedStaticCtor", stc);
     }
 
@@ -5298,6 +5314,8 @@ extern (C++) final class SharedStaticDtorDeclaration : StaticDtorDeclaration
 {
     extern (D) this(Loc loc, Loc endloc, StorageClass stc)
     {
+	if(auto _s = "InvariantDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["InvariantDeclaration"] = 1; }
         super(loc, endloc, "_sharedStaticDtor", stc);
     }
 
@@ -5423,6 +5441,8 @@ extern (C++) final class UnitTestDeclaration : FuncDeclaration
 
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, char* codedoc)
     {
+	if(auto _s = "UnitTestDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["UnitTestDeclaration"] = 1; }
         super(loc, endloc, unitTestId(loc), stc, null);
         this.codedoc = codedoc;
     }
@@ -5523,6 +5543,8 @@ extern (C++) final class NewDeclaration : FuncDeclaration
 
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Parameters* fparams, int varargs)
     {
+	if(auto _s = "NewDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["NewDeclaration"] = 1; }
         super(loc, endloc, Id.classNew, STCstatic | stc, null);
         this.parameters = fparams;
         this.varargs = varargs;
@@ -5617,6 +5639,8 @@ extern (C++) final class DeleteDeclaration : FuncDeclaration
 
     extern (D) this(Loc loc, Loc endloc, StorageClass stc, Parameters* fparams)
     {
+	if(auto _s = "DeleteDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["DeleteDeclaration"] = 1; }
         super(loc, endloc, Id.classDelete, STCstatic | stc, null);
         this.parameters = fparams;
     }

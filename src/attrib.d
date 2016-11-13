@@ -45,6 +45,8 @@ extern (C++) abstract class AttribDeclaration : Dsymbol
 
     final extern (D) this(Dsymbols* decl)
     {
+	if(auto _s = "AttribDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["AttribDeclaration"] = 1; }
         this.decl = decl;
     }
 
@@ -331,6 +333,8 @@ extern (C++) class StorageClassDeclaration : AttribDeclaration
 
     final extern (D) this(StorageClass stc, Dsymbols* decl)
     {
+	if(auto _s = "StorageClassDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["StorageClassDeclaration"] = 1; }
         super(decl);
         this.stc = stc;
     }
@@ -405,6 +409,8 @@ extern (C++) final class DeprecatedDeclaration : StorageClassDeclaration
 
     extern (D) this(Expression msg, Dsymbols* decl)
     {
+	if(auto _s = "DeprecatedDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["DeprecatedDeclaration"] = 1; }
         super(STCdeprecated, decl);
         this.msg = msg;
     }
@@ -492,6 +498,8 @@ extern (C++) final class LinkDeclaration : AttribDeclaration
 
     extern (D) this(LINK p, Dsymbols* decl)
     {
+	if(auto _s = "LinkDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["LinkDeclaration"] = 1; }
         super(decl);
         //printf("LinkDeclaration(linkage = %d, decl = %p)\n", p, decl);
         linkage = p;
@@ -528,6 +536,8 @@ extern (C++) final class CPPMangleDeclaration : AttribDeclaration
 
     extern (D) this(CPPMANGLE p, Dsymbols* decl)
     {
+	if(auto _s = "CPPMangleDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["CPPMangleDeclaration"] = 1; }
         super(decl);
         //printf("CPPMangleDeclaration(cppmangle = %d, decl = %p)\n", p, decl);
         cppmangle = p;
@@ -571,6 +581,8 @@ extern (C++) final class ProtDeclaration : AttribDeclaration
      */
     extern (D) this(Loc loc, Prot p, Dsymbols* decl)
     {
+	if(auto _s = "ProtDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["ProtDeclaration"] = 1; }
         super(decl);
         this.loc = loc;
         this.protection = p;
@@ -659,6 +671,8 @@ extern (C++) final class AlignDeclaration : AttribDeclaration
 
     extern (D) this(Loc loc, Expression ealign, Dsymbols* decl)
     {
+	if(auto _s = "AlignDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["AlignDeclaration"] = 1; }
         super(decl);
         this.loc = loc;
         this.ealign = ealign;
@@ -729,6 +743,8 @@ extern (C++) final class AnonDeclaration : AttribDeclaration
 
     extern (D) this(Loc loc, bool isunion, Dsymbols* decl)
     {
+	if(auto _s = "AnonDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["AnonDeclaration"] = 1; }
         super(decl);
         this.loc = loc;
         this.isunion = isunion;
@@ -873,6 +889,8 @@ extern (C++) final class PragmaDeclaration : AttribDeclaration
 
     extern (D) this(Loc loc, Identifier ident, Expressions* args, Dsymbols* decl)
     {
+	if(auto _s = "PragmaDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["PragmaDeclaration"] = 1; }
         super(decl);
         this.loc = loc;
         this.ident = ident;
@@ -1162,6 +1180,8 @@ extern (C++) class ConditionalDeclaration : AttribDeclaration
 
     final extern (D) this(Condition condition, Dsymbols* decl, Dsymbols* elsedecl)
     {
+	if(auto _s = "ConditionalDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["ConditionalDeclaration"] = 1; }
         super(decl);
         //printf("ConditionalDeclaration::ConditionalDeclaration()\n");
         this.condition = condition;
@@ -1253,6 +1273,8 @@ extern (C++) final class StaticIfDeclaration : ConditionalDeclaration
 
     extern (D) this(Condition condition, Dsymbols* decl, Dsymbols* elsedecl)
     {
+	if(auto _s = "StaticIfDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["StaticIfDeclaration"] = 1; }
         super(condition, decl, elsedecl);
         //printf("StaticIfDeclaration::StaticIfDeclaration()\n");
     }
@@ -1356,6 +1378,8 @@ extern (C++) final class CompileDeclaration : AttribDeclaration
 
     extern (D) this(Loc loc, Expression exp)
     {
+	if(auto _s = "CompileDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["CompileDeclaration"] = 1; }
         super(null);
         //printf("CompileDeclaration(loc = %d)\n", loc.linnum);
         this.loc = loc;
@@ -1443,6 +1467,8 @@ extern (C++) final class UserAttributeDeclaration : AttribDeclaration
 
     extern (D) this(Expressions* atts, Dsymbols* decl)
     {
+	if(auto _s = "UserAttributeDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["UserAttributeDeclaration"] = 1; }
         super(decl);
         //printf("UserAttributeDeclaration()\n");
         this.atts = atts;

@@ -52,6 +52,8 @@ extern (C++) class Initializer : RootObject
 
     final extern (D) this(Loc loc)
     {
+	if(auto _s = "Initializer" in _classStats) { (*_s)++; } 
+	else { _classStats["Initializer"] = 1; }
         this.loc = loc;
     }
 
@@ -127,6 +129,8 @@ extern (C++) final class VoidInitializer : Initializer
 
     extern (D) this(Loc loc)
     {
+	if(auto _s = "VoidInitializer" in _classStats) { (*_s)++; } 
+	else { _classStats["VoidInitializer"] = 1; }
         super(loc);
     }
 
@@ -170,6 +174,8 @@ extern (C++) final class ErrorInitializer : Initializer
 {
     extern (D) this()
     {
+	if(auto _s = "ErrorInitializer" in _classStats) { (*_s)++; } 
+	else { _classStats["ErrorInitializer"] = 1; }
         super(Loc());
     }
 
@@ -214,6 +220,8 @@ extern (C++) final class StructInitializer : Initializer
 
     extern (D) this(Loc loc)
     {
+	if(auto _s = "StructInitializer" in _classStats) { (*_s)++; } 
+	else { _classStats["StructInitializer"] = 1; }
         super(loc);
     }
 
@@ -393,6 +401,8 @@ extern (C++) final class ArrayInitializer : Initializer
 
     extern (D) this(Loc loc)
     {
+	if(auto _s = "ArrayInitializer" in _classStats) { (*_s)++; } 
+	else { _classStats["ArrayInitializer"] = 1; }
         super(loc);
     }
 
@@ -810,6 +820,8 @@ extern (C++) final class ExpInitializer : Initializer
 
     extern (D) this(Loc loc, Expression exp)
     {
+	if(auto _s = "ExpInitializer" in _classStats) { (*_s)++; } 
+	else { _classStats["ExpInitializer"] = 1; }
         super(loc);
         this.exp = exp;
     }

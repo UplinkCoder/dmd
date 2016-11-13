@@ -434,6 +434,8 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
 
     extern (D) this(Loc loc, Identifier id, TemplateParameters* parameters, Expression constraint, Dsymbols* decldefs, bool ismixin = false, bool literal = false)
     {
+	if(auto _s = "TemplateDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateDeclaration"] = 1; }
         super(id);
         static if (LOG)
         {
@@ -2290,6 +2292,8 @@ extern (C++) final class TypeDeduced : Type
 
     extern (D) this(Type tt, Expression e, Type tparam)
     {
+	if(auto _s = "TypeDeduced" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeDeduced"] = 1; }
         super(Tnone);
         tded = tt;
         argexps.push(e);
@@ -5068,6 +5072,8 @@ extern (C++) class TemplateTypeParameter : TemplateParameter
 
     final extern (D) this(Loc loc, Identifier ident, Type specType, Type defaultType)
     {
+	if(auto _s = "TemplateTypeParameter" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateTypeParameter"] = 1; }
         super(loc, ident);
         this.ident = ident;
         this.specType = specType;
@@ -5249,6 +5255,8 @@ extern (C++) final class TemplateThisParameter : TemplateTypeParameter
 {
     extern (D) this(Loc loc, Identifier ident, Type specType, Type defaultType)
     {
+	if(auto _s = "TemplateThisParameter" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateThisParameter"] = 1; }
         super(loc, ident, specType, defaultType);
     }
 
@@ -5283,6 +5291,8 @@ extern (C++) final class TemplateValueParameter : TemplateParameter
     extern (D) this(Loc loc, Identifier ident, Type valType,
         Expression specValue, Expression defaultValue)
     {
+	if(auto _s = "TemplateValueParameter" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateValueParameter"] = 1; }
         super(loc, ident);
         this.ident = ident;
         this.valType = valType;
@@ -5561,6 +5571,8 @@ extern (C++) final class TemplateAliasParameter : TemplateParameter
 
     extern (D) this(Loc loc, Identifier ident, Type specType, RootObject specAlias, RootObject defaultAlias)
     {
+	if(auto _s = "TemplateAliasParameter" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateAliasParameter"] = 1; }
         super(loc, ident);
         this.ident = ident;
         this.specType = specType;
@@ -5789,6 +5801,8 @@ extern (C++) final class TemplateTupleParameter : TemplateParameter
 {
     extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "TemplateTupleParameter" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateTupleParameter"] = 1; }
         super(loc, ident);
         this.ident = ident;
     }
@@ -5964,6 +5978,8 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
     final extern (D) this(Loc loc, Identifier ident, Objects* tiargs)
     {
+	if(auto _s = "TemplateInstance" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateInstance"] = 1; }
         super(null);
         static if (LOG)
         {
@@ -8418,6 +8434,8 @@ extern (C++) final class TemplateMixin : TemplateInstance
 
     extern (D) this(Loc loc, Identifier ident, TypeQualified tqual, Objects* tiargs)
     {
+	if(auto _s = "TemplateMixin" in _classStats) { (*_s)++; } 
+	else { _classStats["TemplateMixin"] = 1; }
         super(loc,
               tqual.idents.dim ? cast(Identifier)tqual.idents[tqual.idents.dim - 1] : (cast(TypeIdentifier)tqual).ident,
               tiargs ? tiargs : new Objects());

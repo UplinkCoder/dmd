@@ -159,6 +159,8 @@ extern (C++) abstract class Declaration : Dsymbol
 
     final extern (D) this(Identifier id)
     {
+	if(auto _s = "Declaration" in _classStats) { (*_s)++; } 
+	else { _classStats["Declaration"] = 1; }
         super(id);
         storage_class = STCundefined;
         protection = Prot(PROTundefined);
@@ -362,6 +364,8 @@ extern (C++) final class TupleDeclaration : Declaration
 
     extern (D) this(Loc loc, Identifier id, Objects* objects)
     {
+	if(auto _s = "TupleDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["TupleDeclaration"] = 1; }
         super(id);
         this.loc = loc;
         this.objects = objects;
@@ -493,6 +497,8 @@ extern (C++) final class AliasDeclaration : Declaration
 
     extern (D) this(Loc loc, Identifier id, Type type)
     {
+	if(auto _s = "AliasDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["AliasDeclaration"] = 1; }
         super(id);
         //printf("AliasDeclaration(id = '%s', type = %p)\n", id->toChars(), type);
         //printf("type = '%s'\n", type->toChars());
@@ -900,6 +906,8 @@ extern (C++) final class OverDeclaration : Declaration
 
     extern (D) this(Identifier ident, Dsymbol s, bool hasOverloads = true)
     {
+	if(auto _s = "OverDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["OverDeclaration"] = 1; }
         super(ident);
         this.aliassym = s;
         this.hasOverloads = hasOverloads;
@@ -1046,6 +1054,8 @@ extern (C++) class VarDeclaration : Declaration
 
     final extern (D) this(Loc loc, Type type, Identifier id, Initializer _init, StorageClass storage_class = STCundefined)
     {
+	if(auto _s = "VarDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["VarDeclaration"] = 1; }
         super(id);
         //printf("VarDeclaration('%s')\n", id->toChars());
         assert(id);
@@ -2416,6 +2426,8 @@ extern (C++) final class SymbolDeclaration : Declaration
 
     extern (D) this(Loc loc, StructDeclaration dsym)
     {
+	if(auto _s = "TypeInfoDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeInfoDeclaration"] = 1; }
         super(dsym.ident);
         this.loc = loc;
         this.dsym = dsym;
@@ -2491,6 +2503,8 @@ extern (C++) final class TypeInfoStructDeclaration : TypeInfoDeclaration
 {
     extern (D) this(Type tinfo)
     {
+	if(auto _s = "TypeInfoClassDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeInfoClassDeclaration"] = 1; }
         super(tinfo);
         if (!Type.typeinfostruct)
         {
@@ -2516,6 +2530,8 @@ extern (C++) final class TypeInfoClassDeclaration : TypeInfoDeclaration
 {
     extern (D) this(Type tinfo)
     {
+	if(auto _s = "TypeInfoInterfaceDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeInfoInterfaceDeclaration"] = 1; }
         super(tinfo);
         if (!Type.typeinfoclass)
         {
@@ -2541,6 +2557,8 @@ extern (C++) final class TypeInfoInterfaceDeclaration : TypeInfoDeclaration
 {
     extern (D) this(Type tinfo)
     {
+	if(auto _s = "TypeInfoPointerDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeInfoPointerDeclaration"] = 1; }
         super(tinfo);
         if (!Type.typeinfointerface)
         {

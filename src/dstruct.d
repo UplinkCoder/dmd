@@ -240,6 +240,8 @@ extern (C++) class StructDeclaration : AggregateDeclaration
 
     final extern (D) this(Loc loc, Identifier id)
     {
+	if(auto _s = "StructDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["StructDeclaration"] = 1; }
         super(loc, id);
         zeroInit = 0; // assume false until we do semantic processing
         ispod = ISPODfwd;
@@ -754,6 +756,8 @@ extern (C++) final class UnionDeclaration : StructDeclaration
 {
     extern (D) this(Loc loc, Identifier id)
     {
+	if(auto _s = "UnionDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["UnionDeclaration"] = 1; }
         super(loc, id);
     }
 

@@ -2485,6 +2485,8 @@ extern (C++) abstract class Expression : RootObject
 
     final extern (D) this(Loc loc, TOK op, int size)
     {
+	if(auto _s = "Expression" in _classStats) { (*_s)++; } 
+	else { _classStats["Expression"] = 1; }
         //printf("Expression::Expression(op = %d) this = %p\n", op, this);
         this.loc = loc;
         this.op = op;
@@ -3424,6 +3426,8 @@ extern (C++) final class IntegerExp : Expression
 
     extern (D) this(Loc loc, dinteger_t value, Type type)
     {
+	if(auto _s = "IntegerExp" in _classStats) { (*_s)++; } 
+	else { _classStats["IntegerExp"] = 1; }
         super(loc, TOKint64, __traits(classInstanceSize, IntegerExp));
         //printf("IntegerExp(value = %lld, type = '%s')\n", value, type ? type->toChars() : "");
         assert(type);
@@ -3597,6 +3601,8 @@ extern (C++) final class ErrorExp : Expression
 {
     extern (D) this()
     {
+	if(auto _s = "ErrorExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ErrorExp"] = 1; }
         super(Loc(), TOKerror, __traits(classInstanceSize, ErrorExp));
         type = Type.terror;
     }
@@ -3622,6 +3628,8 @@ extern (C++) final class RealExp : Expression
 
     extern (D) this(Loc loc, real_t value, Type type)
     {
+	if(auto _s = "RealExp" in _classStats) { (*_s)++; } 
+	else { _classStats["RealExp"] = 1; }
         super(loc, TOKfloat64, __traits(classInstanceSize, RealExp));
         //printf("RealExp::RealExp(%Lg)\n", value);
         this.value = value;
@@ -3696,6 +3704,8 @@ extern (C++) final class ComplexExp : Expression
 
     extern (D) this(Loc loc, complex_t value, Type type)
     {
+	if(auto _s = "ComplexExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ComplexExp"] = 1; }
         super(loc, TOKcomplex80, __traits(classInstanceSize, ComplexExp));
         this.value = value;
         this.type = type;
@@ -3773,6 +3783,8 @@ extern (C++) class IdentifierExp : Expression
 
     final extern (D) this(Loc loc, Identifier ident)
     {
+	if(auto _s = "IdentifierExp" in _classStats) { (*_s)++; } 
+	else { _classStats["IdentifierExp"] = 1; }
         super(loc, TOKidentifier, __traits(classInstanceSize, IdentifierExp));
         this.ident = ident;
     }
@@ -3932,6 +3944,8 @@ extern (C++) final class DollarExp : IdentifierExp
 {
     extern (D) this(Loc loc)
     {
+	if(auto _s = "DsymbolExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DsymbolExp"] = 1; }
         super(loc, Id.dollar);
     }
 
@@ -4171,6 +4185,8 @@ extern (C++) class ThisExp : Expression
 
     final extern (D) this(Loc loc)
     {
+	if(auto _s = "ThisExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ThisExp"] = 1; }
         super(loc, TOKthis, __traits(classInstanceSize, ThisExp));
         //printf("ThisExp::ThisExp() loc = %d\n", loc.linnum);
     }
@@ -4264,6 +4280,8 @@ extern (C++) final class SuperExp : ThisExp
 {
     extern (D) this(Loc loc)
     {
+	if(auto _s = "SuperExp" in _classStats) { (*_s)++; } 
+	else { _classStats["SuperExp"] = 1; }
         super(loc);
         op = TOKsuper;
     }
@@ -4361,6 +4379,8 @@ extern (C++) final class NullExp : Expression
 
     extern (D) this(Loc loc, Type type = null)
     {
+	if(auto _s = "NullExp" in _classStats) { (*_s)++; } 
+	else { _classStats["NullExp"] = 1; }
         super(loc, TOKnull, __traits(classInstanceSize, NullExp));
         this.type = type;
     }
@@ -4431,6 +4451,8 @@ extern (C++) final class StringExp : Expression
 
     extern (D) this(Loc loc, char* string)
     {
+	if(auto _s = "StringExp" in _classStats) { (*_s)++; } 
+	else { _classStats["StringExp"] = 1; }
         super(loc, TOKstring, __traits(classInstanceSize, StringExp));
         this.string = string;
         this.len = strlen(string);
@@ -4870,6 +4892,8 @@ extern (C++) final class TupleExp : Expression
 
     extern (D) this(Loc loc, Expression e0, Expressions* exps)
     {
+	if(auto _s = "TupleExp" in _classStats) { (*_s)++; } 
+	else { _classStats["TupleExp"] = 1; }
         super(loc, TOKtuple, __traits(classInstanceSize, TupleExp));
         //printf("TupleExp(this = %p)\n", this);
         this.e0 = e0;
@@ -5008,6 +5032,8 @@ extern (C++) final class ArrayLiteralExp : Expression
 
     extern (D) this(Loc loc, Expressions* elements)
     {
+	if(auto _s = "ArrayLiteralExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ArrayLiteralExp"] = 1; }
         super(loc, TOKarrayliteral, __traits(classInstanceSize, ArrayLiteralExp));
         this.elements = elements;
     }
@@ -5233,6 +5259,8 @@ extern (C++) final class AssocArrayLiteralExp : Expression
 
     extern (D) this(Loc loc, Expressions* keys, Expressions* values)
     {
+	if(auto _s = "AssocArrayLiteralExp" in _classStats) { (*_s)++; } 
+	else { _classStats["AssocArrayLiteralExp"] = 1; }
         super(loc, TOKassocarrayliteral, __traits(classInstanceSize, AssocArrayLiteralExp));
         assert(keys.dim == values.dim);
         this.keys = keys;
@@ -5364,6 +5392,8 @@ extern (C++) final class StructLiteralExp : Expression
 
     extern (D) this(Loc loc, StructDeclaration sd, Expressions* elements, Type stype = null)
     {
+	if(auto _s = "StructLiteralExp" in _classStats) { (*_s)++; } 
+	else { _classStats["StructLiteralExp"] = 1; }
         super(loc, TOKstructliteral, __traits(classInstanceSize, StructLiteralExp));
         this.sd = sd;
         if (!elements)
@@ -5573,6 +5603,8 @@ extern (C++) final class TypeExp : Expression
 {
     extern (D) this(Loc loc, Type type)
     {
+	if(auto _s = "TypeExp" in _classStats) { (*_s)++; } 
+	else { _classStats["TypeExp"] = 1; }
         super(loc, TOKtype, __traits(classInstanceSize, TypeExp));
         //printf("TypeExp::TypeExp(%s)\n", type->toChars());
         this.type = type;
@@ -5651,6 +5683,8 @@ extern (C++) final class ScopeExp : Expression
 
     extern (D) this(Loc loc, ScopeDsymbol sds)
     {
+	if(auto _s = "ScopeExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ScopeExp"] = 1; }
         super(loc, TOKscope, __traits(classInstanceSize, ScopeExp));
         //printf("ScopeExp::ScopeExp(sds = '%s')\n", sds.toChars());
         //static int count; if (++count == 38) *(char*)0=0;
@@ -5835,6 +5869,8 @@ extern (C++) final class TemplateExp : Expression
 
     extern (D) this(Loc loc, TemplateDeclaration td, FuncDeclaration fd = null)
     {
+	if(auto _s = "NewExp" in _classStats) { (*_s)++; } 
+	else { _classStats["NewExp"] = 1; }
         super(loc, TOKtemplate, __traits(classInstanceSize, TemplateExp));
         //printf("TemplateExp(): %s\n", td->toChars());
         this.td = td;
@@ -6338,6 +6374,8 @@ extern (C++) final class NewAnonClassExp : Expression
 
     extern (D) this(Loc loc, Expression thisexp, Expressions* newargs, ClassDeclaration cd, Expressions* arguments)
     {
+	if(auto _s = "SymbolExp" in _classStats) { (*_s)++; } 
+	else { _classStats["SymbolExp"] = 1; }
         super(loc, TOKnewanonclass, __traits(classInstanceSize, NewAnonClassExp));
         this.thisexp = thisexp;
         this.newargs = newargs;
@@ -6392,6 +6430,8 @@ extern (C++) class SymbolExp : Expression
 
     final extern (D) this(Loc loc, TOK op, int size, Declaration var, bool hasOverloads)
     {
+	if(auto _s = "SymOffExp" in _classStats) { (*_s)++; } 
+	else { _classStats["SymOffExp"] = 1; }
         super(loc, op, size);
         assert(var);
         this.var = var;
@@ -6421,6 +6461,8 @@ extern (C++) final class SymOffExp : SymbolExp
 
     extern (D) this(Loc loc, Declaration var, dinteger_t offset, bool hasOverloads = true)
     {
+	if(auto _s = "VarExp" in _classStats) { (*_s)++; } 
+	else { _classStats["VarExp"] = 1; }
         if (auto v = var.isVarDeclaration())
         {
             // FIXME: This error report will never be handled anyone.
@@ -6621,6 +6663,8 @@ extern (C++) final class OverExp : Expression
 
     extern (D) this(Loc loc, OverloadSet s)
     {
+	if(auto _s = "FuncExp" in _classStats) { (*_s)++; } 
+	else { _classStats["FuncExp"] = 1; }
         super(loc, TOKoverloadset, __traits(classInstanceSize, OverExp));
         //printf("OverExp(this = %p, '%s')\n", this, var->toChars());
         vars = s;
@@ -7104,6 +7148,8 @@ extern (C++) final class DeclarationExp : Expression
 
     extern (D) this(Loc loc, Dsymbol declaration)
     {
+	if(auto _s = "DeclarationExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DeclarationExp"] = 1; }
         super(loc, TOKdeclaration, __traits(classInstanceSize, DeclarationExp));
         this.declaration = declaration;
     }
@@ -7323,6 +7369,8 @@ extern (C++) final class TraitsExp : Expression
 
     extern (D) this(Loc loc, Identifier ident, Objects* args)
     {
+	if(auto _s = "IsExp" in _classStats) { (*_s)++; } 
+	else { _classStats["IsExp"] = 1; }
         super(loc, TOKtraits, __traits(classInstanceSize, TraitsExp));
         this.ident = ident;
         this.args = args;
@@ -7727,6 +7775,8 @@ extern (C++) class UnaExp : Expression
 
     final extern (D) this(Loc loc, TOK op, int size, Expression e1)
     {
+	if(auto _s = "BinExp" in _classStats) { (*_s)++; } 
+	else { _classStats["BinExp"] = 1; }
         super(loc, op, size);
         this.e1 = e1;
     }
@@ -8114,6 +8164,8 @@ extern (C++) class BinAssignExp : BinExp
 {
     final extern (D) this(Loc loc, TOK op, int size, Expression e1, Expression e2)
     {
+	if(auto _s = "BinAssignExp" in _classStats) { (*_s)++; } 
+	else { _classStats["BinAssignExp"] = 1; }
         super(loc, op, size, e1, e2);
     }
 
@@ -8236,6 +8288,8 @@ extern (C++) final class CompileExp : UnaExp
 {
     extern (D) this(Loc loc, Expression e)
     {
+	if(auto _s = "ImportExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ImportExp"] = 1; }
         super(loc, TOKmixin, __traits(classInstanceSize, CompileExp), e);
     }
 
@@ -8283,6 +8337,8 @@ extern (C++) final class ImportExp : UnaExp
 {
     extern (D) this(Loc loc, Expression e)
     {
+	if(auto _s = "AssertExp" in _classStats) { (*_s)++; } 
+	else { _classStats["AssertExp"] = 1; }
         super(loc, TOKimport, __traits(classInstanceSize, ImportExp), e);
     }
 
@@ -8369,6 +8425,8 @@ extern (C++) final class AssertExp : UnaExp
 
     extern (D) this(Loc loc, Expression e, Expression msg = null)
     {
+	if(auto _s = "DotIdExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DotIdExp"] = 1; }
         super(loc, TOKassert, __traits(classInstanceSize, AssertExp), e);
         this.msg = msg;
     }
@@ -8890,6 +8948,8 @@ extern (C++) final class DotTemplateExp : UnaExp
 
     extern (D) this(Loc loc, Expression e, TemplateDeclaration td)
     {
+	if(auto _s = "DotVarExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DotVarExp"] = 1; }
         super(loc, TOKdottd, __traits(classInstanceSize, DotTemplateExp), e);
         this.td = td;
     }
@@ -9115,6 +9175,8 @@ extern (C++) final class DotTemplateInstanceExp : UnaExp
 
     extern (D) this(Loc loc, Expression e, Identifier name, Objects* tiargs)
     {
+	if(auto _s = "DotTemplateInstanceExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DotTemplateInstanceExp"] = 1; }
         super(loc, TOKdotti, __traits(classInstanceSize, DotTemplateInstanceExp), e);
         //printf("DotTemplateInstanceExp()\n");
         this.ti = new TemplateInstance(loc, name, tiargs);
@@ -9382,6 +9444,8 @@ extern (C++) final class DelegateExp : UnaExp
 
     extern (D) this(Loc loc, Expression e, FuncDeclaration f, bool hasOverloads = true)
     {
+	if(auto _s = "CallExp" in _classStats) { (*_s)++; } 
+	else { _classStats["CallExp"] = 1; }
         super(loc, TOKdelegate, __traits(classInstanceSize, DelegateExp), e);
         this.func = f;
         this.hasOverloads = hasOverloads;
@@ -10495,6 +10559,8 @@ extern (C++) final class AddrExp : UnaExp
 {
     extern (D) this(Loc loc, Expression e)
     {
+	if(auto _s = "AddrExp" in _classStats) { (*_s)++; } 
+	else { _classStats["AddrExp"] = 1; }
         super(loc, TOKaddress, __traits(classInstanceSize, AddrExp), e);
     }
 
@@ -10763,6 +10829,8 @@ extern (C++) final class PtrExp : UnaExp
 {
     extern (D) this(Loc loc, Expression e)
     {
+	if(auto _s = "NegExp" in _classStats) { (*_s)++; } 
+	else { _classStats["NegExp"] = 1; }
         super(loc, TOKstar, __traits(classInstanceSize, PtrExp), e);
         //if (e->type)
         //  type = ((TypePointer *)e->type)->next;
@@ -10770,6 +10838,8 @@ extern (C++) final class PtrExp : UnaExp
 
     extern (D) this(Loc loc, Expression e, Type t)
     {
+	if(auto _s = "UAddExp" in _classStats) { (*_s)++; } 
+	else { _classStats["UAddExp"] = 1; }
         super(loc, TOKstar, __traits(classInstanceSize, PtrExp), e);
         type = t;
     }
@@ -10858,6 +10928,8 @@ extern (C++) final class NegExp : UnaExp
 {
     extern (D) this(Loc loc, Expression e)
     {
+	if(auto _s = "NotExp" in _classStats) { (*_s)++; } 
+	else { _classStats["NotExp"] = 1; }
         super(loc, TOKneg, __traits(classInstanceSize, NegExp), e);
     }
 
@@ -10906,6 +10978,8 @@ extern (C++) final class UAddExp : UnaExp
 {
     extern (D) this(Loc loc, Expression e)
     {
+	if(auto _s = "DeleteExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DeleteExp"] = 1; }
         super(loc, TOKuadd, __traits(classInstanceSize, UAddExp), e);
     }
 
@@ -11181,6 +11255,8 @@ extern (C++) final class CastExp : UnaExp
      */
     extern (D) this(Loc loc, Expression e, ubyte mod)
     {
+	if(auto _s = "VectorExp" in _classStats) { (*_s)++; } 
+	else { _classStats["VectorExp"] = 1; }
         super(loc, TOKcast, __traits(classInstanceSize, CastExp), e);
         this.mod = mod;
     }
@@ -11318,6 +11394,8 @@ extern (C++) final class VectorExp : UnaExp
 
     extern (D) this(Loc loc, Expression e, Type t)
     {
+	if(auto _s = "SliceExp" in _classStats) { (*_s)++; } 
+	else { _classStats["SliceExp"] = 1; }
         super(loc, TOKvector, __traits(classInstanceSize, VectorExp), e);
         assert(t.ty == Tvector);
         to = cast(TypeVector)t;
@@ -11691,6 +11769,8 @@ extern (C++) final class ArrayLengthExp : UnaExp
 {
     extern (D) this(Loc loc, Expression e1)
     {
+	if(auto _s = "DotExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DotExp"] = 1; }
         super(loc, TOKarraylength, __traits(classInstanceSize, ArrayLengthExp), e1);
     }
 
@@ -11764,6 +11844,8 @@ extern (C++) final class ArrayExp : UnaExp
 
     extern (D) this(Loc loc, Expression e1, Expression index = null)
     {
+	if(auto _s = "CommaExp" in _classStats) { (*_s)++; } 
+	else { _classStats["CommaExp"] = 1; }
         super(loc, TOKarray, __traits(classInstanceSize, ArrayExp), e1);
         arguments = new Expressions();
         if (index)
@@ -11880,6 +11962,8 @@ extern (C++) final class CommaExp : BinExp
 
     extern (D) this(Loc loc, Expression e1, Expression e2, bool generated = true)
     {
+	if(auto _s = "IntervalExp" in _classStats) { (*_s)++; } 
+	else { _classStats["IntervalExp"] = 1; }
         super(loc, TOKcomma, __traits(classInstanceSize, CommaExp), e1, e2);
         allowCommaExp = isGenerated = generated;
     }
@@ -11987,6 +12071,8 @@ extern (C++) final class IntervalExp : Expression
 
     extern (D) this(Loc loc, Expression lwr, Expression upr)
     {
+	if(auto _s = "IndexExp" in _classStats) { (*_s)++; } 
+	else { _classStats["IndexExp"] = 1; }
         super(loc, TOKinterval, __traits(classInstanceSize, IntervalExp));
         this.lwr = lwr;
         this.upr = upr;
@@ -12421,6 +12507,8 @@ extern (C++) final class PostExp : BinExp
 {
     extern (D) this(TOK op, Loc loc, Expression e)
     {
+	if(auto _s = "AssignExp" in _classStats) { (*_s)++; } 
+	else { _classStats["AssignExp"] = 1; }
         super(loc, op, __traits(classInstanceSize, PostExp), e, new IntegerExp(loc, 1, Type.tint32));
     }
 
@@ -13558,6 +13646,8 @@ extern (C++) final class ConstructExp : AssignExp
     // will become a reference initialization automatically.
     extern (D) this(Loc loc, VarDeclaration v, Expression e2)
     {
+	if(auto _s = "PowAssignExp" in _classStats) { (*_s)++; } 
+	else { _classStats["PowAssignExp"] = 1; }
         auto ve = new VarExp(loc, v);
         assert(v.type && ve.type);
 
@@ -13715,6 +13805,8 @@ extern (C++) final class XorAssignExp : BinAssignExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "CatAssignExp" in _classStats) { (*_s)++; } 
+	else { _classStats["CatAssignExp"] = 1; }
         super(loc, TOKxorass, __traits(classInstanceSize, XorAssignExp), e1, e2);
     }
 
@@ -13817,6 +13909,8 @@ extern (C++) final class ShlAssignExp : BinAssignExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "AddExp" in _classStats) { (*_s)++; } 
+	else { _classStats["AddExp"] = 1; }
         super(loc, TOKshlass, __traits(classInstanceSize, ShlAssignExp), e1, e2);
     }
 
@@ -13953,6 +14047,8 @@ extern (C++) final class AddExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "MinExp" in _classStats) { (*_s)++; } 
+	else { _classStats["MinExp"] = 1; }
         super(loc, TOKadd, __traits(classInstanceSize, AddExp), e1, e2);
     }
 
@@ -14053,6 +14149,8 @@ extern (C++) final class MinExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "CatExp" in _classStats) { (*_s)++; } 
+	else { _classStats["CatExp"] = 1; }
         super(loc, TOKmin, __traits(classInstanceSize, MinExp), e1, e2);
     }
 
@@ -14385,6 +14483,8 @@ extern (C++) final class MulExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "DivExp" in _classStats) { (*_s)++; } 
+	else { _classStats["DivExp"] = 1; }
         super(loc, TOKmul, __traits(classInstanceSize, MulExp), e1, e2);
     }
 
@@ -14490,6 +14590,8 @@ extern (C++) final class DivExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "PowExp" in _classStats) { (*_s)++; } 
+	else { _classStats["PowExp"] = 1; }
         super(loc, TOKdiv, __traits(classInstanceSize, DivExp), e1, e2);
     }
 
@@ -14650,6 +14752,8 @@ extern (C++) final class PowExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "ShrExp" in _classStats) { (*_s)++; } 
+	else { _classStats["ShrExp"] = 1; }
         super(loc, TOKpow, __traits(classInstanceSize, PowExp), e1, e2);
     }
 
@@ -14777,6 +14881,8 @@ extern (C++) final class ShlExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "OrExp" in _classStats) { (*_s)++; } 
+	else { _classStats["OrExp"] = 1; }
         super(loc, TOKshl, __traits(classInstanceSize, ShlExp), e1, e2);
     }
 
@@ -14817,6 +14923,8 @@ extern (C++) final class ShrExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "XorExp" in _classStats) { (*_s)++; } 
+	else { _classStats["XorExp"] = 1; }
         super(loc, TOKshr, __traits(classInstanceSize, ShrExp), e1, e2);
     }
 
@@ -14856,6 +14964,8 @@ extern (C++) final class UshrExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "OrOrExp" in _classStats) { (*_s)++; } 
+	else { _classStats["OrOrExp"] = 1; }
         super(loc, TOKushr, __traits(classInstanceSize, UshrExp), e1, e2);
     }
 
@@ -14948,6 +15058,8 @@ extern (C++) final class OrExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "AndAndExp" in _classStats) { (*_s)++; } 
+	else { _classStats["AndAndExp"] = 1; }
         super(loc, TOKor, __traits(classInstanceSize, OrExp), e1, e2);
     }
 
@@ -15000,6 +15112,8 @@ extern (C++) final class XorExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "CmpExp" in _classStats) { (*_s)++; } 
+	else { _classStats["CmpExp"] = 1; }
         super(loc, TOKxor, __traits(classInstanceSize, XorExp), e1, e2);
     }
 
@@ -15385,6 +15499,8 @@ extern (C++) final class InExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "IdentityExp" in _classStats) { (*_s)++; } 
+	else { _classStats["IdentityExp"] = 1; }
         super(loc, TOKin, __traits(classInstanceSize, InExp), e1, e2);
     }
 
@@ -15440,6 +15556,8 @@ extern (C++) final class RemoveExp : BinExp
 {
     extern (D) this(Loc loc, Expression e1, Expression e2)
     {
+	if(auto _s = "CondExp" in _classStats) { (*_s)++; } 
+	else { _classStats["CondExp"] = 1; }
         super(loc, TOKremove, __traits(classInstanceSize, RemoveExp), e1, e2);
         type = Type.tbool;
     }
@@ -15781,6 +15899,8 @@ extern (C++) final class CondExp : BinExp
 
             extern (D) this(Scope* sc, CondExp ce)
             {
+	if(auto _s = "FuncInitExp" in _classStats) { (*_s)++; } 
+	else { _classStats["FuncInitExp"] = 1; }
                 this.sc = sc;
                 this.ce = ce;
             }

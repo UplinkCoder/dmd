@@ -229,6 +229,8 @@ extern (C++) class ClassDeclaration : AggregateDeclaration
 
     final extern (D) this(Loc loc, Identifier id, BaseClasses* baseclasses, Dsymbols* members, bool inObject)
     {
+	if(auto _s = "ClassDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["ClassDeclaration"] = 1; }
         if (!id)
             id = Identifier.generateId("__anonclass");
         assert(id);
@@ -1512,6 +1514,8 @@ extern (C++) final class InterfaceDeclaration : ClassDeclaration
 {
     extern (D) this(Loc loc, Identifier id, BaseClasses* baseclasses)
     {
+	if(auto _s = "InterfaceDeclaration" in _classStats) { (*_s)++; } 
+	else { _classStats["InterfaceDeclaration"] = 1; }
         super(loc, id, baseclasses, null, false);
         if (id == Id.IUnknown) // IUnknown is the root of all COM interfaces
         {

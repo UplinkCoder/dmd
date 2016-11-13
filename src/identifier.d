@@ -34,6 +34,8 @@ public:
 
     extern (D) this(const(char)* string, size_t length, int value)
     {
+	if(auto _s = "Identifier" in _classStats) { (*_s)++; } 
+	else { _classStats["Identifier"] = 1; }
         //printf("Identifier('%s', %d)\n", string, value);
         this.string = string;
         this.value = value;
