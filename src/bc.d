@@ -1727,8 +1727,9 @@ BCValue interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     BCValue retval = BCValue(Imm32((*rhs) & uint.max));
                     retval.vType = BCValueType.Error;
-                    static if (is(RetainedError))
-                    {
+
+                    static if (is(RetainedError)) {
+                    if (*rhs-1 < ubyte.sizeof*4) {
                         auto err = errors[cast(uint)(*rhs - 1)];
                         if (err.v1.vType != BCValueType.Immediate)
                         {
@@ -1747,8 +1748,10 @@ BCValue interpret_(const int[] byteCode, const BCValue[] args,
                         {
                             *ev2 = err.v2;
                         }
+                        }
                     }
                     return retval;
+                    
                 }
             }
             break;
@@ -1758,9 +1761,8 @@ BCValue interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     BCValue retval = BCValue(Imm32((*rhs) & uint.max));
                     retval.vType = BCValueType.Error;
-                    static if (is(RetainedError))
-                    {
-
+                    static if (is(RetainedError)) {
+                        if (*rhs-1 < ubyte.sizeof*4) {
                         auto err = errors[cast(uint)(*rhs - 1)];
                         if (err.v1.vType != BCValueType.Immediate)
                         {
@@ -1778,6 +1780,7 @@ BCValue interpret_(const int[] byteCode, const BCValue[] args,
                         else
                         {
                             *ev2 = err.v2;
+                            }
                         }
                     }
                     return retval;
