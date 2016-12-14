@@ -115,8 +115,8 @@ struct BlackList
 
     void defaultBlackList()
     {
-        initialize([ /*"_ArrayEq",*/ "isRooted", "__lambda2", "isSameLength", "bug4910",
-            "wrapperParameters", "defaultMatrix", "extSeparatorPos", "args",
+        initialize([/*"_ArrayEq",*/ "isRooted", "__lambda2", "isSameLength",
+            "bug4910", "wrapperParameters", "defaultMatrix", "extSeparatorPos", "args",
             "check", "hashOf", "allAreAcceptedUnits"]);
     }
 
@@ -818,7 +818,6 @@ Expression toExpression(const BCValue value, Type expressionType,
 
         auto err = _sharedCtfeState.errors[value.imm32 - 1];
         import ddmd.errors;
-
         uint e1;
         uint e2;
 
@@ -884,7 +883,9 @@ Expression toExpression(const BCValue value, Type expressionType,
                 auto type = sd.fields[idx].type;
 
                 Expression elm = toExpression(
-                    imm32(*(heapPtr._heap.ptr + value.heapAddr.addr + offset)), type);
+                    imm32(*(heapPtr._heap.ptr + value.heapAddr.addr + offset)),
+                    type);
+
                 elmExprs.insert(idx, elm);
                 offset += align4(_sharedCtfeState.size(member));
             }
@@ -928,7 +929,8 @@ Expression toExpression(const BCValue value, Type expressionType,
             foreach (idx; 0 .. arrayLength)
             {
                 elmExprs.insert(idx,
-                    toExpression(imm32(*(heapPtr._heap.ptr + value.heapAddr.addr + offset)),
+                    toExpression(
+                    imm32(*(heapPtr._heap.ptr + value.heapAddr.addr + offset)),
                     tda.nextOf));
                 offset += elmLength;
             }
@@ -1606,10 +1608,11 @@ public:
             {
                 auto lhs = genExpr(e.e1);
                 auto rhs = genExpr(e.e2);
-                if (lhs.type.type != BCTypeEnum.Slice || rhs.type.type != BCTypeEnum.Slice)
+                if(lhs.type.type != BCTypeEnum.Slice ||
+                rhs.type.type != BCTypeEnum.Slice)
                 {
                     bailout();
-                    return;
+                    return ;
                 }
                 auto lhsBaseType = _sharedCtfeState.slices[lhs.type.typeIndex - 1].elementType;
                 auto rhsBaseType = _sharedCtfeState.slices[rhs.type.typeIndex - 1].elementType;
@@ -2414,13 +2417,13 @@ public:
             auto length = target ? target.i32 : genTemporary(BCType(BCTypeEnum.i32));
             if (arr.type.type == BCTypeEnum.Array)
             {
-                auto idx = arr.type.typeIndex;
-                assert(idx);
-                length = imm32(_sharedCtfeState.arrays[idx - 1].length);
+              auto idx = arr.type.typeIndex;
+              assert(idx);
+              length = imm32(_sharedCtfeState.arrays[idx - 1].length);
             }
             else
             {
-                Load32(length, arr.i32);
+              Load32(length, arr.i32);
             }
             return length;
         }
@@ -2577,11 +2580,11 @@ public:
 
             if (type.type == BCTypeEnum.Array)
             {
-                auto idx = type.typeIndex;
-                assert(idx);
-                auto array = _sharedCtfeState.arrays[idx - 1];
-                Alloc(var.i32, imm32(_sharedCtfeState.size(type) + 4));
-                Store32(var.i32, array.length.imm32);
+               auto idx = type.typeIndex;
+               assert(idx);
+               auto array = _sharedCtfeState.arrays[idx - 1];
+               Alloc(var.i32, imm32(_sharedCtfeState.size(type) + 4));
+               Store32(var.i32, array.length.imm32);
             }
         }
 
@@ -3589,7 +3592,6 @@ public:
     override void visit(CallExp ce)
     {
         bailout();
-
         FuncDeclaration fd;
         BCValue[] bc_args;
         bc_args.length = ce.arguments.dim;
@@ -3603,11 +3605,16 @@ public:
             bailout();
             return;
         }
+        if(!fd, "Could not get funcDecl")
+        {
+          bailout();
+          return;
+        }
         if (!fd.functionSemantic3())
         {
-            bailout();
-            return;
-            //		assert(0, "could not interpret " ~ ce.toString);
+           bailout();
+           return ;
+	//		assert(0, "could not interpret " ~ ce.toString);
             // return cantInterpret();
         }
 
