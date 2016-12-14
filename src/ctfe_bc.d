@@ -143,7 +143,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression th
 
 import ddmd.ctfe.bc_common;
 
-enum perf = 1;
+enum perf = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -227,9 +227,13 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
                 bc_args[i] = arg_bcv.genExpr(arg);
             }
             arg_bcv.endArguments();
-
+            BCValue[2] errorValues;
             auto retval = interpret_(fn.byteCode, bc_args,
-                &_sharedCtfeState.heap, _sharedCtfeState.functions.ptr);
+                &_sharedCtfeState.heap, _sharedCtfeState.functions.ptr,
+                &errorValues[0], &errorValues[1],
+                &_sharedCtfeState.errors[0], &executionCounters[0]);
+            if (executionCounterCount)
+                writeln("executionCounters : \n", executionCounters[0 .. executionCounterCount]);
             static if (perf)
             {
                 isw.stop();
@@ -366,6 +370,9 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
                 &_sharedCtfeState.heap, &_sharedCtfeState.functions[0],
                 &errorValues[0], &errorValues[1],
                 &_sharedCtfeState.errors[0], &executionCounters[0], _sharedCtfeState.stack[]);
+            if (executionCounterCount)
+                writeln("executionCounters : \n", executionCounters[0 .. executionCounterCount]);
+
         }
         sw.stop();
         import std.stdio;
@@ -1219,7 +1226,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             }
     }
 
-    uint addExecutionCounter()
+    ushort addExecutionCounter()
     {
         IncrementCounter(imm32(executionCounterCount));
         return executionCounterCount++;
@@ -3295,16 +3302,16 @@ public:
     {
         SwitchStatement ss;
 
-        uint switchCounter;
-        uint defaultCaseCounter;
-        uint caseCounterCount;
+        ushort switchCounter;
+        ushort defaultCaseCounter;
+        ushort caseCounterCount;
         ushort[255] caseEvalCounters = void;
         ushort[255] caseTakenCounters = void;
 
-        void addCase(uint evalCounter, uint takenCounter)
+        void addCase(ushort evalCounter, ushort takenCounter)
         {
-            caseEvalCounters[caseCounterCount] = cast(ushort) evalCounter;
-            caseTakenCounters[caseCounterCount++] = cast(ushort) takenCounter;
+            caseEvalCounters[caseCounterCount] = evalCounter;
+            caseTakenCounters[caseCounterCount++] = takenCounter;
         }
     }
 
@@ -3365,9 +3372,9 @@ public:
 
                 auto rhs = genExpr(caseStmt.exp);
                 Eq3(BCValue.init, lhs, rhs);
-                uint caseEvalCounter = addExecutionCounter();
+                auto caseEvalCounter = addExecutionCounter();
                 auto jump = beginCndJmp();
-                uint caseTakenCounter = addExecutionCounter();
+                auto caseTakenCounter = addExecutionCounter();
                 if (caseStmt.statement)
                 {
                     import ddmd.statement : BE;
