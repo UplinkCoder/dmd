@@ -128,6 +128,7 @@ enum LongInst : ushort
     Alloc, /// SP[hi & 0xFFFF] = heapSize; heapSize += SP[hi >> 16]
 
     BuiltinCall, // call a builtin.
+    IncrementCounter,
 
 }
 //Imm-Intructuins and corrospinding 2Operand instructions have to be in the same order
@@ -725,8 +726,8 @@ struct BCGen
         {
             Set(result, lhs);
         }
-        emitArithInstruction(LongInst.And, result, rhs);
 
+        emitArithInstruction(LongInst.And, result, rhs);
     }
 
     void Or3(BCValue result, BCValue lhs, BCValue rhs)
@@ -1021,6 +1022,14 @@ struct BCGen
             }
             endCndJmp(cndJmp, genLabel());
         }
+    }
+
+    void IncrementCounter(BCValue counter)
+    {
+        assert(counter.vType == BCValueType.Immediate && counter.type.type == BCTypeEnum.i32);
+        byteCodeArray[ip] = LongInst.IncrementCounter;
+        byteCodeArray[ip + 1] = counter.imm32;
+        ip += 2;
     }
 
 }
@@ -1379,6 +1388,11 @@ string printInstructions(const int* startInstructions, uint length) pure
                 result ~= "Alloc SP[" ~ to!string(hi & 0xFFFF) ~ "] SP[" ~ to!string(hi >> 16) ~ "]\n";
             }
             break;
+        case LongInst.IncrementCounter:
+            {
+                result ~= "IncrementCounter #" ~ to!string(hi) ~ "]\n";
+            }
+            break;
         }
     }
     return result ~ "\n EndInstructionDump";
@@ -1409,7 +1423,8 @@ BCValue interpret(const BCGen* gen, const BCValue[] args,
 BCValue interpret_(const int[] byteCode, const BCValue[] args,
     BCHeap* heapPtr = null, const BCFunction* functions = null,
     BCValue* ev1 = null, BCValue* ev2 = null, const RE* errors = null,
-    long[] stackPtr = null, uint stackOffset = 0) pure @trusted
+    uint* executionCounters = null, long[] stackPtr = null,
+    uint stackOffset = 0) pure @trusted
 {
     import std.conv;
     import std.stdio;
@@ -2078,6 +2093,15 @@ BCValue interpret_(const int[] byteCode, const BCValue[] args,
                 else
                 {
                     assert(0, "HEAP OVERFLOW!");
+                }
+            }
+            break;
+        case LongInst.IncrementCounter:
+            {
+                assert(hi < 1024, "counterCount execeeded");
+                if (executionCounters)
+                {
+                    executionCounters[hi]++;
                 }
             }
             break;
