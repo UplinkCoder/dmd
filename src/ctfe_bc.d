@@ -178,6 +178,9 @@ __gshared SharedCtfeState!BCGenT _sharedCtfeState;
 __gshared SharedCtfeState!BCGenT* sharedCtfeState = &_sharedCtfeState;
 __gshared BlackList _blacklist;
 
+__gshared uint[1024] executionCounters;
+__gshared ushort executionCounterCount;
+
 ulong evaluateUlong(Expression e)
 {
     return e.toUInteger;
@@ -361,7 +364,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
             auto retval = interpret_(bcv.byteCodeArray[0 .. bcv.ip], bc_args,
                 &_sharedCtfeState.heap, &_sharedCtfeState.functions[0],
                 &errorValues[0], &errorValues[1],
-                &_sharedCtfeState.errors[0], _sharedCtfeState.stack[]);
+                &_sharedCtfeState.errors[0], &executionCounters[0], _sharedCtfeState.stack[]);
         }
         sw.stop();
         import std.stdio;
@@ -1212,6 +1215,12 @@ extern (C++) final class BCV(BCGenT) : Visitor
             {
                 _sharedCtfeState.functions[fi - 1] = BCFunction(null);
             }
+    }
+
+    uint addExecutionCounter()
+    {
+        IncrementCounter(imm32(executionCounterCount));
+        return executionCounterCount++;
     }
 
 public:

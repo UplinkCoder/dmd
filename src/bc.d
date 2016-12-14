@@ -1416,7 +1416,7 @@ BCValue interpret(const BCGen* gen, const BCValue[] args,
     BCFunction* functions = null, BCHeap* heapPtr = null, BCValue* ev1 = null,
     BCValue* ev2 = null, const RE* errors = null) pure @safe
 {
-    return interpret_(gen.byteCodeArray[0 .. gen.ip], args, heapPtr, functions, ev2,
+    return interpret_(gen.byteCodeArray[0 .. gen.ip], args, heapPtr, functions, ev1,
         ev2, errors);
 }
 
@@ -2079,7 +2079,7 @@ BCValue interpret_(const int[] byteCode, const BCValue[] args,
                     continue;
                 }
                 returnValue = interpret_((functions + opRefOffset).byteCode,
-                    args, heapPtr, functions, ev1, ev2, errors, stack, stackOffsetCall);
+                    args, heapPtr, functions, ev1, ev2, errors, executionCounters, stack, stackOffsetCall);
 
             }
             break;
