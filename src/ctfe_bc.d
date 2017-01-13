@@ -252,7 +252,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         }
     }
 
-    //writeln("Evaluating function: ", fd.toString);
+    writeln("Evaluating function: ", fd.toString);
     import ddmd.identifier;
     import std.datetime : StopWatch;
 
@@ -1353,7 +1353,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         }
     }
 
-    extern (D) void bailout(const(char)[] message)
+    extern (D) void bailout(const(char)[] message, size_t line = __LINE__)
     {
         IGaveUp = true;
         const fnIdx = _sharedCtfeState.getFunctionIndex(me);
@@ -1371,7 +1371,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             import std.stdio;
 
             static if (bailoutMessages)
-                writeln("bailout: ", message);
+                writeln("bailout (%d): %s", line, message);
         }
     }
 
@@ -4178,7 +4178,7 @@ static if (is(BCGen))
                 }
                 else
                 {
-                    bailout("Encounterd null Statement");
+                    //bailout("Encounterd null Statement");
                     return;
                 }
             }
