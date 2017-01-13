@@ -3471,7 +3471,7 @@ static if (is(BCGen))
 
     override void visit(NegExp ne)
     {
-        bailout("NegExp (unary minus) expression not supported right now");
+        Sub3(retval, imm32(0), genExpr(ne.e1));
     }
 
     override void visit(NotExp ne)
