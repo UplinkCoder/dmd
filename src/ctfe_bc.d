@@ -1371,7 +1371,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             import std.stdio;
 
             static if (bailoutMessages)
-                writeln("bailout (%d): %s", line, message);
+                writefln("bailout (%d): %s", line, message);
         }
     }
 
