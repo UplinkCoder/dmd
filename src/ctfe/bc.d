@@ -87,11 +87,11 @@ enum LongInst : ushort
     Sub,
     Div,
     Mul,
-    Eq, //sets condflags
-    Neq, //sets condflag
-    Lt, //sets condflags
+    Eq,
+    Neq,
+    Lt,
     Le,
-    Gt, //sets condflags
+    Gt,
     Ge,
     Set,
     And,
