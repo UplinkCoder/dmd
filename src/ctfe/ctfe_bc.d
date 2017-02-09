@@ -1310,10 +1310,10 @@ extern (C++) final class BCTypeVisitor : Visitor
         case ENUMTY.Tchar:
             return BCType(BCTypeEnum.c8);
         case ENUMTY.Twchar:
-            //return BCType(BCTypeEnum.c16);
+            return BCType(BCTypeEnum.c16);
         case ENUMTY.Tdchar:
-            //return BCType(BCTypeEnum.c32);
-            return BCType(BCTypeEnum.Char);
+            return BCType(BCTypeEnum.c32);
+        case ENUMTY.Tint8:
         case ENUMTY.Tuns8:
             //return BCType(BCTypeEnum.u8);
         case ENUMTY.Tint8:
@@ -2019,9 +2019,9 @@ public:
                 return ;
             }
 
-            if (fd.hasNestedFrameRefs /*|| fd.isNested*/)
+            if (fd.hasNestedFrameRefs)
             {
-                bailout("cannot deal with closures of any kind: " ~ fd.toString);
+                bailout("cannot deal with closures: " ~ fd.toString);
                 return ;
             }
 
@@ -2257,6 +2257,10 @@ static if (is(BCGen))
                     //static assert(0, "No functions for old man");
                 }
             }
+        }
+        else
+        {
+            assert(0, "function body is not a compundStatement ???" ~ fd.toString);
         }
     }
 
@@ -3864,20 +3868,12 @@ static if (is(BCGen))
             break;
         case TOK.TOKshrass:
             {
-                static if (is(BCGen))
-                    if (lhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.i32)
-                        bailout("BCGen does not suppport 32bit bit-operations");
-
                 Rsh3(lhs, lhs, rhs);
                 retval = lhs;
             }
             break;
         case TOK.TOKshlass:
             {
-                static if (is(BCGen))
-                    if (lhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.i32)
-                        bailout("BCGen does not suppport 32bit bit-operations");
-
                 Lsh3(lhs, lhs, rhs);
                 retval = lhs;
             }
