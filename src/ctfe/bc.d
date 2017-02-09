@@ -145,11 +145,7 @@ pragma(msg, 2 ^^ 6 - LongInst.max, " opcodes remaining");
 static assert(LongInst.ImmAdd - LongInst.Add == LongInst.ImmRsh - LongInst.Rsh);
 static assert(LongInst.ImmAnd - LongInst.And == LongInst.ImmMod - LongInst.Mod);
 
-enum IndirectionFlagMask = ubyte(0x40); // check 7th bit
-
 enum InstMask = ubyte(0x3F); // mask for bit 0-5
-//enum CondFlagMask = ~ushort(0x2FF); // mask for 8-10th bit
-enum CondFlagMask = 0b11_0000_0000;
 
 /** 2StackInst Layout :
 * [0-6] Instruction

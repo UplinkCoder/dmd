@@ -1814,13 +1814,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
 public:
 
-/*    this(FuncDeclaration fd, Expression _this)
-    {
-        me = fd;
-        if (_this)
-            this._this = _this;
-    }
-*/
+
     void beginParameters()
     {
         processingParameters = true;
