@@ -155,25 +155,6 @@ struct BlackList
 
 }
 
-Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression thisExp)
-{
-    Expression[] _args;
-    if (thisExp)
-    {
-        debug (ctfe)
-            assert(0, "Implicit State via _this_ is not supported right now");
-        return null;
-    }
-
-    if (args)
-        foreach (a; *args)
-        {
-            _args ~= a;
-        }
-
-    return evaluateFunction(fd, _args ? _args : [], thisExp);
-}
-
 import ddmd.ctfe.bc_common;
 
 
@@ -219,7 +200,7 @@ ulong evaluateUlong(Expression e)
     return e.toUInteger;
 }
 
-Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _this = null)
+Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression _this = null)
 {
     _blacklist.defaultBlackList();
     import std.stdio;
@@ -261,7 +242,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
     // hence if visit another function before we bugun this one we are executing the
     // argument instead of the 'main' function
 
-    foreach(arg;args)
+    foreach(arg;*args)
     {
         if (arg.type.ty == Tfunction)
         { //TODO we need to fix this!
@@ -331,9 +312,9 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         sw.start();
         bcv.beginArguments();
         BCValue[] bc_args;
-        bc_args.length = args.length;
+        bc_args.length = args.dim;
         bcv.beginArguments();
-        foreach (i, arg; args)
+        foreach (i, arg; *args)
         {
             bc_args[i] = bcv.genExpr(arg);
             if (bcv.IGaveUp)
@@ -2553,7 +2534,6 @@ static if (is(BCGen))
                 }
                 discardValue = oldDiscardValue;
             }
-
             else
             {
                 bailout("Only binary operations on i32s are supported lhs: " ~ lhs.type.type.to!string ~ " rhs: " ~ rhs.type.type.to!string ~ " retval.type: " ~ to!string(retval.type.type) ~  " -- " ~ e.toString);
@@ -3941,7 +3921,7 @@ static if (is(BCGen))
             bailout("We don't support IntegerExpressions with non-integer types: " ~ to!string(bct.type));
         }
 
-        // HACK regardless of the literal type we register it as 32bit if it's smaller then int.max;
+        // HACK regardless of the literal type we register it as 32bit if it's smaller then uint.max;
         if (ie.value > uint.max)
         {
             retval = BCValue(Imm64(ie.value));
@@ -3950,8 +3930,7 @@ static if (is(BCGen))
         {
             retval = imm32(cast(uint) ie.value);
         }
-        //auto value = evaluateUlong(ie);
-        //retval = value <= int.max ? imm32(cast(uint) value) : BCValue(Imm64(value));
+
         assert(retval.vType == BCValueType.Immediate);
     }
 
