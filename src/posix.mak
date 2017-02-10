@@ -224,7 +224,7 @@ endif
 
 FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argtypes arrayop	\
 	arraytypes astcodegen astnull attrib builtin canthrow clone complex cond constfold		\
-	ctfe/bc ctfe/bc_common ctfe/bc_macro ctfe/bc_printer_backend ctfe/bc_c_backend ctfe/ctfe_bc ctfe/bc_test ctfe/bc_limits	\
+	ctfe/bc ctfe/bc_common ctfe/bc_macro ctfe/bc_llvm_backend ctfe/bc_printer_backend ctfe/bc_c_backend ctfe/ctfe_bc ctfe/bc_test ctfe/bc_limits	\
 	cppmangle ctfeexpr dcast dclass declaration delegatize denum dimport	\
 	dinifile dinterpret dmacro dmangle dmodule doc dscope dstruct dsymbol	\
 	dtemplate dversion escape expression func			\
@@ -371,9 +371,8 @@ $G/dmd: $(DMD_SRCS) $(ROOT_SRCS) $G/newdelete.o $G/lexer.a $(G_GLUE_OBJS) $(G_OB
 	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -vtls -J$G -J../res -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
 else
 $G/dmd: $(DMD_SRCS) $(ROOT_SRCS) $G/newdelete.o $G/backend.a $G/lexer.a $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)
-	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -vtls -J$G -J../res -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
+	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -vtls -J$G -J../res -L-lLLVM-3.5 -Isrc/llvm -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
 endif
-
 
 clean:
 	rm -R $(GENERATED)

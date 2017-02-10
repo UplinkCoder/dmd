@@ -1,5 +1,6 @@
 module ddmd.ctfe.bc_llvm_backend;
 
+
 static immutable llvm_imports = q{
     import llvm.c.analysis;
     import llvm.c.core;
@@ -8,12 +9,27 @@ static immutable llvm_imports = q{
     import llvm.c.target;
 };
 
+enum hasLLVMHeaders = is(typeof(() { mixin(llvm_imports); }));
+
+static if (hasLLVMHeaders)
+{
+    mixin(llvm_imports);
+}
+
 static uint MegaBytes(uint size)
 {
     return size * 1024 * 1024;
 }
 
-static if (!is(typeof(() { mixin(llvm_imports); })))
+struct BCFunction
+{
+    void* funcDecl;
+    uint fnIdx;
+    LLVMValueRef fnRef;
+    ushort nArgs;
+}
+
+static if (!hasLLVMHeaders)
 {
     pragma(msg, "SDCs LLVM Header are not avilable\nLLVM_Backend is not compiled");
 }
@@ -48,6 +64,8 @@ else
     byte parameterCount;
 
     LLVMValueRef[1024] functions;
+    LLVMValueRef callSwitchFunction;
+
     uint functionCount;
 
     //bllockCount and blocks are function-LocalState,
@@ -76,6 +94,8 @@ else
 
     void Finalize()
     {
+        genCallSwitchFn();
+        functionCount = 0;
         LLVMDumpModule(mod);
         LLVMPassManagerRef pass = LLVMCreatePassManager();
         LLVMAddConstantPropagationPass(pass);
@@ -113,6 +133,23 @@ else
         LLVMPositionBuilderAtEnd(builder, blocks[blockCount++]);
     }
 
+    void genCallSwitchFn()
+    {
+        callSwitchFunction = LLVMAddFunction(mod, "callSwitchFn", LLVMFunctionType(LLVMVoidTypeInContext(ctx), [LLVMInt32TypeInContext(ctx), LLVMInt32TypeInContext(ctx), LLVMPointerType(LLVMInt32TypeInContext(ctx), 0)].ptr, 3, 0));
+        // void fn(uint fnIdx, uint nArgs, uint* argsP)
+        auto fnIdx = LLVMGetParam(callSwitchFunction, 0);
+        auto nArgs = LLVMGetParam(callSwitchFunction, 1);
+        auto argsP = LLVMGetParam(callSwitchFunction, 2);
+
+        auto _switch = LLVMBuildSwitch(builder, fnIdx, null, functionCount);
+
+        foreach(i;0 .. functionCount)
+        {
+            auto fnNArgs = LLVMCountParams(functions[i]);
+
+        }
+    }
+
     LLVMValueRef toLLVMValueRef(BCValue v)
     {
         if (v.type.type == BCTypeEnum.Char)
@@ -122,19 +159,10 @@ else
         else if (v.type.type == BCTypeEnum.Slice)
             v = v.i32;
 
-        assert(v.type.type == BCTypeEnum.i32 || v.type.type == BCTypeEnum.i32Ptr
-            || v.type.type == BCTypeEnum.i64,
+        assert(v.type.type == BCTypeEnum.i32 || v.type.type == BCTypeEnum.i64,
             "i32 or i32Ptr expected not: " ~ to!string(v.type.type));
 
-        if (v.type.type == BCTypeEnum.i32Ptr)
-        {
-            assert(v.vType == BCValueType.StackValue);
-            auto addr1 = LLVMConstInt(LLVMInt32Type(), v.stackAddr, false);
-            auto gep1 = LLVMBuildInBoundsGEP(builder, stack, &addr1, 1, "");
-            auto load1 = LLVMBuildLoad(builder, gep1, "");
-            return LLVMBuildGEP(builder, stack, &load1, 1, "");
-        }
-        else if (v.vType == BCValueType.StackValue)
+        if (v.vType == BCValueType.StackValue)
         {
             return LLVMBuildLoad(builder, stackGEP(v), "");
         }
@@ -602,8 +630,43 @@ else
 
         Byte3Macro(&this, _result, word, idx);
     }
+
+    LLVMValueRef gepHelper(LLVMValueRef array, uint idx)
+    {
+        auto addr1 = [
+            LLVMConstInt(LLVMInt32Type(), 0, false),
+            LLVMConstInt(LLVMInt32Type(), idx, false)
+        ];
+        return LLVMBuildInBoundsGEP(builder, array, addr1.ptr, 2, "");
+    }
+
     import ddmd.globals : Loc;
-    void Call(BCValue _result, BCValue fn, BCValue[] args, Loc l = Loc.init);
+    void Call(BCValue _result, BCValue fn, BCValue[] args, Loc l = Loc.init)
+    {
+        auto nArgs = cast(uint) args.length;
+        if (fn.vType == BCValueType.Immediate)
+        {
+            LLVMValueRef[64] argArray;
+            foreach(uint i, arg; args)
+            {
+                argArray[i] = toLLVMValueRef(arg);
+            }
+
+            StoreStack(LLVMBuildCall(builder, functions[fn.imm32 - 1], &argArray[0], nArgs, ""), _result);
+        }
+        else
+        {
+            auto fnIdx = toLLVMValueRef(fn);
+            auto argArray = LLVMBuildAlloca(builder, LLVMArrayType(LLVMInt32TypeInContext(ctx), nArgs), "");
+            foreach(uint i, arg; args)
+            {
+                LLVMBuildStore(builder, toLLVMValueRef(arg), gepHelper(argArray, i));
+            }
+
+            StoreStack(LLVMBuildCall(builder, callSwitchFunction, [fnIdx, argArray, toLLVMValueRef(imm32(nArgs))].ptr, 3, ""), _result);
+        }
+    }
+
     void Load32(BCValue _to, BCValue from)
     {
         sameLabel = false;
@@ -625,6 +688,11 @@ else
     }
 
     void Cat(BCValue _result, const BCValue lhs, const BCValue rhs, const uint size)
+    {
+        sameLabel = false;
+    }
+
+    void Assert(BCValue value, BCValue message)
     {
         sameLabel = false;
     }
