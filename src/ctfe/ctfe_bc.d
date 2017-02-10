@@ -4988,8 +4988,7 @@ static if (is(BCGen))
                 bailout("Function could not be generated in: " ~ ce.toString);
                 return ;
             }
-
-            Call(retval, fnValue, bc_args, ce.loc);
+            Call(retval, fnValue, bc_args);
 
             //FIXME figure out what we do in the case where we have more arguments then parameters
             foreach(i, ref arg;bc_args)
