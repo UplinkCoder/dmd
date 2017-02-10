@@ -55,14 +55,17 @@ auto instKind(LongInst i)
 
 struct RetainedCall
 {
-    import ddmd.globals : Loc;
     BCValue fn;
     BCValue[] args;
 
     uint callerId;
     BCAddr callerIp;
     StackAddr callerSp;
+    debug (ctfe_call)
+{
+    import ddmd.globals : Loc;
     Loc loc;
+}
 }
 
 enum LongInst : ushort
@@ -792,13 +795,24 @@ pure:
         }
         emitArithInstruction(LongInst.Mod, result, rhs);
     }
+debug (ctfe_call)
+{
     import ddmd.globals : Loc;
     void Call(BCValue result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
         calls[callCount++] = RetainedCall(fn, args, functionId, ip, sp, l);
         emitLongInst(LongInst64(LongInst.Call, result.stackAddr, pushOntoStack(imm32(callCount)).stackAddr));
     }
+}
+else
+{
+    void Call(BCValue result, BCValue fn, BCValue[] args)
+    {
+        calls[callCount++] = RetainedCall(fn, args, functionId, ip, sp);
+        emitLongInst(LongInst64(LongInst.Call, result.stackAddr, pushOntoStack(imm32(callCount)).stackAddr));
+    }
 
+}
     void Load32(BCValue _to, BCValue from)
     {
         if (!isStackValueOrParameter(from))
@@ -1934,11 +1948,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     }
                     else
                     {
-                        import ddmd.declaration : FuncDeclaration;
-                        import core.stdc.string : strlen;
-                        const string fnString = cast(string)(cast(FuncDeclaration)functions[cast(size_t)(fn - 1)].funcDecl).ident.toString;
-
-                        assert(0, "Argument " ~ to!string(i) ~" ValueType unhandeled: " ~ to!string(arg.vType) ~"\n Calling Function: " ~ fnString ~ " from: " ~ call.loc.toChars[0 .. strlen(call.loc.toChars)]);
+                        assert(0, "Argument " ~ to!string(i) ~" ValueType unhandeled: " ~ to!string(arg.vType));
                     }
                 }
                 if (callDepth++ == 2000)
