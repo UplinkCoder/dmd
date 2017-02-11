@@ -135,13 +135,19 @@ else
 
     void genCallSwitchFn()
     {
-        callSwitchFunction = LLVMAddFunction(mod, "callSwitchFn", LLVMFunctionType(LLVMVoidTypeInContext(ctx), [LLVMInt32TypeInContext(ctx), LLVMInt32TypeInContext(ctx), LLVMPointerType(LLVMInt32TypeInContext(ctx), 0)].ptr, 3, 0));
+        auto oldFn = fn;
+        scope(exit) fn = oldFn;
+        fn = callSwitchFunction = LLVMAddFunction(mod, "callSwitchFn", LLVMFunctionType(LLVMVoidType, [LLVMInt32Type, LLVMInt32Type, LLVMPointerType(LLVMInt32Type, 0)].ptr, 3, 0));
         // void fn(uint fnIdx, uint nArgs, uint* argsP)
         auto fnIdx = LLVMGetParam(callSwitchFunction, 0);
         auto nArgs = LLVMGetParam(callSwitchFunction, 1);
         auto argsP = LLVMGetParam(callSwitchFunction, 2);
-
-        auto _switch = LLVMBuildSwitch(builder, fnIdx, null, functionCount);
+        auto defaultCase = LLVMAppendBasicBlock(fn, "InvalidDefaultCase");
+        LLVMPositionBuilderAtEnd(builder, defaultCase);
+        LLVMBuildUnreachable(builder);
+        newBlock(); 
+        
+        auto _switch = LLVMBuildSwitch(builder, fnIdx, defaultCase, functionCount);
 
         foreach(i;0 .. functionCount)
         {
@@ -657,7 +663,7 @@ else
         else
         {
             auto fnIdx = toLLVMValueRef(fn);
-            auto argArray = LLVMBuildAlloca(builder, LLVMArrayType(LLVMInt32TypeInContext(ctx), nArgs), "");
+            auto argArray = LLVMBuildAlloca(builder, LLVMArrayType(LLVMInt32Type, nArgs), "");
             foreach(uint i, arg; args)
             {
                 LLVMBuildStore(builder, toLLVMValueRef(arg), gepHelper(argArray, i));
