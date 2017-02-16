@@ -273,7 +273,7 @@ void out_config_init(
 #endif
 }
 
-#ifdef DEBUG
+//#ifdef DEBUG
 
 /****************************
  * Transmit internal compiler debugging flags.
@@ -297,7 +297,7 @@ void out_config_debug(
     debugy = y;
 }
 
-#endif
+//#endif
 
 /*************************************
  */
