@@ -3650,13 +3650,6 @@ static if (is(BCGen))
 
         }
 
-        // exit if we could not gen rhs
-        //FIXME that should never happen
-        if (!rhs)
-        {
-            bailout("ConstructExp: could not gen rhs");
-            return;
-        }
         Set(lhs.i32, rhs.i32);
         retval = lhs;
     }
