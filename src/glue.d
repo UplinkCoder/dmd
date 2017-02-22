@@ -315,6 +315,21 @@ void obj_startaddress(Symbol *s)
 
 void genObjFile(Module m, bool multiobj)
 {
+
+    auto nameLen = strlen(m.srcfile.name.str) + 4;
+    auto cg_filename = cast(char*) allocmemory(nameLen);
+    strcpy(cg_filename,m.srcfile.name.str);
+    cg_filename[nameLen - 4 .. nameLen] = ".cg\0";
+    import ddmd.hdrgen;
+    scope OutBuffer ob;
+    scope HdrGenState hds;
+    scope PrettyPrintVisitor ppv = new PrettyPrintVisitor(&ob, &hds);
+    hds.fullQual = 1;
+    m.accept(ppv);
+    import std.stdio;
+    auto cg_file = File(cast(const)cg_filename[0 .. nameLen], "wb");
+    cg_file.rawWrite(ob.data[0 .. ob.size]);
+    cg_file.close();
     //EEcontext *ee = env.getEEcontext();
 
     //printf("Module.genobjfile(multiobj = %d) %s\n", multiobj, m.toChars());
