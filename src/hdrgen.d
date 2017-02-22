@@ -1318,7 +1318,7 @@ public:
             if (onemember && onemember.isFuncDeclaration())
                 buf.writestring("foo ");
         }
-        if (hgs.hdrgen && visitEponymousMember(d))
+        if (visitEponymousMember(d))
             return;
         if (hgs.ddoc)
             buf.writestring(d.kind());
@@ -1330,7 +1330,7 @@ public:
         visitTemplateParameters(hgs.ddoc ? d.origParameters : d.parameters);
         buf.writeByte(')');
         visitTemplateConstraint(d.constraint);
-        if (hgs.hdrgen)
+        //if (hgs.hdrgen)
         {
             hgs.tpltMember++;
             buf.writenl();
@@ -1893,8 +1893,6 @@ public:
 
     override void visit(StaticDtorDeclaration d)
     {
-        if (hgs.hdrgen)
-            return;
         if (stcToBuffer(buf, d.storage_class & ~STCstatic))
             buf.writeByte(' ');
         if (d.isSharedStaticDtorDeclaration())
@@ -1905,8 +1903,6 @@ public:
 
     override void visit(InvariantDeclaration d)
     {
-        if (hgs.hdrgen)
-            return;
         if (stcToBuffer(buf, d.storage_class))
             buf.writeByte(' ');
         buf.writestring("invariant");
@@ -1915,8 +1911,6 @@ public:
 
     override void visit(UnitTestDeclaration d)
     {
-        if (hgs.hdrgen)
-            return;
         if (stcToBuffer(buf, d.storage_class))
             buf.writeByte(' ');
         buf.writestring("unittest");
@@ -2210,7 +2204,7 @@ public:
         char[BUFFER_LEN] buffer;
         CTFloat.sprint(buffer.ptr, 'g', value);
         assert(strlen(buffer.ptr) < BUFFER_LEN);
-        if (hgs.hdrgen)
+        // if (hgs.hdrgen)
         {
             real_t r = CTFloat.parse(buffer.ptr);
             if (r != value) // if exact duplication
