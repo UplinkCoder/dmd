@@ -322,13 +322,15 @@ void genObjFile(Module m, bool multiobj)
     cg_filename[nameLen - 4 .. nameLen] = ".cg\0";
     import ddmd.hdrgen;
     scope OutBuffer ob;
+    ob.doindent = 1;
+    ob.setsize(ushort.max);
     scope HdrGenState hds;
     scope PrettyPrintVisitor ppv = new PrettyPrintVisitor(&ob, &hds);
     hds.fullQual = 1;
     m.accept(ppv);
     import std.stdio;
     auto cg_file = File(cast(const)cg_filename[0 .. nameLen], "wb");
-    cg_file.rawWrite(ob.data[0 .. ob.size]);
+    cg_file.write(ob.extractString);
     cg_file.close();
     //EEcontext *ee = env.getEEcontext();
 
