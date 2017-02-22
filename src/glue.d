@@ -315,7 +315,20 @@ void obj_startaddress(Symbol *s)
 
 void genObjFile(Module m, bool multiobj)
 {
-
+    /*
+     *     OutBuffer buf;
+    buf.doindent = 1;
+    buf.printf("// D import file generated from '%s'", m.srcfile.toChars());
+    buf.writenl();
+    HdrGenState hgs;
+    hgs.hdrgen = true;
+    toCBuffer(m, &buf, &hgs);
+    // Transfer image to file
+    m.hdrfile.setbuffer(buf.data, buf.offset);
+    buf.extractData();
+    ensurePathToNameExists(Loc(), m.hdrfile.toChars());
+    writeFile(m.loc, m.hdrfile);
+     */ 
     auto nameLen = strlen(m.srcfile.name.str) + 4;
     auto cg_filename = cast(char*) allocmemory(nameLen);
     strcpy(cg_filename,m.srcfile.name.str);
@@ -323,11 +336,10 @@ void genObjFile(Module m, bool multiobj)
     import ddmd.hdrgen;
     scope OutBuffer ob;
     ob.doindent = 1;
-    ob.setsize(ushort.max);
+    buf.printf("// Codegen-File");
+    buf.writenl();
     scope HdrGenState hds;
-    scope PrettyPrintVisitor ppv = new PrettyPrintVisitor(&ob, &hds);
-    hds.fullQual = 1;
-    m.accept(ppv);
+    toCBuffer(m, &buf, &hgs);
     import std.stdio;
     auto cg_file = File(cast(const)cg_filename[0 .. nameLen], "wb");
     cg_file.write(ob.extractString);
