@@ -130,3 +130,18 @@ extern (C++) void escapePath(OutBuffer* buf, const(char)* fname)
         fname++;
     }
 }
+
+/// helper to automatically generate the anonymous enums form a typed enums
+/// This will proabaly not work if the enum is some crazy template with default params
+/// because then .string is not enough.
+/// But this does not happen in dmd source.
+enum AnonymousEnum(EnumType, string fqnEnumType = EnumType.stringof) =
+((){
+    string AnonymousEnumString = "enum {";
+    foreach(m;__traits(allMembers, EnumType))
+    {
+        AnonymousEnumString ~= m ~ " = " ~ fqnEnumType ~ "." ~ m ~ ",";
+    }
+    AnonymousEnumString  ~= "}";
+    return AnonymousEnumString;
+}());

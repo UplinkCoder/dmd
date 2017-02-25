@@ -2478,14 +2478,11 @@ StringExp semanticString(Scope *sc, Expression exp, const char* s)
 
 enum OwnedBy : int
 {
-    OWNEDcode,          // normal code expression in AST
-    OWNEDctfe,          // value expression for CTFE
-    OWNEDcache,         // constant value cached for CTFE
+    OWNEDcode,          /// normal code expression in AST
+    OWNEDctfe,          /// value expression for CTFE
+    OWNEDcache,         /// constant value cached for CTFE
 }
-
-alias OWNEDcode = OwnedBy.OWNEDcode;
-alias OWNEDctfe = OwnedBy.OWNEDctfe;
-alias OWNEDcache = OwnedBy.OWNEDcache;
+mixin(AnonymousEnum!OwnedBy);
 
 enum WANTvalue  = 0;    // default
 enum WANTexpand = 1;    // expand const/immutable variables if possible
