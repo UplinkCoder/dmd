@@ -952,11 +952,6 @@ Expression toExpression(const BCValue value, Type expressionType,
     const BCValue[2]* errorValues = null, const RetainedError* errors = null)
 {
     import ddmd.parse : Loc;
-    static if (bailoutMessages)
-    {
-        import std.stdio;
-        writeln("Calling toExpression with Type: ", expressionType.toString);
-    }
     Expression result;
     if (value.vType == BCValueType.Unknown)
     {
@@ -1407,6 +1402,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         ignoreVoid = false;
         noRetval = false;
 
+        lastConstVd = lastConstVd.init;
         unrolledLoopState = null;
         switchFixup = null;
         switchState = null;
@@ -1477,14 +1473,14 @@ extern (C++) final class BCV(BCGenT) : Visitor
         void Load32(BCValue _to, BCValue from)
         {
             Assert(from.i32, _sharedCtfeState.addError(Loc.init,
-                "Load Source may not be null"));
+                "Load Source may not be null - target: " ~ to!string(_to.stackAddr)));
             gen.Load32(_to, from);
         }
 
         void Store32(BCValue _to, BCValue value)
         {
             Assert(_to.i32, _sharedCtfeState.addError(Loc.init,
-                "Store Destination may not be null"));
+                "Store Destination may not be null - from: " ~ to!string(value.stackAddr)));
             gen.Store32(_to, value);
         }
 
@@ -1683,6 +1679,7 @@ public:
             {
                 return genExpr(ci);
             }
+
             return BCValue.init;
         }
         else
@@ -2764,42 +2761,68 @@ static if (is(BCGen))
                bailout("currently we cannot slice during argument processing");
                return ;
             }
-            assert(lwr && upr);
 
             auto origSlice = genExpr(se.e1);
             bailout(!origSlice, "could not get slice expr in " ~ se.toString);
             auto elmType = _sharedCtfeState.elementType(origSlice.type);
-            auto alignedElmSize = align4(_sharedCtfeState(elmType));
+            auto alignedElmSize = align4(_sharedCtfeState.size(elmType));
 
             auto newSlice = genTemporary(i32Type);
             Alloc(newSlice, imm32(uint.sizeof*2));
 
             // TODO assert lwr <= upr
 
-            auto origLength = getBase(origSlice);
+            auto origLength = getLength(origSlice);
+            if (!origLength)
+            {
+                bailout("could not gen origLength in " ~ se.toString);
+                return ;
+            }
             BCValue newLength;
-            if (se.upr.op == TOKDollar/* || (se.upr.op == TOKarraylength && ... */)
+            BCValue lwr;
+            if (se.upr.op == TOKdollar && se.lwr.isConst && se.lwr.toInteger == 0/* || (se.upr.op == TOKarraylength && ... */)
             {
                 //upr bount is dollar or slice.length so there is no need to adjust the length
                 newLength = origLength;
             }
             else
             {
+                import std.stdio;
+
+                lwr = genExpr(se.lwr);
+                if (!lwr)
+                {
+                    bailout("could not gen lowerBound in " ~ se.toString);
+                    return ;
+                }
+
                 auto upr = genExpr(se.upr);
-                newLength = upr;
+                if (!upr)
+                {
+                    bailout("could not gen upperBound in " ~ se.toString);
+                    return ;
+                }
+                newLength = genTemporary(i32Type);
+                Sub3(newLength, upr.i32, lwr.i32);
             }
-            Store32(newSlice, newLength);
+            Store32(newSlice, newLength.i32);
 
             auto origBase = getBase(origSlice);
+            if (!origBase)
+            {
+                bailout("could not gen origBase in " ~ se.toString);
+                return ;
+            }
+
             BCValue newBase;
-            if (isConst(se.lwr) && se.lwr.toInteger == 0)
+            if (se.lwr.isConst && se.lwr.toInteger == 0)
             {
                 // lower bound is zero so no need to recompute the base
                 newBase = origBase;
             }
             else
             {
-                auto lwr = genExpr(se.lwr);
+
                 newBase = genTemporary(i32Type);
                 Mul3(newBase, lwr, imm32(alignedElmSize));
                 Add3(newBase, newBase, origBase);
@@ -2807,6 +2830,7 @@ static if (is(BCGen))
 
             BCValue newBasePtr = genTemporary(i32Type);
             Add3(newBasePtr, newSlice, imm32(uint.sizeof));
+            Store32(newBasePtr, newBase.i32);
 
             retval = newSlice;
         }
