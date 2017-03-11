@@ -1023,6 +1023,69 @@ Expression toExpression(const BCValue value, Type expressionType,
         return CTFEExp.cantexp;
     }
 
+    Expression createArray(BCValue arr, Type elmType)
+    {
+        ArrayLiteralExp arrayResult;
+        auto baseType = _sharedCtfeState.btv.toBCType(elmType);
+        auto elmLength = _sharedCtfeState.size(baseType);
+        auto arrayLength = heapPtr._heap[arr.heapAddr.addr];
+        auto arrayBase = heapPtr._heap[arr.heapAddr.addr + 4];
+        debug (ctfe)
+        {
+            import std.stdio;
+            
+            writeln("value ", value.toString);
+        }
+        debug (ctfe)
+        {
+            import std.stdio;
+            
+            foreach (idx; 0 .. heapPtr.heapSize)
+            {
+                // writefln("%d %x", idx, heapPtr._heap[idx]);
+            }
+        }
+        
+        Expressions* elmExprs = new Expressions();
+        
+        uint offset = 0;
+        debug (ctfe)
+        {
+            import std.stdio;
+            
+            writeln("building Array of Length ", arrayLength);
+        }
+        /* import std.stdio;
+            writeln("HeapAddr: ", value.heapAddr.addr);
+            writeln((cast(char*)(heapPtr._heap.ptr + value.heapAddr.addr + 1))[0 .. 64]);
+            */
+        
+        foreach (idx; 0 .. arrayLength)
+        {
+            /*    if (elmLength == 1)
+                {
+                    elmExprs.insert(idx,
+                        toExpression(imm32((heapPtr._heap[value.heapAddr.addr + offset] >> ((idx-1 % 4) * 8)) & 0xFF),
+                        tda.nextOf)
+                    );
+                    offset += !(idx % 4);
+                }
+                else */
+            {
+                elmExprs.insert(idx,
+                    toExpression(imm32(*(heapPtr._heap.ptr + arrayBase + offset)),
+                        elmType));
+                offset += elmLength;
+            }
+            
+        }
+        
+        arrayResult = new ArrayLiteralExp(Loc(), elmExprs);
+        arrayResult.ownedByCtfe = OWNEDctfe;
+
+        return arrayResult;
+    }
+
     if (expressionType.isString)
     {
         import ddmd.lexer : Loc;
@@ -1079,76 +1142,20 @@ Expression toExpression(const BCValue value, Type expressionType,
             (cast(StructLiteralExp) result).ownedByCtfe = OWNEDctfe;
         }
         break;
-    case Tarray:
-        {
-            auto tda = cast(TypeDArray) expressionType;
-
-            auto baseType = _sharedCtfeState.btv.toBCType(tda.nextOf);
-            auto elmLength = _sharedCtfeState.size(baseType);
-            auto arrayLength = heapPtr._heap[value.heapAddr.addr];
-            auto arrayBase = heapPtr._heap[value.heapAddr.addr + 4];
-            debug (ctfe)
-            {
-                import std.stdio;
-
-                writeln("value ", value.toString);
-            }
-            debug (ctfe)
-            {
-                import std.stdio;
-
-                foreach (idx; 0 .. heapPtr.heapSize)
-                {
-                    // writefln("%d %x", idx, heapPtr._heap[idx]);
-                }
-            }
-
-            Expressions* elmExprs = new Expressions();
-
-            uint offset = 0;
-            debug (ctfe)
-            {
-                import std.stdio;
-
-                writeln("building Array of Length ", arrayLength);
-            }
-            /* import std.stdio;
-            writeln("HeapAddr: ", value.heapAddr.addr);
-            writeln((cast(char*)(heapPtr._heap.ptr + value.heapAddr.addr + 1))[0 .. 64]);
-            */
-
-            foreach (idx; 0 .. arrayLength)
-            {
-            /*    if (elmLength == 1)
-                {
-                    elmExprs.insert(idx,
-                        toExpression(imm32((heapPtr._heap[value.heapAddr.addr + offset] >> ((idx-1 % 4) * 8)) & 0xFF),
-                        tda.nextOf)
-                    );
-                    offset += !(idx % 4);
-                }
-                else */
-                {
-                elmExprs.insert(idx,
-                    toExpression(imm32(*(heapPtr._heap.ptr + arrayBase + offset)),
-                    tda.nextOf));
-                offset += elmLength;
-                }
-
-            }
-
-            result = new ArrayLiteralExp(Loc(), elmExprs);
-            (cast(ArrayLiteralExp) result).ownedByCtfe = OWNEDctfe;
-        }
-        break;
     case Tsarray:
         {
             auto tsa = cast(TypeSArray) expressionType;
             assert(heapPtr._heap[value.heapAddr.addr] == evaluateUlong(tsa.dim),
                 "static arrayLength mismatch: " ~ to!string(heapPtr._heap[value.heapAddr.addr]) ~ " != " ~ to!string(
-                evaluateUlong(tsa.dim)));
-            goto default;
+                    evaluateUlong(tsa.dim)));
+            result = createArray(value, tsa.nextOf);
+        } break;
+    case Tarray:
+        {
+            auto tda = cast(TypeDArray) expressionType;
+            result = createArray(value, tda.nextOf);
         }
+        break;
     case Tbool:
         {
             //assert(value.imm32 == 0 || value.imm32 == 1, "Not a valid bool");
