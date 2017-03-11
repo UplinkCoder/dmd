@@ -1033,33 +1033,33 @@ Expression toExpression(const BCValue value, Type expressionType,
         debug (ctfe)
         {
             import std.stdio;
-            
+
             writeln("value ", value.toString);
         }
         debug (ctfe)
         {
             import std.stdio;
-            
+
             foreach (idx; 0 .. heapPtr.heapSize)
             {
                 // writefln("%d %x", idx, heapPtr._heap[idx]);
             }
         }
-        
+
         Expressions* elmExprs = new Expressions();
-        
+
         uint offset = 0;
         debug (ctfe)
         {
             import std.stdio;
-            
+
             writeln("building Array of Length ", arrayLength);
         }
         /* import std.stdio;
             writeln("HeapAddr: ", value.heapAddr.addr);
             writeln((cast(char*)(heapPtr._heap.ptr + value.heapAddr.addr + 1))[0 .. 64]);
             */
-        
+
         foreach (idx; 0 .. arrayLength)
         {
             /*    if (elmLength == 1)
@@ -1077,9 +1077,9 @@ Expression toExpression(const BCValue value, Type expressionType,
                         elmType));
                 offset += elmLength;
             }
-            
+
         }
-        
+
         arrayResult = new ArrayLiteralExp(Loc(), elmExprs);
         arrayResult.ownedByCtfe = OWNEDctfe;
 
@@ -2759,14 +2759,56 @@ static if (is(BCGen))
         }
         else
         {
-            if (se.lwr.toUInteger == 0)
+            if (insideArgumentProcessing)
             {
-                if (se.lowerIsLessThanUpper)
-                {
-
-                }
+               bailout("currently we cannot slice during argument processing");
+               return ;
             }
-            bailout("We don't handle [xx .. yy] for now");
+            assert(lwr && upr);
+
+            auto origSlice = genExpr(se.e1);
+            bailout(!origSlice, "could not get slice expr in " ~ se.toString);
+            auto elmType = _sharedCtfeState.elementType(origSlice.type);
+            auto alignedElmSize = align4(_sharedCtfeState(elmType));
+
+            auto newSlice = genTemporary(i32Type);
+            Alloc(newSlice, imm32(uint.sizeof*2));
+
+            // TODO assert lwr <= upr
+
+            auto origLength = getBase(origSlice);
+            BCValue newLength;
+            if (se.upr.op == TOKDollar/* || (se.upr.op == TOKarraylength && ... */)
+            {
+                //upr bount is dollar or slice.length so there is no need to adjust the length
+                newLength = origLength;
+            }
+            else
+            {
+                auto upr = genExpr(se.upr);
+                newLength = upr;
+            }
+            Store32(newSlice, newLength);
+
+            auto origBase = getBase(origSlice);
+            BCValue newBase;
+            if (isConst(se.lwr) && se.lwr.toInteger == 0)
+            {
+                // lower bound is zero so no need to recompute the base
+                newBase = origBase;
+            }
+            else
+            {
+                auto lwr = genExpr(se.lwr);
+                newBase = genTemporary(i32Type);
+                Mul3(newBase, lwr, imm32(alignedElmSize));
+                Add3(newBase, newBase, origBase);
+            }
+
+            BCValue newBasePtr = genTemporary(i32Type);
+            Add3(newBasePtr, newSlice, imm32(uint.sizeof));
+
+            retval = newSlice;
         }
     }
 
