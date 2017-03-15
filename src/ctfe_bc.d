@@ -3861,7 +3861,7 @@ static if (is(BCGen))
         return (bct.type == BCTypeEnum.i32 || bct.type == BCTypeEnum.i64);
     }
 
-/*    override void visit(ConstructExp ce)
+    override void visit(ConstructExp ce)
     {
         //TODO ConstructExp is basically the same as AssignExp
         // find a way to merge those
@@ -3921,9 +3921,9 @@ static if (is(BCGen))
 
         }
         Set(lhs.i32, rhs.i32);
-        retval = lhs;/
+        retval = lhs;
     }
-*/
+
 
     override void visit(AssignExp ae)
     {
