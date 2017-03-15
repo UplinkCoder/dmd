@@ -2558,9 +2558,8 @@ static if (is(BCGen))
         }
 
         bool isString = (indexed.type.type == BCTypeEnum.String);
-        //FIXME check if Slice.ElementType == Char;
-        //and set isString to true;
         auto idx = genExpr(ie.e2).i32; // HACK
+        BCValue ptr = genTemporary(i32Type);
         version (ctfe_noboundscheck)
         {
         }
@@ -2570,46 +2569,13 @@ static if (is(BCGen))
             Assert(BCValue.init, _sharedCtfeState.addError(ie.loc,
                 "ArrayIndex %d out of bounds %d", idx, length));
         }
-        BCArray* arrayType;
-        BCSlice* sliceType;
 
-        if (indexed.type.type == BCTypeEnum.Array)
-        {
-            arrayType = &_sharedCtfeState.arrayTypes[indexed.type.typeIndex - 1];
+        auto elmType = _sharedCtfeState.elementType(indexed.type);
+        int elmSize = _sharedCtfeState.size(elmType);
+        assert(cast(int) elmSize > 0);
 
-            debug (ctfe)
-            {
-                import std.stdio;
-
-                if (arrayType)
-                    writeln("arrayType: ", *arrayType);
-            }
-        }
-        else if (indexed.type.type == BCTypeEnum.Slice)
-        {
-            sliceType = &_sharedCtfeState.sliceTypes[indexed.type.typeIndex - 1];
-            debug (ctfe)
-            {
-                import std.stdio;
-
-            //    writeln(_sharedCtfeState.sliceTypes[0 .. 4]);
-                if (sliceType)
-                    writeln("sliceType ", (*sliceType).elementType.type, " -- ", sliceType - &_sharedCtfeState.sliceTypes[0], " | ", indexed.type.typeIndex);
-
-            }
-
-        }
-        auto ptr = genTemporary(BCType(BCTypeEnum.i32));
-        //We set the ptr already to the beginning of the array;
-        scope (exit)
-        {
-            //removeTemporary(ptr);
-        }
-        auto elmType = arrayType ? arrayType.elementType : (
-            sliceType ? sliceType.elementType : BCType(BCTypeEnum.Char));
         auto oldRetval = retval;
         retval = assignTo ? assignTo : genTemporary(elmType);
-        //        if (elmType.type == BCTypeEnum.i32)
         {
             debug (ctfe)
             {
@@ -2621,15 +2587,12 @@ static if (is(BCGen))
 
             if (!isString)
             {
-                if (!arrayType && !sliceType)
+                if (!elmType)
                 {
-                    bailout("no array type or sliceType for " ~ ie.toString);
+                    bailout("could nit get elementType for: " ~ ie.toString);
+                    return ;
                 }
-                int elmSize = _sharedCtfeState.size(elmType);
-                assert(cast(int) elmSize > -1);
-                //elmSize = align4(elmSize);
 
-                //elmSize = (elmSize / 4 > 0 ? elmSize / 4 : 1);
                 Mul3(offset, idx, imm32(elmSize));
                 Add3(ptr, offset, getBase(indexed));
                 Load32(retval, ptr);
@@ -2643,18 +2606,9 @@ static if (is(BCGen))
                 //auto arrayLength = genTemporary(BCType(BCTypeEnum.i32));
                 //Load32(arrayLength, indexed.i32);
                 //Lt3(inBounds,  idx, arrayLength);
-                Add3(ptr, indexed.i32, bcOne);
-
-                auto modv = genTemporary(BCType(BCTypeEnum.i32));
-                Mod3(modv, idx, imm32(4));
-                Div3(offset, idx, imm32(4));
-                Add3(ptr, ptr, offset);
-
+                Add3(ptr, indexed.i32, imm32(elmSize));
                 Load32(retval, ptr);
                 //TODO use UTF8 intrinsic!
-                Byte3(retval, retval, modv);
-                //removeTemporary(modv);
-                //removeTemporary(tmpElm);
 
             }
             /*
