@@ -2572,7 +2572,11 @@ static if (is(BCGen))
 
         auto elmType = _sharedCtfeState.elementType(indexed.type);
         int elmSize = _sharedCtfeState.size(elmType);
-        bailout (cast(int) elmSize <= 0, "could not get Element-Type-size: for" ~ ie.toString);
+        if (cast(int) elmSize <= 0)
+        {
+            bailout("could not get Element-Type-size for: " ~ ie.toString);
+            return ;
+        }
         auto offset = genTemporary(i32Type);
 
         auto oldRetval = retval;
@@ -2595,7 +2599,8 @@ static if (is(BCGen))
                 if (!assignTo || assignTo.type != elmType)
                     bailout("Either we don't know the target-Type or the target type requires conversion: " ~ assignTo.type.type.to!string);
                 //TODO use UTF8 intrinsic!
-
+                bailout("apperantly we really cannot support string indexing ...");
+                return ;
             }
 
             //TODO assert that idx is not out of bounds;
