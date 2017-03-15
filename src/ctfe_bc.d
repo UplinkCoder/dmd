@@ -2572,7 +2572,7 @@ static if (is(BCGen))
 
         auto elmType = _sharedCtfeState.elementType(indexed.type);
         int elmSize = _sharedCtfeState.size(elmType);
-        assert(cast(int) elmSize > 0);
+        bailout (cast(int) elmSize <= 0, "could not get Element-Type-size: for" ~ ie.toString);
         auto offset = genTemporary(i32Type);
 
         auto oldRetval = retval;
