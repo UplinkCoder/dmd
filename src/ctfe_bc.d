@@ -1177,7 +1177,7 @@ Expression toExpression(const BCValue value, Type expressionType,
             assert(heapPtr._heap[value.heapAddr.addr + SliceDescriptor.LengthOffset] == evaluateUlong(tsa.dim),
                 "static arrayLength mismatch: " ~ to!string(heapPtr._heap[value.heapAddr.addr + SliceDescriptor.LengthOffset]) ~ " != " ~ to!string(
                     evaluateUlong(tsa.dim)));
-           // result = createArray(value, tsa.nextOf);
+            result = createArray(value, tsa.nextOf);
         } break;
     case Tarray:
         {
@@ -1253,7 +1253,7 @@ extern (C++) final class BCTypeVisitor : Visitor
             //return BCType(BCTypeEnum.i1);
             return BCType(BCTypeEnum.i32);
         case ENUMTY.Tchar:
-            //return BCType(BCTypeEnum.c8);
+            return BCType(BCTypeEnum.c8);
         case ENUMTY.Twchar:
             //return BCType(BCTypeEnum.c16);
         case ENUMTY.Tdchar:
@@ -2573,6 +2573,7 @@ static if (is(BCGen))
         auto elmType = _sharedCtfeState.elementType(indexed.type);
         int elmSize = _sharedCtfeState.size(elmType);
         assert(cast(int) elmSize > 0);
+        auto offset = genTemporary(i32Type);
 
         auto oldRetval = retval;
         retval = assignTo ? assignTo : genTemporary(elmType);
@@ -2583,39 +2584,29 @@ static if (is(BCGen))
             }
 
             // We add one to go over the length;
-            auto offset = genTemporary(i32Type);
-
-            if (!isString)
-            {
                 if (!elmType)
                 {
                     bailout("could nit get elementType for: " ~ ie.toString);
                     return ;
                 }
 
-                Mul3(offset, idx, imm32(elmSize));
-                Add3(ptr, offset, getBase(indexed));
-                Load32(retval, ptr);
-            }
-            else
+            if (isString)
             {
-
-                bailout("String-Indexing does not work without UTF support afterall");
-                //TODO assert that idx is not out of bounds;
-                //auto inBounds = genTemporary(BCType(BCTypeEnum.i1));
-                //auto arrayLength = genTemporary(BCType(BCTypeEnum.i32));
-                //Load32(arrayLength, indexed.i32);
-                //Lt3(inBounds,  idx, arrayLength);
-                Add3(ptr, indexed.i32, imm32(elmSize));
-                Load32(retval, ptr);
+                if (!assignTo || assignTo.type != elmType)
+                    bailout("Either we don't know the target-Type or the target type requires conversion: " ~ assignTo.type.type.to!string);
                 //TODO use UTF8 intrinsic!
 
             }
-            /*
-        else
-        {
-            bailout("Type of IndexExp unsupported " ~ ie.e1.type.toString);
-        }*/
+
+            //TODO assert that idx is not out of bounds;
+            //auto inBounds = genTemporary(BCType(BCTypeEnum.i1));
+            //auto arrayLength = genTemporary(BCType(BCTypeEnum.i32));
+            //Load32(arrayLength, indexed.i32);
+            //Lt3(inBounds,  idx, arrayLength);
+
+            Mul3(offset, idx, imm32(elmSize));
+            Add3(ptr, offset, getBase(indexed));
+            Load32(retval, ptr);
         }
     }
 
@@ -3865,7 +3856,7 @@ static if (is(BCGen))
         return (bct.type == BCTypeEnum.i32 || bct.type == BCTypeEnum.i64);
     }
 
-    override void visit(ConstructExp ce)
+/*    override void visit(ConstructExp ce)
     {
         //TODO ConstructExp is basically the same as AssignExp
         // find a way to merge those
@@ -3925,8 +3916,9 @@ static if (is(BCGen))
 
         }
         Set(lhs.i32, rhs.i32);
-        retval = lhs;
+        retval = lhs;/
     }
+*/
 
     override void visit(AssignExp ae)
     {
@@ -4176,7 +4168,7 @@ static if (is(BCGen))
                     }
                 }
             }
-
+            assignTo = lhs;
 
             ignoreVoid = false;
             auto rhs = genExpr(ae.e2);
@@ -4196,6 +4188,12 @@ static if (is(BCGen))
             {
                 Set(lhs, rhs);
             }
+            else if (lhs.type.type == BCTypeEnum.i64 && (lhs.type.type == BCTypeEnum.i64 || rhs.type.type == BCTypeEnum.i32))
+            {
+                Set(lhs, rhs);
+                retval = lhs;
+                return ;
+            }
             else
             {
                 if (lhs.type.type == BCTypeEnum.Ptr)
@@ -4212,7 +4210,7 @@ static if (is(BCGen))
                         Store32(lhs, rhs);
                      }
                 }
-                else if (lhs.type.type == BCTypeEnum.Char && rhs.type.type == BCTypeEnum.Char)
+                else if (lhs.type.type == BCTypeEnum.c8 && rhs.type.type == BCTypeEnum.c8)
                 {
                     Set(lhs.i32, rhs.i32);
                 }
@@ -4245,11 +4243,8 @@ static if (is(BCGen))
                     return ;
                 }
             }
-
-            // I don't know how this got changed in between but apperantly it did ...
             assignTo = lhs;
         }
-
         if (assignTo.heapRef != BCHeapRef.init)
             StoreToHeapRef(assignTo);
 
