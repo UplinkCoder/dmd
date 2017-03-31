@@ -1294,7 +1294,6 @@ extern (C++) final class BCTypeVisitor : Visitor
             return BCType(BCTypeEnum.c16);
         case ENUMTY.Tdchar:
             return BCType(BCTypeEnum.c32);
-        case ENUMTY.Tint8:
         case ENUMTY.Tuns8:
             //return BCType(BCTypeEnum.u8);
         case ENUMTY.Tint8:
