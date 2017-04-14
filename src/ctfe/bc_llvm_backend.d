@@ -1,5 +1,5 @@
 module ddmd.ctfe.bc_llvm_backend;
-
+import ddmd.func : FuncDeclaration;
 
 static immutable llvm_imports = q{
     import llvm.c.analysis;
@@ -49,7 +49,6 @@ else
     ushort temporaryCount;
 
     LLVMValueRef heap;
-
     LLVMValueRef heapTop;
 
     LLVMValueRef ccond; /// current condition;
@@ -88,14 +87,18 @@ else
 
         mod = LLVMModuleCreateWithName("CTFE");
         heap = LLVMAddGlobal(mod, LLVMArrayType(LLVMInt32Type(), 2 ^^ 16), "heap");
+
         heapTop = LLVMAddGlobal(mod, LLVMInt32Type(), "heapTop");
+
+        // void callSwitchFn(uint fnIdx, uint nArgs, uint[64] args)
+        callSwitchFunction = LLVMAddFunction(mod, "callSwitchFn", LLVMFunctionType(LLVMInt32Type, [LLVMInt32Type, LLVMInt32Type, LLVMArrayType(LLVMInt32Type, 64)].ptr, 3, 0)); 
 
         builder = LLVMCreateBuilder();
     }
 
     void Finalize()
     {
-        //genCallSwitchFn();
+        // genCallSwitchFn();
         functionCount = 0;
         LLVMDumpModule(mod);
         LLVMPassManagerRef pass = LLVMCreatePassManager();
@@ -138,8 +141,7 @@ else
     {
         auto oldFn = fn;
         scope(exit) fn = oldFn;
-        fn = callSwitchFunction = LLVMAddFunction(mod, "callSwitchFn", LLVMFunctionType(LLVMVoidType, [LLVMInt32Type, LLVMInt32Type, LLVMPointerType(LLVMInt32Type, 0)].ptr, 3, 0));
-        // void fn(uint fnIdx, uint nArgs, uint* argsP)
+        fn = callSwitchFunction;
         auto fnIdx = LLVMGetParam(callSwitchFunction, 0);
         auto nArgs = LLVMGetParam(callSwitchFunction, 1);
         auto argsP = LLVMGetParam(callSwitchFunction, 2);
@@ -159,7 +161,7 @@ else
 
     LLVMValueRef toLLVMValueRef(BCValue v)
     {
-        if (v.type.type == BCTypeEnum.Char)
+        if (v.type.type == BCTypeEnum.c8 || v.type.type == BCTypeEnum.c32)
             v = v.i32;
         else if (v.type.type == BCTypeEnum.String)
             v = v.i32;
@@ -206,7 +208,9 @@ else
             parameterTypes ~= LLVMInt32Type();
         }
 
-        fn = functions[functionCount] = LLVMAddFunction(mod, "",
+        const(char)* functionName = fd ? (cast(FuncDeclaration)fd).ident.toChars() : ""; 
+
+        fn = functions[functionCount] = LLVMAddFunction(mod, functionName,
             LLVMFunctionType(LLVMInt32Type(), parameterTypes.ptr,
             cast(uint) parameterTypes.length, 0));
 
@@ -374,7 +378,6 @@ else
     {
         if (!cond)
         {
-            LLVMDumpModule(mod);
             assert(ccond !is null);
             cond.voidStar = cast(void*) ccond;
         }
@@ -406,7 +409,6 @@ else
         {
             import std.stdio;
 
-            LLVMDumpModule(mod);
             writeln("BlockCount :", blockCount);
             assert(0);
         }
@@ -459,11 +461,15 @@ else
 
     LLVMValueRef stackGEP(BCValue v)
     {
+/*
         auto addr1 = [
             LLVMConstInt(LLVMInt32Type(), 0, false),
             LLVMConstInt(LLVMInt32Type(), v.stackAddr, false)
         ];
         return LLVMBuildInBoundsGEP(builder, stack, addr1.ptr, 2, "");
+
+*/
+       return gepHelper(stack, v.stackAddr);
     }
 
     LLVMValueRef heapTopGEP()
@@ -665,27 +671,32 @@ else
     import ddmd.globals : Loc;
     void Call(BCValue _result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
+        import std.stdio;
+        writeln("emiting call to function: ", fn);
         auto nArgs = cast(uint) args.length;
-        if (fn.vType == BCValueType.Immediate)
+        if (fn.vType == BCValueType.Immediate && fn.imm32 <= functionCount)
         {
             LLVMValueRef[64] argArray;
             foreach(uint i, arg; args)
             {
                 argArray[i] = toLLVMValueRef(arg);
             }
-
+            assert(functions[fn.imm32 -1], "no function to use");
             StoreStack(_result, LLVMBuildCall(builder, functions[fn.imm32 - 1], &argArray[0], nArgs, ""));
         }
         else
         {
             auto fnIdx = toLLVMValueRef(fn);
-            auto argArray = LLVMBuildAlloca(builder, LLVMArrayType(LLVMInt32Type, nArgs), "");
-            foreach(uint i, arg; args)
+            auto argArray = LLVMBuildAlloca(builder, LLVMArrayType(LLVMInt32Type, 64), "");
+            auto argArray0 = gepHelper(argArray, 0); 
+            auto argArrayPtr = LLVMBuildBitCast(builder, argArray0, LLVMPointerType(LLVMInt32Type, 0), ""); 
+            auto _nArgs = toLLVMValueRef(imm32(nArgs));
+            foreach(uint i, ref arg; args)
             {
                 LLVMBuildStore(builder, toLLVMValueRef(arg), gepHelper(argArray, i));
             }
-
-            StoreStack(_result, LLVMBuildCall(builder, callSwitchFunction, [fnIdx, argArray, toLLVMValueRef(imm32(nArgs))].ptr, 3, ""));
+            writeln("calling switch fn");
+            // StoreStack(_result, LLVMBuildCall(builder, callSwitchFunction, [fnIdx, _nArgs, argArrayPtr].ptr, 3, ""));
         }
     }
 
@@ -891,3 +902,4 @@ else
     }
 
 }
+
