@@ -100,20 +100,30 @@ else
     {
         // genCallSwitchFn();
         functionCount = 0;
-        LLVMDumpModule(mod);
+        // LLVMDumpModule(mod);
         LLVMPassManagerRef pass = LLVMCreatePassManager();
         LLVMAddConstantPropagationPass(pass);
         LLVMAddInstructionCombiningPass(pass);
         LLVMAddPromoteMemoryToRegisterPass(pass);
         LLVMAddGVNPass(pass);
         LLVMAddCFGSimplificationPass(pass);
+/*
+              LLVMAddConstantPropagationPass(pass);
+            LLVMAddInstructionCombiningPass(pass);
+          LLVMAddDemoteMemoryToRegisterPass(pass); // Demotes every possible value to memory
+            LLVMAddPromoteMemoryToRegisterPass(pass);
+          LLVMAddGVNPass(pass);
+        LLVMAddCFGSimplificationPass(pass);
+        LLVMRunPassManager(pass, mod);
+
+*/
         LLVMRunPassManager(pass, mod);
         LLVMDisposeBuilder(builder);
     }
 
     void print()
     {
-        LLVMDumpModule(mod);
+        // LLVMDumpModule(mod);
         LLVMVerifyModule(mod, LLVMVerifierFailureAction.PrintMessage, &error);
         LLVMPassManagerRef pass = LLVMCreatePassManager();
 //        LLVMAddTargetData(LLVMGetExecutionEngineTargetData(engine), pass);
@@ -276,13 +286,6 @@ else
         LLVMAddGlobalMapping(engine, heap, &heapPtr._heap[0]);
         LLVMPassManagerRef pass = LLVMCreatePassManager();
         LLVMAddTargetData(LLVMGetExecutionEngineTargetData(engine), pass);
-              LLVMAddConstantPropagationPass(pass);
-            LLVMAddInstructionCombiningPass(pass);
-          LLVMAddDemoteMemoryToRegisterPass(pass); // Demotes every possible value to memory
-            LLVMAddPromoteMemoryToRegisterPass(pass);
-          LLVMAddGVNPass(pass);
-        LLVMAddCFGSimplificationPass(pass);
-        LLVMRunPassManager(pass, mod);
 
         LLVMGenericValueRef[] gv_args;
         foreach (arg; args)

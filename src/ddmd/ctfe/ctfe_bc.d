@@ -17,7 +17,7 @@ import ddmd.arraytypes : Expressions, VarDeclarations;
 
 import std.conv : to;
 
-enum perf = 0;
+enum perf = 1;
 enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
@@ -351,7 +351,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
 
         static if (UseLLVMBackend)
         {
-            bcv.gen.print();
+            // bcv.gen.print();
 
             auto retval = bcv.gen.interpret(bc_args, &_sharedCtfeState.heap);
         }
@@ -727,7 +727,7 @@ struct SharedCtfeState(BCGenT)
     {
         import core.stdc.string : memset;
 
-        memset(&stack, 0, stack[0].sizeof * stack.length / 4);
+        memset(&stack[0], 0, stack[0].sizeof * stack.length);
     }
 
     void initHeap(uint maxHeapSize = 2 ^^ 24)
