@@ -84,6 +84,10 @@ else
         LLVMLinkInMCJIT();
 
         functionCount = 0;
+        functions[0] = functions[0].init;
+        blockCount = 0;
+        sp = 4;
+        temporaryCount = ushort(0);
 
         mod = LLVMModuleCreateWithName("CTFE");
         heap = LLVMAddGlobal(mod, LLVMArrayType(LLVMInt32Type(), 2 ^^ 16), "heap");
