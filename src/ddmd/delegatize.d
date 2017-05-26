@@ -31,6 +31,7 @@ extern (C++) Expression toDelegate(Expression e, Type t, Scope* sc)
     if (t.hasWild())
         tf.mod = MODwild;
     auto fld = new FuncLiteralDeclaration(loc, loc, tf, TOKdelegate, null);
+    fld.inlining = PINLINE.never;
     sc = sc.push();
     sc.parent = fld; // set current function to be the delegate
     lambdaSetParent(e, sc);
