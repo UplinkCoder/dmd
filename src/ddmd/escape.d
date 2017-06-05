@@ -300,6 +300,9 @@ bool checkAssignEscape(Scope* sc, Expression e, bool gag)
     foreach (VarDeclaration v; er.byref)
     {
         //printf("byref: %s\n", v.toChars());
+        if(v == va)
+            continue;
+
         if (v.isDataseg())
             continue;
 
