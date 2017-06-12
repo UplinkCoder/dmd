@@ -56,6 +56,7 @@ struct TestArgs
     string[] objcSources;
     string   permuteArgs;
     string   compileOutput;
+    string[] outputLines;
     string   gdbScript;
     string   gdbMatch;
     string   postScript;
@@ -234,6 +235,18 @@ bool gatherTestParameters(ref TestArgs testArgs, string input_dir, string input_
     testArgs.disabledPlatforms = split(disabledPlatformsStr);
 
     findOutputParameter(file, "TEST_OUTPUT", testArgs.compileOutput, envData.sep);
+    if(!testArgs.compileOutput)
+    {
+        string p;
+        for (;;)
+        {
+            findTestParameter(file, "CONTAINS", p);
+            if (p && p.length)
+                testArgs.outputLines ~= p;
+            else
+                break;
+        }
+    }
 
     findOutputParameter(file, "GDB_SCRIPT", testArgs.gdbScript, envData.sep);
     findTestParameter(file, "GDB_MATCH", testArgs.gdbMatch);
@@ -399,6 +412,21 @@ bool collectExtraSources (in string input_dir, in string output_dir, in string[]
     }
 
     return true;
+}
+
+/// returns : true if the string contains all the substrings in the given order.
+bool outputContains(string output, string[] subStrings, out int[] unmatchedStrings)
+{
+    foreach(int i,s;subStrings)
+    {
+        auto pos = output.indexOf(s);
+        if (pos < 0)
+            unmatchedStrings ~= i;
+        else
+            output = output[0 .. pos] ~ output[pos + s.length .. $];
+   }
+
+   return unmatchedStrings.length == 0;
 }
 
 // compare output string to reference string, but ignore places
@@ -597,6 +625,15 @@ int main(string[] args)
 
             auto m = std.regex.match(compile_output, `Internal error: .*$`);
             enforce(!m, m.hit);
+
+            if (testArgs.outputLines !is null)
+            {
+                assert(testArgs.compileOutput is null, "cannot have CONTAINS and TEST_OUTPUT");
+                int[] subStringsNotFound;
+                enforce(outputContains(compile_output, testArgs.outputLines, subStringsNotFound),
+                    "\nthe following sub-strings were not found in the output:\n----\n" ~
+                    subStringsNotFound[].map!(i => testArgs.outputLines[i]).join("\n") ~ "\n----\n");
+            }
 
             if (testArgs.compileOutput !is null)
             {
