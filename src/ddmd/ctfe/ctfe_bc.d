@@ -5555,6 +5555,7 @@ static if (is(BCGen))
             {
                 foreach (fixup; _uls.continueFixups[0 .. _uls.continueFixupCount])
                 {
+                    
                     //HACK the will leave a nop in the bcgen
                     //but it will break llvm or other potential backends;
                     if (fixup.addr != block.end.addr)
@@ -6269,6 +6270,8 @@ static if (is(BCGen))
             else if (toType == BCTypeEnum.i64) {} // nop
             else if (toType.type.anyOf([BCTypeEnum.c8, BCTypeEnum.i8]))
                 And3(retval.i32, retval.i32, imm32(0xff));
+            else if (toType.type.anyOf([BCTypeEnum.c16, BCTypeEnum.i16]))
+                And3(retval.i32, retval.i32, imm32(0xffff));
             else
             {
                 bailout("Cast not implemented: " ~ ce.toString);
