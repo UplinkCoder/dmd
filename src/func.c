@@ -26,6 +26,8 @@
 #include "hdrgen.h"
 #include "target.h"
 
+#include "trace.h"
+
 #ifdef IN_GCC
 #include "d-dmd-gcc.h"
 #endif
@@ -120,6 +122,7 @@ void FuncDeclaration::semantic(Scope *sc)
     InterfaceDeclaration *id;
     Dsymbol *pd;
 
+    TRACE(this);
 #if 0
     printf("FuncDeclaration::semantic(sc = %p, this = %p, '%s', linkage = %d)\n", sc, this, toPrettyChars(), sc->linkage);
     if (isFuncLiteralDeclaration())
