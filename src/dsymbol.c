@@ -17,6 +17,7 @@
 #include "aav.h"
 
 #include "mars.h"
+#include "trace.h"
 #include "dsymbol.h"
 #include "aggregate.h"
 #include "identifier.h"

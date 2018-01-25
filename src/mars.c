@@ -35,6 +35,8 @@
 #include "lib.h"
 #include "json.h"
 
+#include "trace.h";
+
 #if WINDOWS_SEH
 #include <windows.h>
 long __cdecl __ehfilter(LPEXCEPTION_POINTERS ep);
@@ -432,6 +434,7 @@ int main(int iargc, const char *argv[])
 {
     mem.init();                         // initialize storage allocator
     mem.setStackBottom(&argv);
+    init_trace();
 #if _WIN32 && __DMC__
     mem.addroots((char *)&_xi_a, (char *)&_end);
 #endif

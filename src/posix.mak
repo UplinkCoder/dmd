@@ -116,6 +116,7 @@ DMD_OBJS = \
 	imphint.o argtypes.o ti_pvoid.o apply.o sapply.o sideeffect.o \
 	html.o unialpha.o target.o \
 	pdata.o cv8.o backconfig.o divcoeff.o dwarfeh.o \
+	trace.o \
 	$(TARGET_OBJS)
 
 ifeq (OSX,$(TARGET))
@@ -663,6 +664,9 @@ var.o: $C/var.c optab.c tytab.c
 	$(CC) -c $(MFLAGS) -I. $<
 
 version.o: version.c
+	$(CC) -c $(CFLAGS) $<
+
+trace.o: trace.c
 	$(CC) -c $(CFLAGS) $<
 
 ######################################################
