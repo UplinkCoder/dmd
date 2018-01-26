@@ -31,6 +31,7 @@
 #include "dsymbol.h"
 #include "identifier.h"
 #include "hdrgen.h"
+#include "trace.h"
 
 #if WINDOWS_SEH
 #include <windows.h>
@@ -1548,6 +1549,7 @@ FuncDeclaration *TemplateDeclaration::deduceFunctionTemplate(Scope *sc, Loc loc,
     TemplateInstance *ti;
     FuncDeclaration *fd;
 
+    TRACE(this);
 #if 0
     printf("TemplateDeclaration::deduceFunctionTemplate() %s\n", toChars());
     printf("    targsi:\n");

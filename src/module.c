@@ -37,6 +37,7 @@
 #include "hdrgen.h"
 #include "lexer.h"
 #include "expression.h"
+#include "trace.h"
 
 #define MARS 1
 #include "html.h"
@@ -629,7 +630,7 @@ void Module::parse()
 void Module::importAll(Scope *prevsc)
 {
     //printf("+Module::importAll(this = %p, '%s'): parent = %p\n", this, toChars(), parent);
-
+    TRACE(this);
     if (scope)
         return;                 // already done
 

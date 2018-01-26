@@ -20,6 +20,7 @@
 #include "id.h"
 #include "statement.h"
 #include "template.h"
+#include "trace.h"
 
 /********************************* AggregateDeclaration ****************************/
 
@@ -67,6 +68,7 @@ void AggregateDeclaration::setScope(Scope *sc)
 
 void AggregateDeclaration::semantic2(Scope *sc)
 {
+    TRACE(this);
     //printf("AggregateDeclaration::semantic2(%s)\n", toChars());
     if (scope && members)
     {   error("has forward references");

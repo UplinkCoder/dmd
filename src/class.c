@@ -28,6 +28,7 @@
 #include "module.h"
 #include "expression.h"
 #include "statement.h"
+#include "trace.h"
 
 /********************************* ClassDeclaration ****************************/
 
@@ -239,6 +240,7 @@ Dsymbol *ClassDeclaration::syntaxCopy(Dsymbol *s)
 
 void ClassDeclaration::semantic(Scope *sc)
 {
+    TRACE(this);
     //printf("ClassDeclaration::semantic(%s), type = %p, sizeok = %d, this = %p\n", toChars(), type, sizeok, this);
     //printf("\tparent = %p, '%s'\n", sc->parent, sc->parent ? sc->parent->toChars() : "");
     //printf("sc->stc = %x\n", sc->stc);
@@ -1187,6 +1189,7 @@ Dsymbol *InterfaceDeclaration::syntaxCopy(Dsymbol *s)
 
 void InterfaceDeclaration::semantic(Scope *sc)
 {
+    TRACE(this);
     //printf("InterfaceDeclaration::semantic(%s), type = %p\n", toChars(), type);
     if (inuse)
         return;
