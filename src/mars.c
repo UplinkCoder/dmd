@@ -35,7 +35,7 @@
 #include "lib.h"
 #include "json.h"
 
-#include "trace.h";
+#include "trace.h"
 
 #if WINDOWS_SEH
 #include <windows.h>
@@ -1576,6 +1576,12 @@ int main(int iargc, const char *argv[])
 
     if (global.params.doXGeneration)
         json_generate(&modules);
+
+    for(int i = 0; i < trace_point_array_count;i++)
+    {
+        _trace_point_* tp = trace_point_array + i;
+        printf("%s|%s: %s -- sema_dur: %lld \n", tp->name, tp->sym->kind(), tp->sym->toChars(), tp->end_ticks - tp->begin_ticks);
+    }
 
     if (global.params.oneobj)
     {
