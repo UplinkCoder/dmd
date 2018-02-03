@@ -137,11 +137,9 @@ bool isFloat(BCType bct) @safe pure nothrow
 
 bool isBasicBCType(BCType bct) @safe pure
 {
-    return !(bct.type == BCTypeEnum.Struct || bct.type == BCTypeEnum.Array
+    return !(bct.type == BCTypeEnum.Struct || bct.type == BCTypeEnum.Array || bct.type == BCTypeEnum.Class
             || bct.type == BCTypeEnum.Slice || bct.type == BCTypeEnum.Undef || bct.type == BCTypeEnum.Ptr);
 }
-
-static assert(!isBasicBCType(BCType(BCTypeEnum.Array, 1)));
 
 const(bool) isStackValueOrParameter(const BCValue val) pure @safe nothrow
 {

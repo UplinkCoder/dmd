@@ -603,9 +603,23 @@ struct BeginStructResult
     alias _struct this;
 }
 
+struct BeginClassResult
+{
+    uint classCount;
+    BCClass* _class;
+    alias _class this;
+
+    void addField(const BCType bct, bool isVoid)
+    {
+        memberTypes[memberCount++] = bct;
+        size += _sharedCtfeState.size(bct, true);
+    }
+}
+
+
 struct BCStruct
 {
-    uint memberTypeCount;
+    uint memberCount;
     uint size = StructMetaData.Size;
 
     BCType[bc_max_members] memberTypes;
@@ -616,10 +630,10 @@ struct BCStruct
     {
         string result;
         result ~= " Size: " ~ to!string(size);
-        result ~= " MemberCount: " ~ to!string(memberTypeCount);
+        result ~= " MemberCount: " ~ to!string(memberCount);
         result ~= " [";
 
-        foreach(i; 0 .. memberTypeCount)
+        foreach(i; 0 .. memberCount)
         {
             result ~= memberTypes[i].toString;
             result ~= " {" ~ to!string(offset(i)) ~ "}, ";
@@ -632,10 +646,10 @@ struct BCStruct
 
     void addField(const BCType bct, bool isVoid, uint[] initValue)
     {
-        memberTypes[memberTypeCount] = bct;
-        initializers[memberTypeCount].length = initValue.length;
-        initializers[memberTypeCount][0 .. initValue.length] = initValue[0 .. initValue.length];
-        voidInit[memberTypeCount++] = isVoid;
+        memberTypes[memberCount] = bct;
+        initializers[memberCount].length = initValue.length;
+        initializers[memberCount][0 .. initValue.length] = initValue[0 .. initValue.length];
+        voidInit[memberCount++] = isVoid;
 
         size += align4(_sharedCtfeState.size(bct, true));
     }
@@ -647,8 +661,8 @@ struct BCStruct
             return -1;
 
         debug (ctfe)
-            assert(idx <= memberTypeCount);
-            else if (idx > memberTypeCount)
+            assert(idx <= memberCount);
+            else if (idx > memberCount)
                 return -1;
 
         foreach (t; memberTypes[0 .. idx])
@@ -681,7 +695,7 @@ struct BCStruct
 
 struct BCUnion
 {
-    uint memberTypeCount;
+    uint memberCount;
     uint size = UnionMetaData.Size;
 
     BCType[bc_max_members] memberTypes;
@@ -692,10 +706,10 @@ struct BCUnion
     {
         string result;
         result ~= " Size: " ~ to!string(size);
-        result ~= " MemberCount: " ~ to!string(memberTypeCount);
+        result ~= " MemberCount: " ~ to!string(memberCount);
         result ~= " [";
 
-        foreach(i; 0 .. memberTypeCount)
+        foreach(i; 0 .. memberCount)
         {
             result ~= memberTypes[i].toString;
         }
@@ -707,14 +721,14 @@ struct BCUnion
 
     void addField(const BCType bct, bool isVoid, uint[] initValue)
     {
-        if (!memberTypeCount) // if we are on the first field set the initalizer
+        if (!memberCount) // if we are on the first field set the initalizer
         {
             initializer.length = initValue.length;
             initializer[0 .. initValue.length] = initValue[0 .. initValue.length];
         }
 
-        memberTypes[memberTypeCount] = bct;
-        voidInit[memberTypeCount++] = isVoid;
+        memberTypes[memberCount] = bct;
+        voidInit[memberCount++] = isVoid;
 
         size = max(align4(_sharedCtfeState.size(bct, true)) + UnionMetaData.Size, size);
     }
@@ -723,7 +737,38 @@ struct BCUnion
 
 struct BCClass 
 {
-    
+    uint parentIdx; /// 0 is object
+    uint size;
+    uint memberCount;
+
+    BCType[bc_max_members] memberTypes;
+
+    const int offset(const int idx)
+    {
+        int _offset;
+        if (idx == -1)
+            return -1;
+
+        debug (ctfe)
+            assert(idx <= memberCount);
+            else if (idx > memberCount)
+                return -1;
+
+
+        _offset += (
+            parentIdx ?
+            _sharedCtfeState.classTypes[parentIdx - 1].size :
+            ClassMetaData.Size
+        );
+
+        foreach (t; memberTypes[0 .. idx])
+        {
+            _offset += align4(sharedCtfeState.size(t, true));
+        }
+
+        return _offset;
+    }
+
 }
 
 struct SharedExecutionState
@@ -784,6 +829,7 @@ struct SharedCtfeState(BCGenT)
 
 
     uint structCount;
+    uint classCount;
     uint arrayCount;
     uint sliceCount;
     uint pointerCount;
@@ -828,7 +874,7 @@ struct SharedCtfeState(BCGenT)
         else if (type.type == BCTypeEnum.Class)
         {
             if (type.typeIndex)
-                result = "BCStruct: " ~ (cast()structDeclpointerTypes[type.typeIndex - 1]).toString;
+                result = "BCClass: " ~ (cast()classDeclTypePointers[type.typeIndex - 1]).toString;
             else
                 result = type.toString;
         }
@@ -862,7 +908,7 @@ struct SharedCtfeState(BCGenT)
         uint offset;
         result.length = structType.size;
 
-        foreach(i, init;structType.initializers[0 .. structType.memberTypeCount])
+        foreach(i, init;structType.initializers[0 .. structType.memberCount])
         {
             auto _size = _sharedCtfeState.size(structType.memberTypes[i]);
             auto endOffset = offset + _size;
@@ -944,7 +990,9 @@ struct SharedCtfeState(BCGenT)
 
     import ddmd.globals : Loc;
 
-    extern (D) BCValue addError(Loc loc, string msg, BCValue v1 = BCValue.init, BCValue v2 = BCValue.init, BCValue v3 = BCValue.init, BCValue v4 = BCValue.init)
+    extern (D) BCValue addError(Loc loc, string msg, BCValue v1 = BCValue.init,
+        BCValue v2 = BCValue.init, BCValue v3 = BCValue.init,
+        BCValue v4 = BCValue.init)
     {
         auto sa1 = TypedStackAddr(v1.type, v1.stackAddr);
         auto sa2 = TypedStackAddr(v2.type, v2.stackAddr);
@@ -1016,6 +1064,26 @@ struct SharedCtfeState(BCGenT)
         return structCount;
     }
 
+    int getClassIndex(ClassDeclaration cd)
+    {
+        if (cd is null)
+            return 0;
+
+        foreach (i, classDeclPtr; classDeclTypePointers[0 .. classCount])
+        {
+            if (classDeclPtr == cd)
+            {
+                return cast(uint) i + 1;
+            }
+        }
+
+        //register structType
+        auto oldClassCount = classCount;
+        btv.visit(cd);
+        assert(oldClassCount < classCount);
+        return classCount;
+    }
+
     int getPointerIndex(TypePointer pt)
     {
         if (pt is null)
@@ -1079,6 +1147,22 @@ struct SharedCtfeState(BCGenT)
         }
         else
             return BCType(BCTypeEnum.Struct, s.structCount);
+    }
+
+    BeginClassResult beginClass(ClassDeclaration cd)
+    {
+        classDeclTypePointers[classCount] = cd;
+        return BeginClassResult(classCount, &classTypes[classCount++]);
+    }
+
+    const(BCType) endClass(BeginClassResult* s, bool died)
+    {
+        if (died)
+        {
+            return BCType.init;
+        }
+        else
+            return BCType(BCTypeEnum.Class, s.classCount);
     }
     /*
     string getTypeString(BCType type)
@@ -1440,7 +1524,7 @@ Expression toExpression(const BCValue value, Type expressionType,
                 writeln("structType: ", _struct);
                 writeln("StructHeapRep: ", structBegin[0 .. _struct.size]);
             }
-            foreach (idx, memberType; _struct.memberTypes[0 .. _struct.memberTypeCount])
+            foreach (idx, memberType; _struct.memberTypes[0 .. _struct.memberCount])
             {
                 debug (abi)
                 {
@@ -1724,6 +1808,13 @@ extern (C++) final class BCTypeVisitor : Visitor
                 return BCType(BCTypeEnum.Ptr, _sharedCtfeState.pointerCount);
             }
         }
+        else if (t.ty == Tclass)
+        {
+            auto cd = (cast(TypeClass) t).sym;
+            uint classIndex = _sharedCtfeState.getClassIndex(cd);
+            return classIndex ? BCType(BCTypeEnum.Class, classIndex) : BCType.init;
+        }
+
         else if (t.ty == Tfunction)
         {
             return BCType(BCTypeEnum.Function);
@@ -1734,6 +1825,22 @@ extern (C++) final class BCTypeVisitor : Visitor
 
         return BCType.init;
     }
+
+    override void visit(ClassDeclaration cd)
+    {
+        lastLoc = cd.loc;
+        bool died = true;
+
+        auto ct = sharedCtfeState.beginClass(cd);
+
+        // setParentIdx;
+        if (cd.baseClass)
+            ct.parentIdx = _sharedCtfeState.getClassIndex(cd.baseClass);
+
+        sharedCtfeState.endClass(&ct, died);
+
+    }
+
 
     override void visit(StructDeclaration sd)
     {
@@ -3073,7 +3180,6 @@ static if (is(BCGen))
                 retval = retval.i32;
             }
 
-
             if (wasAssignTo && rhs == retval)
             {
                 auto retvalHeapRef = retval.heapRef;
@@ -3895,9 +4001,34 @@ static if (is(BCGen))
                 }
             }
         }
+        else if (dve.e1.type.ty == Tclass && (cast(TypeClass) dve.e1.type).sym)
+        {
+            auto cd = (cast(TypeClass) dve.e1.type).sym;
+            auto ti = _sharedCtfeState.getClassIndex(cd);
+
+            int fieldIndex = -1;
+            /// 0 means this, 1 means super, 2 means super.super and so on
+            int level = 0;
+
+            FindField: while(cd)
+            {
+                foreach(int i,f;cd.fields)
+                {
+                    if (dve.var == f)
+                    {
+                        fieldIndex = i;
+                        break FindField;
+                    }
+                }
+                cd = cd.baseClass;
+                level++;
+            }
+
+            bailout("Class.field still has to be implemented fi:" ~ fieldIndex.to!string ~ " lvl:" ~ level.to!string);
+        }
         else
         {
-            bailout("Can only take members of a struct for now");
+            bailout("Can only take members of a struct/class for now");
         }
 
     }
@@ -4105,7 +4236,7 @@ static if (is(BCGen))
         }
         BCStruct _struct = _sharedCtfeState.structTypes[idx - 1];
 
-        foreach (i; 0 .. _struct.memberTypeCount)
+        foreach (i; 0 .. _struct.memberCount)
         {
             if (_struct.voidInit[i])
             {
@@ -4662,8 +4793,8 @@ static if (is(BCGen))
     void initStruct(BCValue structPtr, const (BCStruct)* type)
     {
         /// TODO FIXME this has to copy the struct Intializers if there is one
-        uint memberTypeCount = type.memberTypeCount;
-        foreach(int i, mt; type.memberTypes[0 .. memberTypeCount])
+        uint memberCount = type.memberCount;
+        foreach(int i, mt; type.memberTypes[0 .. memberCount])
         {
             if (mt.type == BCTypeEnum.Array)
             {
@@ -4804,7 +4935,6 @@ static if (is(BCGen))
             }
             else if (auto ci = vd.getConstInitializer)
             {
-
                 auto _init = genExpr(ci);
                 if (_init.type == BCType(BCTypeEnum.i32))
                 {
@@ -4819,6 +4949,10 @@ static if (is(BCGen))
                     //Set(var.i32, _init.i32);
                     //TODO we should really do a memcopy here instead of copying the pointer;
                     MemCpy(var.i32, _init.i32, imm32(_sharedCtfeState.size(_init.type)));
+                }
+                else if (_init.type.type == BCTypeEnum.Class)
+                {
+                    Set(var.i32, _init.i32);
                 }
                 else if (_init.type.type == BCTypeEnum.Slice || _init.type.type == BCTypeEnum.Array || _init.type.type == BCTypeEnum.string8)
                 {
@@ -5826,6 +5960,10 @@ static if (is(BCGen))
                     initStruct(lhs, structType);
 
                     endCndJmp(structZeroJmp, genLabel());
+                }
+                else if (lhs.type.type == BCTypeEnum.Class && rhs.type.type == BCTypeEnum.Class)
+                {
+                    Set(lhs.i32, rhs.i32);
                 }
                 else
                 {
