@@ -4655,19 +4655,25 @@ static if (is(BCGen))
     }
 
 
-    /// Params fIndex => fieldIndex of the field to be set to void/nonVoid
-    /// Params nonVoid => true if seting to nonVoid false if setting to Void
+    int bitfieldOffset(BCStruct* structType) pure const
+    {
+        return align4(structType.size) + StructMetaData.VoidInitBitfieldOffset;
+    }
+
+    /// Params: 
+    ///     fIndex => fieldIndex of the field to be set to void/nonVoid
+    ///     nonVoid => true if seting to nonVoid false if setting to Void
     void setMemberVoidInit(BCValue structPtr, int fIndex, bool nonVoid)
     {
         assert(structPtr.type.type == BCTypeEnum.Struct, "setMemberVoidInit may only be called on structs for now");
         assert(structPtr.type.typeIndex, "StructPtr typeIndex invalid");
-        auto structType = _sharedCtfeState.structTypes[structPtr.type.typeIndex - 1];
+        auto structType = &_sharedCtfeState.structTypes[structPtr.type.typeIndex - 1];
 
         auto bitfieldIndex = structType.voidInitBitfieldIndex(fIndex);
 
         BCValue bitFieldAddr  = genTemporary(i32Type);
         BCValue bitFieldValue = genTemporary(i32Type);
-        Add3(bitFieldAddr, structPtr.i32, imm32(align4(structType.size) + StructMetaData.VoidInitBitfieldOffset));
+        Add3(bitFieldAddr, structPtr.i32, imm32(bitfieldOffset(structType)));
         Load32(bitFieldValue, bitFieldAddr);
         uint bitFieldIndexBit = 1 << bitfieldIndex;
         if (nonVoid)
@@ -4688,13 +4694,13 @@ static if (is(BCGen))
     {
         assert(structPtr.type.type == BCTypeEnum.Struct, "setMemberVoidInit may only be called on structs for now");
         assert(structPtr.type.typeIndex, "StructPtr typeIndex invalid");
-        auto structType = _sharedCtfeState.structTypes[structPtr.type.typeIndex - 1];
+        auto structType = &_sharedCtfeState.structTypes[structPtr.type.typeIndex - 1];
 
         auto bitfieldIndex = structType.voidInitBitfieldIndex(fIndex);
 
         BCValue bitFieldAddr  = genTemporary(i32Type);
         BCValue bitFieldValue = genTemporary(i32Type);
-        Add3(bitFieldAddr, structPtr.i32, imm32(align4(structType.size) + StructMetaData.VoidInitBitfieldOffset));
+        Add3(bitFieldAddr, structPtr.i32, imm32(bitfieldOffset(structType)));
         Load32(bitFieldValue, bitFieldAddr);
 
         And3(bitFieldValue, bitFieldValue, imm32(1 << bitfieldIndex));
