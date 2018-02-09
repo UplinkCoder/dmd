@@ -18,13 +18,13 @@ import ddmd.arraytypes : Expressions, VarDeclarations;
 
 import std.conv : to;
 
-enum perf = 0;
+enum perf = 1;
 enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
-enum UseCBackend = 1;
+enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
 
@@ -5970,6 +5970,10 @@ static if (is(BCGen))
                 else if (lhs.type.type == BCTypeEnum.Class && rhs.type.type == BCTypeEnum.Class)
                 {
                     Set(lhs.i32, rhs.i32);
+                }
+                else if (lhs.type.type == BCTypeEnum.Class && rhs.type.type == BCTypeEnum.Null)
+                {
+                    Set(lhs.i32, imm32(0));
                 }
                 else
                 {
