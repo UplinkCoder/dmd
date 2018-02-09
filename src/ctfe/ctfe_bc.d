@@ -23,8 +23,8 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
-enum UseCBackend = 0;
+enum UsePrinterBackend = 0;
+enum UseCBackend = 1;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
 
