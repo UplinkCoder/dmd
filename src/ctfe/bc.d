@@ -175,7 +175,7 @@ enum LongInst : ushort
     Line,
 
 }
-//Imm-Intructuins and corrospinding 2Operand instructions have to be in the same order
+//Imm-Instructions and corresponding 2Operand instructions have to be in the same order
 static immutable bc_order_errors = () {
     string result;
     auto members = [__traits(allMembers, LongInst)];
@@ -183,7 +183,7 @@ static immutable bc_order_errors = () {
     auto d2 = LongInst.ImmMod - LongInst.Mod;
     if (d1 != d2)
     {
-        result ~= "mismatch between ImmAdd - Add and ImmMod-Mod\nThis indicates Imm insts that do not corrospond to 2stack insts";
+        result ~= "mismatch between ImmAdd - Add and ImmMod-Mod\nThis indicates Imm insts that do not correspond to 2stack insts";
     }
 
     foreach (i, member; members)
@@ -265,11 +265,11 @@ struct LongInst64
 
 }
 
-static assert(LongInst.max < 0x7F, "Instruction do not fit in 7 bit anymore");
+static assert(LongInst.max < 0x7F, "Instructions do not fit in 7 bits anymore");
 
 static short isShortJump(const int offset) pure @safe
 {
-    assert(offset != 0, "An Jump to the Jump itself is invalid");
+    assert(offset != 0, "A Jump to the Jump itself is invalid");
 
     const bool wasNegative = (offset < 0);
     int abs_offset = wasNegative ? offset * -1 : offset;
@@ -391,7 +391,7 @@ struct BCGen
     }
 
 pure:
-    /// The emitLongInst functions have be kept up to date if
+    /// The emitLongInst functions have to be kept up to date if
     /// LongInst64 is changed.
     void emitLongInst(const LongInst i, const BCAddr targetAddr)
     {
@@ -744,7 +744,7 @@ pure:
                 rhs = pushOntoStack(rhs);
             }
             else
-                assert(0, "did not expecte type " ~ to!string(rhs.type.type) ~ "to be used in a float expression");
+                assert(0, "did not expect type " ~ to!string(rhs.type.type) ~ "to be used in a float expression");
 
             if (inst != LongInst.Set)
                 inst += (LongInst.FAdd32 - LongInst.Add);
@@ -768,7 +768,7 @@ pure:
         {
             if  (basicTypeSize(rhs.type) <= 4)
             {
-                //Change the instruction into the corrosponding Imm Instruction;
+                //Change the instruction into the corresponding Imm Instruction;
                 inst += (LongInst.ImmAdd - LongInst.Add);
                 emitLongInst(inst, lhs.stackAddr, rhs.imm32);
                 return ;
@@ -801,7 +801,7 @@ pure:
                 emitLongInst(LongInst.SetHighImm, lhs.stackAddr, Imm32(rhs.imm64 >> 32));
         }
 
-        else if (lhs != rhs) // do not emit self asignments;
+        else if (lhs != rhs) // do not emit self assignments;
         {
             emitArithInstruction(LongInst.Set, lhs, rhs);
         }
@@ -977,7 +977,7 @@ pure:
 
     void Xor3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType != BCValueType.Immediate, "Cannot or to Immediate");
+        assert(result.vType != BCValueType.Immediate, "Cannot xor to Immediate");
 
         result = (result ? result : lhs);
         if (lhs != result)
@@ -1016,7 +1016,7 @@ pure:
 
     void Mod3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType != BCValueType.Immediate, "Cannot and to Immediate");
+        assert(result.vType != BCValueType.Immediate, "Cannot mod to Immediate");
 
         result = (result ? result : lhs);
         if (lhs != result)
@@ -1911,7 +1911,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             break;
         case BCTypeEnum.Struct, BCTypeEnum.String, BCTypeEnum.Array, BCTypeEnum.Ptr:
             {
-                // This might need to be removed agaein ?
+                // This might need to be removed again?
                 *(&stackP[argOffset / 4]) = arg.heapAddr.addr;
                 argOffset += uint.sizeof;
             }
@@ -2822,7 +2822,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                                 assert(0, "!!! HEAP OVERFLOW !!!");
                             else
                             {
-                                // we will now resize the heap to 8 times of it's former size
+                                // we will now resize the heap to 8 times its former size
                                 auto newHeap = new uint[](heapPtr.heapMax * 12);
                                 newHeap[0 .. heapSize] = heapPtr._heap[0 .. heapSize];
                                 heapPtr._heap = newHeap;
@@ -2922,7 +2922,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                         assert(0, "!!! HEAP OVERFLOW !!!");
                     else
                     {
-                        // we will now resize the heap to 8 times of it's former size
+                        // we will now resize the heap to 8 times its former size
                         auto newHeap = new uint[](heapPtr.heapMax * 8);
                         newHeap[0 .. heapSize] = heapPtr._heap[0 .. heapSize];
                         heapPtr._heap = newHeap;
