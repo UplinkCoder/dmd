@@ -24,6 +24,7 @@ class E : C
 int testClassStuff ()
 {
   C c1, c2, c3;
+  D c4;
   c1 = new C();
   c2 = new D();
   c3 = new E();

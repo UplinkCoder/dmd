@@ -1162,7 +1162,9 @@ struct SharedCtfeState(BCGenT)
             return BCType.init;
         }
         else
+        {
             return BCType(BCTypeEnum.Class, s.classCount);
+        }
     }
     /*
     string getTypeString(BCType type)
@@ -1210,7 +1212,19 @@ struct SharedCtfeState(BCGenT)
                 return _struct.size;
 
             }
+        case BCTypeEnum.Class :
+            {
+                if (type.typeIndex && type.typeIndex < classCount)
+                {
+                    // the if above shoud really be an assert
+                    // I have no idea why this even happens
+                    return 0;
+                }
 
+                const BCClass _class = classTypes[type.typeIndex - 1];
+
+                return _class.size;
+            }
         case BCTypeEnum.Array:
             {
                 if(!type.typeIndex || type.typeIndex > arrayCount)
@@ -1831,13 +1845,28 @@ extern (C++) final class BCTypeVisitor : Visitor
         lastLoc = cd.loc;
         bool died = true;
 
+        int parentIdx; 
+
+        if (cd.baseClass)
+        {
+            parentIdx = _sharedCtfeState.getClassIndex(cd.baseClass);
+            assert(parentIdx);
+        }
+
         auto ct = sharedCtfeState.beginClass(cd);
 
-        // setParentIdx;
-        if (cd.baseClass)
-            ct.parentIdx = _sharedCtfeState.getClassIndex(cd.baseClass);
+        ct.parentIdx = parentIdx;
 
+        foreach(VarDeclaration f;cd.fields)
+        {
+            ct.addField(toBCType(f.type), f._init ? !!f._init.isVoidInitializer : false); 
+        }
+        if (parentIdx)
+        {
+            ct.size += _sharedCtfeState.classTypes[parentIdx - 1].size;
+        }
         sharedCtfeState.endClass(&ct, died);
+
 
     }
 
@@ -4483,7 +4512,6 @@ static if (is(BCGen))
             retval.type.type = BCTypeEnum.Function;
         }
 
-
     }
 
     override void visit(NewExp ne)
@@ -4491,24 +4519,45 @@ static if (is(BCGen))
         lastLoc = ne.loc;
 
         Line(ne.loc.linnum);
-        auto ptr = genTemporary(i32Type);
         auto type = toBCType(ne.newtype);
-        auto typeSize = _sharedCtfeState.size(type);
+
+        uint typeSize;
+        BCValue ptr;
+
+        if (type.type == BCTypeEnum.Class)
+        {
+            ptr = genTemporary(type);
+            typeSize = _sharedCtfeState.size(type) + ClassMetaData.Size;
+        }
+        else
+        {
+            ptr = genTemporary(i32Type);
+            typeSize = _sharedCtfeState.size(type);
+        }
 
         if (!typeSize)
             bailout(type.toString ~ "does not seem to have a size in: " ~ ne.toString);
         else
-            Alloc(ptr, imm32(typeSize));
+            Alloc(ptr, imm32(typeSize), type);
 
         if (isBasicBCType(type) && typeSize > 4)
         {
             auto value = ne.arguments && ne.arguments.dim == 1 ? genExpr((*ne.arguments)[0]) : imm32(0);
             Store32(ptr, value.i32);
         }
+        else if (type.type == BCTypeEnum.Class)
+        {
+            Store32(ptr.i32, imm32(type.typeIndex));
+            ptr.type = type;
+        }
+        else
+        {
+            bailout("Can only new basic Types under <=4 bytes for now");
+        }
+
         // TODO do proper handling of the arguments to the newExp.
         retval = ptr;
 
-        bailout("Can only new basic Types under <=4 bytes for now");
         return;
 
     }
@@ -6489,6 +6538,7 @@ static if (is(BCGen))
 
             // Calling a member function
             _this = dve.e1;
+            import std.stdio;
 
             if (!dve.var || !dve.var.isFuncDeclaration())
             {
@@ -6496,12 +6546,29 @@ static if (is(BCGen))
                 return ;
             }
             fd = dve.var.isFuncDeclaration();
+            thisPtr = genExpr(dve.e1);
+
+            if (dve.e1.type.ty == Tclass && fd.isVirtualMethod())
+            {
+                auto bcType = toBCType(dve.e1.type);
+                addVirtualCall(bcType, fd);
+
+                auto typeId = genTemporary(i32Type);
+                Load32(typeId, thisPtr.i32);
+                uint fIdx = _sharedCtfeState.getFunctionIndex(fd);
+                fnValue = vtblLoad(bcType, typeId, fIdx);
+                bailout("A virtual call ... Oh No! -- " ~ ce.toString);
+            }
+            else
+            {
+                // non-virtual so the function
+            }
             /*
             if (_this.op == TOKdottype)
                 _this = (cast(DotTypeExp)dve.e1).e1;
             }
             */
-            thisPtr = genExpr(dve.e1);
+
         }
         // functionPtr
         else if (ce.e1.op == TOKstar)
@@ -6690,6 +6757,22 @@ static if (is(BCGen))
 
     }
 
+    void addVirtualCall(BCType t, FuncDeclaration fd)
+    {
+        assert(t.type == BCTypeEnum.Class);
+        assert(fd.isVirtualMethod);
+
+        ClassDeclaration cd = _sharedCtfeState.classDeclTypePointers[t.typeIndex - 1];
+        // cd.findFunc()
+    }
+
+    BCValue vtblLoad(BCType t, BCValue typeId, int fnIdx)
+    {
+        assert(t.type == BCTypeEnum.Class);
+        return BCValue.init;
+
+    }
+
     override void visit(ReturnStatement rs)
     {
         lastLoc = rs.loc;
@@ -6715,10 +6798,11 @@ static if (is(BCGen))
             () {
                 with (BCTypeEnum)
                 {
-                    return [c8, i8, c32, i32, i64, f23, f52, Slice, Array, Struct, string8];
+                    enum a = [c8, i8, c32, i32, i64, f23, f52, Slice, Array, Struct, string8];
+                    return cast(typeof(a[0])[a.length]) a;
                 }
             } ();
-
+            pragma(msg, typeof(acceptedReturnTypes));
             if (retval.type.type.anyOf(acceptedReturnTypes))
                 Ret(retval);
             else
@@ -6814,6 +6898,8 @@ static if (is(BCGen))
             else if (toType == BCTypeEnum.i64) {} // nop
             else if (toType.type.anyOf([BCTypeEnum.c8, BCTypeEnum.i8]))
                 And3(retval.i32, retval.i32, imm32(0xff));
+            else if (toType.type.anyOf([BCTypeEnum.c16, BCTypeEnum.i16]))
+                And3(retval.i32, retval.i32, imm32(0xffff));
             else
             {
                 bailout("Cast not implemented: " ~ ce.toString);
