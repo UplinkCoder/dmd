@@ -23,7 +23,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -4494,16 +4494,22 @@ static if (is(BCGen))
         auto ptr = genTemporary(i32Type);
         auto type = toBCType(ne.newtype);
         auto typeSize = _sharedCtfeState.size(type);
-        if (!isBasicBCType(type) || typeSize > 4)
+
+        if (!typeSize)
+            bailout(type.toString ~ "does not seem to have a size in: " ~ ne.toString);
+        else
+            Alloc(ptr, imm32(typeSize));
+
+        if (isBasicBCType(type) && typeSize > 4)
         {
-            bailout("Can only new basic Types under <=4 bytes for now");
-            return;
+            auto value = ne.arguments && ne.arguments.dim == 1 ? genExpr((*ne.arguments)[0]) : imm32(0);
+            Store32(ptr, value.i32);
         }
-        Alloc(ptr, imm32(typeSize));
         // TODO do proper handling of the arguments to the newExp.
-        auto value = ne.arguments && ne.arguments.dim == 1 ? genExpr((*ne.arguments)[0]) : imm32(0);
-        Store32(ptr, value);
         retval = ptr;
+
+        bailout("Can only new basic Types under <=4 bytes for now");
+        return;
 
     }
 
