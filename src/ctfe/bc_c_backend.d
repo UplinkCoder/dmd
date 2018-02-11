@@ -183,10 +183,10 @@ pure:
             v = v.i32;
         else if (v.type.type == BCTypeEnum.Function)
             v = v.i32;
-        // the next one is highly doubious
+        // the next one is highly dubious
         else if (v.type.type == BCTypeEnum.i64)
             v = v.i32;
-        // this one is highly doubious too
+        // this one is highly dubious too
         if (v.type.type == BCTypeEnum.Void || v.type.type == BCTypeEnum.Null)
         {
             v = imm32(0);
@@ -604,7 +604,7 @@ pure:
 
     void Xor3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType != BCValueType.Immediate, "Cannot or to Immediate");
+        assert(result.vType != BCValueType.Immediate, "Cannot xor to Immediate");
 
         result = (result ? result : lhs);
         if (lhs != result)
@@ -643,7 +643,7 @@ pure:
 
     void Mod3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(result.vType != BCValueType.Immediate, "Cannot and to Immediate");
+        assert(result.vType != BCValueType.Immediate, "Cannot mod to Immediate");
 
         result = (result ? result : lhs);
         if (lhs != result)

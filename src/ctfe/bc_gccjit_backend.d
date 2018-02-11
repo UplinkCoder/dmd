@@ -100,7 +100,7 @@ else
             uint flags;
         }
 
-        assert(result, "No result did you try to run before calling Finalize");
+        assert(result, "No result. Did you try to run before calling Finalize?");
 
         alias fType = extern (C) ReturnType function(long[max_params] args, uint* heapSize, uint* heap);
 
@@ -267,7 +267,7 @@ else
             return stackValues[val.stackAddr];
         }
         else
-            assert(0, "vType: " ~ enumToString(val.vType) ~ " is current not supported");
+            assert(0, "vType: " ~ enumToString(val.vType) ~ " is currently not supported");
 
     }
 
@@ -288,7 +288,7 @@ else
             return rvalue(stackValues[val.stackAddr]);
         }
         else
-            assert(0, "vType: " ~ enumToString(val.vType) ~ " is current not supported");
+            assert(0, "vType: " ~ enumToString(val.vType) ~ " is currently not supported");
     }
 
     private jrvalue rvalue(jlvalue val)

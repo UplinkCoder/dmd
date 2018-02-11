@@ -144,7 +144,7 @@ struct Print_BCGen
                 }
                 else
                 {
-                    assert(0, "Unexpeced Immediate of Type" ~ to!string(val.type.type));
+                    assert(0, "Unexpected Immediate of Type" ~ to!string(val.type.type));
                 }
             }
             break;
@@ -266,7 +266,7 @@ struct Print_BCGen
         //currentFunctionStateNumber++;
         if (!parameterCount)
         {
-            //write a newline when we effectivly begin a new function;
+            //write a newline when we effectively begin a new function;
             result ~= "\n";
         }
         name =  name ? name : "p";
