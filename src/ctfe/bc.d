@@ -2822,7 +2822,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                                 assert(0, "!!! HEAP OVERFLOW !!!");
                             else
                             {
-                                // we will now resize the heap to 8 times its former size
+                                // we will now resize the heap to 12 times its former size
                                 auto newHeap = new uint[](heapPtr.heapMax * 12);
                                 newHeap[0 .. heapSize] = heapPtr._heap[0 .. heapSize];
                                 heapPtr._heap = newHeap;
