@@ -64,7 +64,7 @@ bool test(BCGenT)()
 
         with (gen)
         {
-            auto p1 = genParameter(BCType(BCTypeEnum.i32)); //first parameter gets push on here
+            auto p1 = genParameter(BCType(BCTypeEnum.i32)); //first parameter gets pushed on here
             auto p2 = genParameter(BCType(BCTypeEnum.i32)); //the second goes here
             beginFunction();
 

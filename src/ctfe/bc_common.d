@@ -98,7 +98,7 @@ const(uint) basicTypeSize(const BCTypeEnum bct) @safe pure
             return 4;
         }
     case Ptr :
-            assert(0, "Ptr is not suppsed to be a basicType anymore");
+            assert(0, "Ptr is not supposed to be a basicType anymore");
 
     case string8, string16, string32:
         {
@@ -173,7 +173,7 @@ enum BCTypeEnum : ubyte
 
     f23, /// 32  bit float mantissa has 23 bit
     f52, /// 64  bit float mantissa has 52 bit
-    f106, /// 128 bit float mantissa has 106 but (52+52)
+    f106, /// 128 bit float mantissa has 106 bit (52+52)
 
     string8,
     String = string8,
@@ -489,7 +489,7 @@ struct BCValue
         HeapAddr heapAddr;
         Imm32 imm32;
         Imm64 imm64;
-/* for now we represent floats in imm32 or imm64 respectivly
+/* for now we represent floats in imm32 or imm64 respectively
         Imm23f imm23f;
         Imm52f imm52f;
 */
@@ -518,7 +518,7 @@ struct BCValue
             {
                 import std.conv : to;
 
-                assert(0, "toUint not implement for " ~ vType.to!string);
+                assert(0, "toUint not implemented for " ~ vType.to!string);
             }
         }
 
@@ -554,7 +554,7 @@ struct BCValue
             return "imm: " ~ (type.type == BCTypeEnum.i64 || type.type == BCTypeEnum.f52
                     ? to!string(imm64) : to!string(imm32));
         default:
-            return "unkown value format";
+            return "unknown value format";
         }
     }
 
