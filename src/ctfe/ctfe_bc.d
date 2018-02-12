@@ -4969,7 +4969,7 @@ static if (is(BCGen))
 
         if (!vd)
         {
-            // It seems like we can ignore Declarartions which are not variables
+            // It seems like we can ignore declarations which are not variables
             return;
         }
 
@@ -4977,7 +4977,7 @@ static if (is(BCGen))
         auto var = retval;
         if (!var)
         {
-            bailout("var for Declarartion could not be generated -- " ~ de.toString);
+            bailout("var for declarartion could not be generated -- " ~ de.toString);
             return ;
         }
         debug (ctfe)
