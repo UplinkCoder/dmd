@@ -3446,7 +3446,7 @@ static if (is(BCGen))
             {
                 // Everything in here is highly suspicious!
                 // FIXME Design!
-                // Things which are already heapValues
+                // Things that are already heapValues
                 // don't need to be stored ((or do they ??) ... do we need to copy) ?
 
                 retval.type = _sharedCtfeState.pointerOf(v.type);
@@ -4969,7 +4969,7 @@ static if (is(BCGen))
 
         if (!vd)
         {
-            // It seems like we can ignore declarations which are not variables
+            // It seems like we can ignore declarations that are not variables
             return;
         }
 
