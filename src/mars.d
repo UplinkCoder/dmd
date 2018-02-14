@@ -1588,6 +1588,7 @@ Language changes listed by -transition=id:
         char[255] fileNameBuffer;
         import core.stdc.time : ctime, time;
         auto now = time(null);
+
         auto timeString = ctime(&now);
         // replace the ' ' by _ and '\n' or '\r' by '\0'
         {
