@@ -48,6 +48,8 @@ import ddmd.target;
 import ddmd.tokens;
 import ddmd.visitor;
 
+import ddmd.trace;
+
 /// Inline Status
 enum ILS : int
 {
@@ -2043,6 +2045,7 @@ extern (C++) class FuncDeclaration : Declaration
      */
     final bool functionSemantic()
     {
+        mixin(traceString("this", "functionSemantic"));
         if (!_scope)
             return !errors;
 
@@ -3913,6 +3916,8 @@ extern (D) int overloadApply(Dsymbol fstart, scope int delegate(Dsymbol) dg)
         {
             if (od.hasOverloads)
             {
+                if (od.aliassym == d)
+                    assert(0, "Booya");
                 if (int r = overloadApply(od.aliassym, dg))
                     return r;
             }
@@ -3927,11 +3932,17 @@ extern (D) int overloadApply(Dsymbol fstart, scope int delegate(Dsymbol) dg)
         {
             if (fa.hasOverloads)
             {
+                if (fa.funcalias == d)
+                    assert(0, "Booya");
+
                 if (int r = overloadApply(fa.funcalias, dg))
                     return r;
             }
             else if (auto fd = fa.toAliasFunc())
             {
+                if (fd == d)
+                    assert(0, "Booya");
+
                 if (int r = dg(fd))
                     return r;
             }
@@ -3944,6 +3955,9 @@ extern (D) int overloadApply(Dsymbol fstart, scope int delegate(Dsymbol) dg)
         }
         else if (auto ad = d.isAliasDeclaration())
         {
+            if (ad.toAlias == d)
+                assert(0, "Booya");
+
             next = ad.toAlias();
             if (next == ad)
                 break;

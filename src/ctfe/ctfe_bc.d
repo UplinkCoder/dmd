@@ -12,18 +12,21 @@ import ddmd.statement;
 import ddmd.sideeffect;
 import ddmd.visitor;
 import ddmd.arraytypes : Expressions, VarDeclarations;
+
+import ddmd.trace;
+
 /**
  * Written By Stefan Koch in 2016-18
  */
 
 import std.conv : to;
 
-enum perf = 1;
-enum bailoutMessages = 1;
+enum perf = 0;
+enum bailoutMessages = 0;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -367,6 +370,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
 
     if (!bcv.IGaveUp)
     {
+        mixin(traceString("fd", "newCTFE"));
+
         import std.algorithm;
         import std.range;
         import std.datetime : StopWatch;

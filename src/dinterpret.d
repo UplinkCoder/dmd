@@ -36,6 +36,8 @@ import ddmd.tokens;
 import ddmd.utf;
 import ddmd.visitor;
 
+import ddmd.trace;
+
 enum CtfeGoal : int
 {
     ctfeNeedRvalue,     // Must return an Rvalue (== CTFE value)
@@ -795,6 +797,7 @@ extern (C++) Expression ctfeInterpretForPragmaMsg(Expression e)
  */
 extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expressions* arguments, Expression thisarg)
 {
+    mixin(traceString("fd"));
     debug (LOG)
     {
         printf("\n********\n%s FuncDeclaration::interpret(istate = %p) %s\n", fd.loc.toChars(), istate, fd.toChars());
