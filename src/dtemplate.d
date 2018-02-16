@@ -570,6 +570,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
 
     override void semantic(Scope* sc)
     {
+        mixin(traceString("this"));
         static if (LOG)
         {
             printf("TemplateDeclaration.semantic(this = %p, id = '%s')\n", this, ident.toChars());
@@ -2325,6 +2326,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
      */
     TemplateInstance findExistingInstance(TemplateInstance tithis, Expressions* fargs)
     {
+        mixin(traceString("tithis"));
         //printf("findExistingInstance(%p)\n", tithis);
         tithis.fargs = fargs;
         auto tibox = TemplateInstanceBox(tithis);
@@ -6140,6 +6142,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
     void semantic(Scope* sc, Expressions* fargs)
     {
+        mixin(traceString("this"));
         //printf("[%s] TemplateInstance.semantic('%s', this=%p, gag = %d, sc = %p)\n", loc.toChars(), toChars(), this, global.gag, sc);
         version (none)
         {

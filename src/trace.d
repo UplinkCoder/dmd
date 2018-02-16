@@ -91,6 +91,7 @@ return q{
             v_type.stringof, ` ~ (fn ? `"`~fn~`"` : "__FUNCTION__") ~ ", " ~
             vname ~ `);            
         }
+        else static assert(0, "we dont know how to deal with: " ~ v_type.stringof);
     }
 `;
 else

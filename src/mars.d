@@ -1634,15 +1634,30 @@ Language changes listed by -transition=id:
 
         foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count])
         {
-            if (dp.sym is null)
-                continue;
+
+            Loc loc;
+            const (char)* name;
+
+            if (dp.sym !is null)
+            {
+                loc = dp.sym.loc;
+                name = dp.sym.toChars();
+            }
+            else if (dp.exp !is null)
+            {
+                loc = dp.exp.loc;
+                name = dp.exp.toChars();
+            }
+            else 
+                continue; // we probably should assert here, but whaverever.
+
             // Identifier id = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
 
             bufferPos += sprintf(cast(char*) bufferPos,
                 "%lld|%s|%s|%s|%s|%lld|%lld|%lld|%lld|\n",
                 dp.end_ticks - dp.begin_ticks,
-                dp.sym.toChars(), &dp.kind[0], &dp.fn[0],
-                dp.sym.loc.toChars(), dp.begin_ticks, dp.end_ticks,
+                name, &dp.kind[0], &dp.fn[0],
+                loc.toChars(), dp.begin_ticks, dp.end_ticks,
                 dp.begin_mem, dp.end_mem);
         }
 
