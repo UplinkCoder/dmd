@@ -6762,8 +6762,21 @@ static if (is(BCGen))
         assert(t.type == BCTypeEnum.Class);
         assert(fd.isVirtualMethod);
 
-        ClassDeclaration cd = _sharedCtfeState.classDeclTypePointers[t.typeIndex - 1];
-        // cd.findFunc()
+        ClassDeclaration vtblRoot = _sharedCtfeState.classDeclTypePointers[t.typeIndex - 1];
+
+        auto id = fd.ident;
+        auto tf = cast(TypeFunction)fd.type;
+
+        for (; vtblRoot;)
+        {
+            auto bc = vtblRoot.baseClass;
+            if (bc && !bc.findFunc(id, tf))
+                break;
+        }
+
+        // now vtblRoot should be the first class which has the function.
+        // let's add the correct FunctionIndex into the slot for t.typeIndex
+        // inside out cozy little vtbl
     }
 
     BCValue vtblLoad(BCType t, BCValue typeId, int fnIdx)
