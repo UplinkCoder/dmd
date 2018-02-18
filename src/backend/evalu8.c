@@ -644,7 +644,7 @@ elem * evalu8(elem *e, goal_t goal)
     elem_debug(e);
     e1 = e->E1;
 
-    //printf("evalu8(): "); elem_print(e);
+//    printf("evalu8(): "); elem_print(e);
     elem_debug(e1);
     if (e1->Eoper == OPconst && !tyvector(e1->Ety))
     {

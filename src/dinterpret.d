@@ -675,6 +675,7 @@ public:
  */
 extern (C++) void ctfeCompile(FuncDeclaration fd)
 {
+    mixin(traceString("fd"));
     debug (LOGCOMPILE)
     {
         printf("\n%s FuncDeclaration::ctfeCompile %s\n", fd.loc.toChars(), fd.toChars());

@@ -2100,6 +2100,7 @@ extern (C++) class FuncDeclaration : Declaration
      */
     final bool functionSemantic3()
     {
+        mixin(traceString("this"));
         if (semanticRun < PASSsemantic3 && _scope)
         {
             /* Forward reference - we need to run semantic3 on this function.

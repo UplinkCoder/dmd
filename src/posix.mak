@@ -163,7 +163,7 @@ CXXFLAGS += -g -g3 -DDEBUG=1 -DUNITTEST
 DFLAGS += -g -debug -unittest
 endif
 ifdef ENABLE_RELEASE
-CXXFLAGS += -O2
+CXXFLAGS += -O2 -g
 DFLAGS += -O -release -inline
 endif
 ifdef ENABLE_PROFILING
