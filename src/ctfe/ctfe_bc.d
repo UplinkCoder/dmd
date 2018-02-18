@@ -22,7 +22,7 @@ import ddmd.trace;
 import std.conv : to;
 
 enum perf = 0;
-enum bailoutMessages = 0;
+enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
@@ -162,6 +162,8 @@ struct BlackList
 
 Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression thisExp)
 {
+    mixin(traceString("fd", "newCTFE_full"));
+
     Expression[] _args;
     if (thisExp)
     {
@@ -370,7 +372,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
 
     if (!bcv.IGaveUp)
     {
-        mixin(traceString("fd", "newCTFE"));
+        mixin(traceString("fd", "newCTFE_execution"));
 
         import std.algorithm;
         import std.range;
