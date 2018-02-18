@@ -395,6 +395,9 @@ enum ENUMTY : int
     Tchar,
     Twchar,
     Tdchar,
+
+    Talias,
+
     Terror,
     Tinstance,
     Ttypeof,
@@ -443,6 +446,7 @@ alias Tbool = ENUMTY.Tbool;
 alias Tchar = ENUMTY.Tchar;
 alias Twchar = ENUMTY.Twchar;
 alias Tdchar = ENUMTY.Tdchar;
+alias Talias = ENUMTY.Talias;
 alias Terror = ENUMTY.Terror;
 alias Tinstance = ENUMTY.Tinstance;
 alias Ttypeof = ENUMTY.Ttypeof;
@@ -532,6 +536,8 @@ extern (C++) abstract class Type : RootObject
     extern (C++) static __gshared Type twchar;
     extern (C++) static __gshared Type tdchar;
 
+    extern (C++) static __gshared Type talias;    // very speical this is the typeof(typeof)
+
     // Some special types
     extern (C++) static __gshared Type tshiftcnt;
     extern (C++) static __gshared Type tvoidptr;    // void*
@@ -545,6 +551,8 @@ extern (C++) abstract class Type : RootObject
     extern (C++) static __gshared Type tsize_t;     // matches size_t alias
     extern (C++) static __gshared Type tptrdiff_t;  // matches ptrdiff_t alias
     extern (C++) static __gshared Type thash_t;     // matches hash_t alias
+
+
 
     extern (C++) static __gshared ClassDeclaration dtypeinfo;
     extern (C++) static __gshared ClassDeclaration typeinfoclass;
@@ -898,7 +906,8 @@ extern (C++) abstract class Type : RootObject
             Tchar,
             Twchar,
             Tdchar,
-            Terror
+            Terror,
+            Talias
         ];
 
         for (size_t i = 0; basetab[i] != Terror; i++)
@@ -936,6 +945,8 @@ extern (C++) abstract class Type : RootObject
         tchar = basic[Tchar];
         twchar = basic[Twchar];
         tdchar = basic[Tdchar];
+
+        talias = basic[Talias];
 
         tshiftcnt = tint32;
         terror = basic[Terror];

@@ -3467,6 +3467,9 @@ final class Parser : Lexer
         case TOKdchar:
             t = Type.tdchar;
             goto LabelX;
+
+        case TOKalias:
+                t = Type.tbool;
         LabelX:
             nextToken();
             break;
