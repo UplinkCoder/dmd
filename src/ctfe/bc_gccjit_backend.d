@@ -224,7 +224,7 @@ else
         args[0] = gcc_jit_context_new_rvalue_from_ptr(ctx, c_char_p,  cast(void*)"string: \"%.*s\" :: length %d\n".ptr);
 
         jrvalue length_times_four = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_MULT, i32type,
             length,
             rvalue_int(4)
@@ -258,12 +258,12 @@ else
 
     private void printHeapString(uint addr)
     {
-        jlvalue base = gcc_jit_context_new_array_access(ctx, null,
+        jlvalue base = gcc_jit_context_new_array_access(ctx, currentLoc,
             rvalue(_heap), rvalue(addr)
         );
 
         jlvalue length = gcc_jit_context_new_array_access(ctx, null,
-            rvalue(_heap), rvalue(addr - 1)
+            rvalue(_heap), rvalue(addr - 4)
         );
 
         auto heapBase = gcc_jit_lvalue_get_address(_heap, null);
@@ -405,6 +405,16 @@ else
         printf_fn = gcc_jit_context_get_builtin_function(ctx, "printf");
 
         // memcpy = gcc_jit_context_get_builtin_function(ctx, "memcpy");
+
+		// debug stuff
+		ctx.gcc_jit_context_set_bool_option(
+			GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, 1
+		);
+
+      //  u32type = gcc_jit_context_get_int_type(ctx, 32, 0);
+      //  u64type = gcc_jit_context_get_int_type(ctx, 64, 0);
+        i32type =  gcc_jit_context_get_type(ctx,GCC_JIT_TYPE_INT);//gcc_jit_context_get_int_type(ctx, 32, 1);
+        i64type = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_LONG_LONG);//gcc_jit_context_get_int_type(ctx, 64, 1);
 
         heapType =
             gcc_jit_type_get_pointer(u32type);
@@ -584,7 +594,7 @@ else
 
         foreach(uint _p;0 .. parameterCount)
         {
-            parameters[_p] = gcc_jit_context_new_array_access(ctx, null,
+            parameters[_p] = gcc_jit_context_new_array_access(ctx, currentLoc,
                 gcc_jit_param_as_rvalue(p[0]), rvalue(_p)
             );
         }
@@ -687,7 +697,7 @@ else
             false_block = targetBlock;
         }
 
-        auto cond = gcc_jit_context_new_comparison(ctx, null,
+        auto cond = gcc_jit_context_new_comparison(ctx, currentLoc,
             GCC_JIT_COMPARISON_NE, rvalue(jmp.cond), zero
         );
 
@@ -709,13 +719,13 @@ else
     void Alloc(BCValue heapPtr, BCValue size)
     {
         auto _size = rvalue(size);
-        _size = gcc_jit_context_new_cast(ctx, null,
+        _size = gcc_jit_context_new_cast(ctx, currentLoc,
             _size, i32type
         );
 
         auto _heapSize = gcc_jit_rvalue_dereference(rvalue(heapSize), null);
 
-        auto rheapSize = gcc_jit_context_new_cast(ctx, null,
+        auto rheapSize = gcc_jit_context_new_cast(ctx, currentLoc,
             rvalue(_heapSize), i64type
         );
 
@@ -831,7 +841,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_PLUS, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -849,7 +859,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_MINUS, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -867,7 +877,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_MULT, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -885,7 +895,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_DIVIDE, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -903,7 +913,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_BITWISE_AND, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -922,7 +932,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_BITWISE_OR, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -941,7 +951,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_BITWISE_XOR, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -960,7 +970,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_LSHIFT, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -971,6 +981,7 @@ else
         );
 
     }
+
     void Rsh3(BCValue result, BCValue lhs, BCValue rhs)
     {
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
@@ -978,7 +989,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_LSHIFT, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -997,7 +1008,7 @@ else
 
 
         auto _result = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_MODULO, i64type,
             rvalue(lhs),
             rvalue(rhs)
@@ -1184,7 +1195,7 @@ else
 
 
         jrvalue size_times_four = gcc_jit_context_new_binary_op (
-            ctx, null,
+            ctx, currentLoc,
             GCC_JIT_BINARY_OP_MULT, i64type,
             _size,
             rvalue(uint.sizeof)
