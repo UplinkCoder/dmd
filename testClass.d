@@ -16,7 +16,6 @@ class D : C
 
 class E : D
 {
- this() { dbl = 2.0f; }
  // this is ma' derived field yo!
  double dbl;
  override int i() {return 3;}
@@ -34,7 +33,7 @@ int testClassStuff ()
 
   D e = new E();
   assert(cast(int)e.f() == 2);
-  pragma(msg, () {E e = new E(); return e.f(); } ());
+//  pragma(msg, () {E e = new E(); return e.f(); } ());
 
   return c1.i + c2.i + c3.i;
 }

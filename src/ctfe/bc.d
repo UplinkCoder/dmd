@@ -7,7 +7,7 @@ import std.conv;
 /**
  * Written By Stefan Koch in 2016/17
  */
-debug = 1;
+debug = 0;
 enum InstKind
 {
     ShortInst,
@@ -2708,7 +2708,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 debug
                 {
                     import std.stdio;
-                    writeln("Store[",*lhsRef,"] = ",*rhs & uint.max);
+                    writeln(ip,":Store[",*lhsRef,"] = ",*rhs & uint.max);
                 }
 
             }
@@ -2723,7 +2723,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 debug
                 {
                     import std.stdio;
-                    writeln("Loaded[",*rhs,"] = ",*lhsRef);
+                    writeln(ip,":Loaded[",*rhs,"] = ",*lhsRef);
                 }
             }
             break;

@@ -17,13 +17,14 @@ import ddmd.arraytypes : Expressions, VarDeclarations;
  */
 
 import std.conv : to;
+import core.stdc.stdio : printf;
 
 enum perf = 1;
 enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -62,19 +63,19 @@ struct JumpTarget
 
 struct UncompiledFunction
 {
-    FuncDeclaration fd;
+    union
+    {
+        FuncDeclaration fd;
+    }
     uint fn;
-    bool mayFail; /** virtual functions may fail
-                  to complile for ctfe this is
-                  okay since we can not statically
-                  proof if it is actually called */
-}
-
-struct UncompiledConstructor
-{
-    CtorDeclaration ctor;
-    uint fn;
-    BCType type;
+    union
+    {
+        BCType type;
+        bool mayFail; /** virtual functions may fail
+                      to complile for ctfe this is
+                      okay since we can not statically
+                      proof if it is actually called */
+    }
 }
 
 struct SwitchFixupEntry
@@ -386,6 +387,13 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         import std.datetime : StopWatch;
         import std.stdio;
 
+        static if (is(BCGen))
+        {
+            auto myCode = bcv.byteCodeArray[0 .. bcv.ip].idup;
+            auto myIp = bcv.ip;
+        }
+
+
         BCValue[4] errorValues;
         StopWatch sw;
         sw.start();
@@ -408,6 +416,14 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         bcv.endArguments();
         bcv.compileUncompiledFunctions();
         bcv.buildVtbls();
+        // we build the vtbls now let's build the constructors
+        bcv.compileUncompiledFunctions(true);
+        static if (is(BCGen))
+        {
+            bcv.ip = myIp;
+            bcv.byteCodeArray[0 .. bcv.ip] = myCode[0 .. bcv.ip];
+        }
+
         bcv.Finalize();
 
         static if (UseLLVMBackend)
@@ -2022,8 +2038,6 @@ extern (C++) final class BCV(BCGenT) : Visitor
         unresolvedGotoCount = 0;
         breakFixupCount = 0;
         continueFixupCount = 0;
-        uncompiledFunctionCount = 0;
-        uncompiledConstructorCount = 0;
         scopeCount = 0;
         fixupTableCount = 0;
         processedArgs = 0;
@@ -2070,7 +2084,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     BCAddr[ubyte.max] continueFixups = void;
     BCScope[16] scopes = void;
     BoolExprFixupEntry[ubyte.max] fixupTable = void;
-    UncompiledConstructor[ubyte.max] uncompiledConstructors = void;
+    UncompiledFunction[ubyte.max] uncompiledConstructors = void;
     UncompiledFunction[ubyte.max * 8] uncompiledFunctions = void;
     SwitchState[16] switchStates = void;
 
@@ -2761,7 +2775,9 @@ public:
             {
                 const fnIdx = ++_sharedCtfeState.functionCount;
                 _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd);
-                uncompiledFunctions[uncompiledFunctionCount++] = UncompiledFunction(fd, fnIdx, mayFail);
+                uncompiledFunctions[uncompiledFunctionCount] = UncompiledFunction(fd, fnIdx);
+                uncompiledFunctions[uncompiledFunctionCount].mayFail = mayFail;
+                ++uncompiledFunctionCount;
                 *fnIdxP = fnIdx;
             }
             else
@@ -2772,16 +2788,23 @@ public:
 
         void addUncompiledConstructor(CtorDeclaration ctor, BCType type, int *cIdxP)
         {
-             if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
+            if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
             {
                 bailout("UncompiledFunctions overflowed");
                 return ;
             }
+            printf("UncompiledConstructor: %s\n", ctor.toString().ptr);
+            if (!ctor)
+            {
+                ctor = cast(CtorDeclaration)
+                    _sharedCtfeState.classDeclTypePointers[type.typeIndex - 1];
+            }
 
             const fnIdx = ++_sharedCtfeState.functionCount;
             _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) ctor);
-            uncompiledConstructors[uncompiledConstructorCount++] = 
-                UncompiledConstructor(ctor, fnIdx, type);
+            uncompiledConstructors[uncompiledConstructorCount] = 
+                UncompiledFunction(ctor, fnIdx, type);
+            ++uncompiledConstructorCount;
             *cIdxP = fnIdx;
         }
 
@@ -2800,14 +2823,15 @@ public:
         }
     }
 
-    void compileUncompiledFunctions()
+    void compileUncompiledFunctions(bool forCtor = false)
     {
         uint lastUncompiledFunction;
 
     LuncompiledFunctions :
-        foreach (uf; uncompiledFunctions[lastUncompiledFunction .. uncompiledFunctionCount])
+        foreach (uf; forCtor ? uncompiledConstructors[0 .. uncompiledConstructorCount] :
+                               uncompiledFunctions[lastUncompiledFunction .. uncompiledFunctionCount])
         {
-            if (_blacklist.isInBlacklist(uf.fd.ident))
+            if (!forCtor && _blacklist.isInBlacklist(uf.fd.ident))
             {
                 bailout("Bail out on blacklisted");
                 return;
@@ -2815,8 +2839,59 @@ public:
 
             //assert(!me, "We are not clean!");
             me = uf.fd;
+            auto fnIdx = uf.fn;
+
+            if (forCtor)
+            {
+                // if we are building a ctor it might happen that it is null
+                // when the class has no construcor defined
+                // however we need to safe a vtblPtr at the very least
+                // so let's do just that!
+
+                assert(uf.type.type == BCTypeEnum.Class && uf.type.typeIndex);
+                const tIdx = uf.type.typeIndex - 1;
+                auto bcClass = &_sharedCtfeState.classTypes[tIdx];
+                auto cdtp = _sharedCtfeState.classDeclTypePointers[tIdx]; 
+                beginParameters();
+                    auto p1 = genParameter(i32Type, "thisPtr");
+                endParameters();
+                static if (is(BCGen))
+                {
+                    auto osp = sp;
+                }
+                beginFunction(fnIdx, cast(void*) null);
+                    printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
+                    if (ClassMetaData.VtblOffset)
+                    {
+                        auto vtblPtrPtr = genTemporary(i32Type);
+                        Add3(vtblPtrPtr, p1, imm32(ClassMetaData.VtblOffset));
+                        Store32(vtblPtrPtr, imm32(bcClass.vtblPtr));
+                    }
+                    else
+                    {
+                        Store32(p1, imm32(bcClass.vtblPtr));
+                    }
+                    Ret(p1);
+                endFunction();
+                static if (is(BCGen))
+                {
+                    _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) uf.fd,
+                        fnIdx, BCFunctionTypeEnum.Bytecode,
+                        cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
+                        // get rid of dup!
+                        byteCodeArray[0 .. ip].idup);
+                }
+
+                continue ;
+            }
+
+            if (forCtor)
+            {
+                Assert(imm32(0), _sharedCtfeState.addError(lastLoc, "Ctor did not return or something"));
+            }
+
             beginParameters();
-            auto parameters = uf.fd.parameters;
+            auto parameters = me.parameters;
             if (parameters)
                 foreach (i, p; *parameters)
             {
@@ -2832,10 +2907,9 @@ public:
             if (parameters)
                 linkRefsCallee(parameters);
 
-            auto fnIdx = uf.fn;
-            Line(uf.fd.loc.linnum);
-            beginFunction(fnIdx - 1, cast(void*)uf.fd);
-            uf.fd.fbody.accept(this);
+            Line(me.loc.linnum);
+            beginFunction(fnIdx - 1, cast(void*)me);
+            me.fbody.accept(this);
 
             static if (is(BCGen))
             {
@@ -2848,14 +2922,14 @@ public:
                 // insert a dummy return after void functions because they can omit a returnStatement
                 Ret(bcNull);
             }
-            Line(uf.fd.endloc.linnum);
+            Line(me.endloc.linnum);
             endFunction();
 
             lastUncompiledFunction++;
 
             if (IGaveUp)
             {
-                if (uf.mayFail)
+                if (!forCtor && uf.mayFail)
                 {
                     Assert(imm32(0), addError(uf.fd.loc, "CTFE ABORT IN : " ~ uf.fd.toString ~ ":" ~ to!string(lastLine)));
                     IGaveUp = false;
@@ -2885,10 +2959,22 @@ public:
 
         if (uncompiledFunctionCount > lastUncompiledFunction)
             goto LuncompiledFunctions;
-
+        
         clearArray(uncompiledFunctions, uncompiledFunctionCount);
         // not sure if the above clearArray does anything
         uncompiledFunctionCount = 0;
+        if (forCtor)
+        {
+            clearArray(uncompiledConstructors, uncompiledConstructorCount);
+            // not sure if the above clearArray does anything
+            uncompiledConstructorCount = 0;
+        }
+    }
+
+    void compileUncompiledConstructors()
+    {
+        // this function will be the very last thing executed;
+        
     }
 
     override void visit(FuncDeclaration fd)
@@ -2956,9 +3042,7 @@ public:
 
             if (fd.isVirtualMethod())
             {
-                assert(fd.vtblIndex != -1, "virtual method with vtblIdx of -1, seems invlaid -- " ~ fd.toString);
-                //addVtblEntry(fd, typeId, fnIdx);
-                
+                assert(fd.vtblIndex != -1, "virtual method with vtblIdx of -1, seems invlaid -- " ~ fd.toString);                
             }
             
             beginFunction(fnIdx - 1, cast(void*)fd);
@@ -4635,7 +4719,20 @@ static if (is(BCGen))
         }
         else if (type.type == BCTypeEnum.Class)
         {
-            auto cIdx = _sharedCtfeState.getFunctionIndex(ne.member);
+            FuncDeclaration ctor = ne.member;
+            bool noCtor;
+            if (!ctor)
+            {
+                noCtor = true;
+                // ne.member is null when there is no constructor in the class
+                // However we need to have some kind of ID for it so we don't
+                // Generate it over and over agian let's just cast the classType
+                // It should be unique :)
+
+                ctor = cast (FuncDeclaration)
+                        _sharedCtfeState.classDeclTypePointers[type.typeIndex - 1];
+            }            
+            auto cIdx = _sharedCtfeState.getFunctionIndex(ctor);
             if (!cIdx)
             {
                 addUncompiledConstructor(ne.member, type, &cIdx);
@@ -4647,9 +4744,11 @@ static if (is(BCGen))
             {
                 cTorArgs[idx] = genExpr((*ne.arguments)[idx]);
             }
+            if (noCtor)
+                cTorArgs ~= ptr.i32;
+
             Comment("ConstructorCall");
             Call(ptr, imm32(cIdx), cTorArgs);
-            Store32(ptr.i32, imm32(type.typeIndex));
             ptr.type = type;
         }
         else
@@ -6945,7 +7044,7 @@ static if (is(BCGen))
                     addUncompiledFunction(fd, &fIdx, true);
                 }
                 assert(fIdx);
-                vtbl[vti] = fIdx - 1;
+                vtbl[vti] = fIdx;
             }
             import std.stdio; writeln("ct:", cdtp.toString, " vtbl:", vtbl[0 .. maxIdx + 1]);
             const vtblLength = maxIdx + 1;
