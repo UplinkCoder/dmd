@@ -134,6 +134,14 @@ struct Print_BCGen
                 {
                     result ~= "Imm64(" ~ to!string(val.imm64.imm64) ~ ")";
                 }
+                else if (val.type == BCTypeEnum.f23)
+                {
+                    result ~= "Imm23f(" ~ to!string(*cast(float*)&val.imm32.imm32) ~ ")";
+                }
+                else if (val.type == BCTypeEnum.f52)
+                {
+                    result ~= "Imm52f(" ~ to!string(*cast(double*)&val.imm64.imm64) ~ ")";
+                }
                 else if (val.type == BCTypeEnum.Null)
                 {
                     result ~= "Imm32(0/*null*/)";
@@ -553,6 +561,15 @@ struct Print_BCGen
         result ~= indent ~ "IToF64(" ~ print(_result) ~ ", " ~ print(value) ~ ");\n";
     }
 
+    void F32ToI(BCValue _result, BCValue value)
+    {
+        result ~= indent ~ "F32ToI(" ~ print(_result) ~ ", " ~ print(value) ~ ");\n";
+    }
+
+    void F64ToI(BCValue _result, BCValue value)
+    {
+        result ~= indent ~ "F64ToI(" ~ print(_result) ~ ", " ~ print(value) ~ ");\n";
+    }
 }
 
 enum genString = q{

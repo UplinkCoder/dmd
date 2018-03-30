@@ -11,13 +11,16 @@ class D : C
  // this is ma' derived field yo!
  int d;
  override int i() {return 2;}
+ float f() { return 1.0f; }
 }
 
-class E : C
+class E : D
 {
+ this() { dbl = 2.0f; }
  // this is ma' derived field yo!
  double dbl;
  override int i() {return 3;}
+ override float f() { return 2.0f; }
 }
 
 
@@ -28,6 +31,10 @@ int testClassStuff ()
   c1 = new C();
   c2 = new D();
   c3 = new E();
+
+  D e = new E();
+  assert(cast(int)e.f() == 2);
+  pragma(msg, () {E e = new E(); return e.f(); } ());
 
   return c1.i + c2.i + c3.i;
 }

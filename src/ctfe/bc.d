@@ -1190,6 +1190,23 @@ pure:
         emitLongInst(LongInst.IToF64, result.stackAddr, rhs.stackAddr);
     }
 
+    void F32ToI(BCValue result, BCValue rhs)
+    {
+        assert(isStackValueOrParameter(result));
+        assert(isStackValueOrParameter(rhs));
+
+        emitLongInst(LongInst.F32ToI, result.stackAddr, rhs.stackAddr);
+    }
+
+    void F64ToI(BCValue result, BCValue rhs)
+    {
+        assert(isStackValueOrParameter(result));
+        assert(isStackValueOrParameter(rhs));
+
+        emitLongInst(LongInst.F64ToI, result.stackAddr, rhs.stackAddr);
+    }
+
+
     void StrEq3(BCValue result, BCValue lhs, BCValue rhs)
     {
         assert(result.vType == BCValueType.Unknown

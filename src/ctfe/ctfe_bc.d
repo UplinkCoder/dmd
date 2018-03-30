@@ -2,7 +2,7 @@ module ddmd.ctfe.ctfe_bc;
 import ddmd.ctfe.bc_limits;
 import ddmd.expression;
 import ddmd.declaration : FuncDeclaration, VarDeclaration, Declaration,
-    SymbolDeclaration, STCref;
+    SymbolDeclaration, STCref, CtorDeclaration;
 import ddmd.dsymbol;
 import ddmd.dstruct;
 import ddmd.dclass;
@@ -64,6 +64,17 @@ struct UncompiledFunction
 {
     FuncDeclaration fd;
     uint fn;
+    bool mayFail; /** virtual functions may fail
+                  to complile for ctfe this is
+                  okay since we can not statically
+                  proof if it is actually called */
+}
+
+struct UncompiledConstructor
+{
+    CtorDeclaration ctor;
+    uint fn;
+    BCType type;
 }
 
 struct SwitchFixupEntry
@@ -202,10 +213,13 @@ struct UnionMetaData
     enum VoidInitBitfieldOffset = 0;
     enum Size = bc_max_members/8;
 }
+/// prepended to a class
+/// before the first member
 struct ClassMetaData
 {
-    enum TypeIdIdxOffset = 0;
-    enum Size = 4;
+    enum VtblOffset = 0;
+    enum TypeIdIdxOffset = 4;
+    enum Size = 8;
 }
 
 __gshared LocType!() lastLoc;
@@ -393,6 +407,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         }
         bcv.endArguments();
         bcv.compileUncompiledFunctions();
+        bcv.buildVtbls();
         bcv.Finalize();
 
         static if (UseLLVMBackend)
@@ -740,6 +755,9 @@ struct BCClass
     uint parentIdx; /// 0 is object
     uint size;
     uint memberCount;
+    uint vtblPtr;
+
+    int[] usedVtblIdxs;
 
     BCType[bc_max_members] memberTypes;
 
@@ -1861,6 +1879,7 @@ extern (C++) final class BCTypeVisitor : Visitor
         {
             ct.addField(toBCType(f.type), f._init ? !!f._init.isVoidInitializer : false); 
         }
+
         if (parentIdx)
         {
             ct.size += _sharedCtfeState.classTypes[parentIdx - 1].size;
@@ -1974,6 +1993,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     uint continueFixupCount;
     uint fixupTableCount;
     uint uncompiledFunctionCount;
+    uint uncompiledConstructorCount;
     uint scopeCount;
     uint processedArgs;
     uint switchStateCount;
@@ -2002,6 +2022,8 @@ extern (C++) final class BCV(BCGenT) : Visitor
         unresolvedGotoCount = 0;
         breakFixupCount = 0;
         continueFixupCount = 0;
+        uncompiledFunctionCount = 0;
+        uncompiledConstructorCount = 0;
         scopeCount = 0;
         fixupTableCount = 0;
         processedArgs = 0;
@@ -2048,6 +2070,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     BCAddr[ubyte.max] continueFixups = void;
     BCScope[16] scopes = void;
     BoolExprFixupEntry[ubyte.max] fixupTable = void;
+    UncompiledConstructor[ubyte.max] uncompiledConstructors = void;
     UncompiledFunction[ubyte.max * 8] uncompiledFunctions = void;
     SwitchState[16] switchStates = void;
 
@@ -2363,6 +2386,32 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
     }
 
+    void IndexedScaledLoad32(BCValue _to, BCValue from, BCValue index, int scale, int line = __LINE__)
+    {
+        assert(_to.type == BCTypeEnum.i32, "_to has to be an i32");
+        assert(from.type == BCTypeEnum.i32, "from has to be an i32");
+        assert(index.type == BCTypeEnum.i32, "index has to be an i32");
+
+        static if (is(typeof(gen.IndexedScaledLoad32) == function)
+                && is(typeof(gen.IndexedScaledLoad32(
+                        BCValue.init, BCValue.init, BCValue.init, int.init
+                )) == void)
+                && isValidIndexScalar(scale))
+        {
+            gen.IndexedScaledLoad32(_to, from, index, scale);
+        }
+
+        else
+        {
+            Comment("ScaledLoad from " ~ to!string(line));
+
+            auto ea = genTemporary(i32Type);
+            Mul3(ea, index, imm32(scale));
+            Add3(ea, ea, from);
+            Load32(_to, ea);
+        }
+    }
+
     void StringEq(BCValue result, BCValue lhs, BCValue rhs)
     {
 
@@ -2671,7 +2720,7 @@ public:
 
     static if (is(BCFunction) && is(typeof(_sharedCtfeState.functionCount)))
     {
-        void addUncompiledFunction(FuncDeclaration fd, int* fnIdxP)
+        void addUncompiledFunction(FuncDeclaration fd, int* fnIdxP, bool mayFail = false)
         {
             assert(*fnIdxP == 0, "addUncompiledFunction has to be called with *fnIdxP == 0");
             if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
@@ -2712,7 +2761,7 @@ public:
             {
                 const fnIdx = ++_sharedCtfeState.functionCount;
                 _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd);
-                uncompiledFunctions[uncompiledFunctionCount++] = UncompiledFunction(fd, fnIdx);
+                uncompiledFunctions[uncompiledFunctionCount++] = UncompiledFunction(fd, fnIdx, mayFail);
                 *fnIdxP = fnIdx;
             }
             else
@@ -2720,12 +2769,34 @@ public:
                 bailout("Null-Body: probably builtin: " ~ fd.toString);
             }
         }
+
+        void addUncompiledConstructor(CtorDeclaration ctor, BCType type, int *cIdxP)
+        {
+             if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
+            {
+                bailout("UncompiledFunctions overflowed");
+                return ;
+            }
+
+            const fnIdx = ++_sharedCtfeState.functionCount;
+            _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) ctor);
+            uncompiledConstructors[uncompiledConstructorCount++] = 
+                UncompiledConstructor(ctor, fnIdx, type);
+            *cIdxP = fnIdx;
+        }
+
+
     }
     else
     {
         void addUncompiledFunction(FuncDeclaration fd, int *fnIdxP)
         {
             assert(0, "We don't support Functions!\nHow do you expect me to add a function?");
+        }
+
+        void addUncompiledConstructor(CtorDeclaration ctor, BCType type, int *cIdxP)
+        {
+            assert(0, "We don't support Functions!\nHow do you expect me to add a constructor?");
         }
     }
 
@@ -2781,10 +2852,19 @@ public:
             endFunction();
 
             lastUncompiledFunction++;
+
             if (IGaveUp)
             {
-                bailout("A called function bailed out: " ~ uf.fd.toString);
-                return ;
+                if (uf.mayFail)
+                {
+                    Assert(imm32(0), addError(uf.fd.loc, "CTFE ABORT IN : " ~ uf.fd.toString ~ ":" ~ to!string(lastLine)));
+                    IGaveUp = false;
+                }
+                else
+                {
+                    bailout("A called function bailed out: " ~ uf.fd.toString);
+                    return ;
+                }
             }
 
             static if (is(BCGen))
@@ -2873,6 +2953,14 @@ public:
             {
                 fnIdx = 1;
             }
+
+            if (fd.isVirtualMethod())
+            {
+                assert(fd.vtblIndex != -1, "virtual method with vtblIdx of -1, seems invlaid -- " ~ fd.toString);
+                //addVtblEntry(fd, typeId, fnIdx);
+                
+            }
+            
             beginFunction(fnIdx - 1, cast(void*)fd);
             visit(fbody);
             if (fd.type.nextOf.ty == Tvoid)
@@ -4547,6 +4635,20 @@ static if (is(BCGen))
         }
         else if (type.type == BCTypeEnum.Class)
         {
+            auto cIdx = _sharedCtfeState.getFunctionIndex(ne.member);
+            if (!cIdx)
+            {
+                addUncompiledConstructor(ne.member, type, &cIdx);
+            }
+
+            BCValue[] cTorArgs;
+            cTorArgs.length = ne.arguments.dim;
+            foreach(idx; 0 .. ne.arguments.dim)
+            {
+                cTorArgs[idx] = genExpr((*ne.arguments)[idx]);
+            }
+            Comment("ConstructorCall");
+            Call(ptr, imm32(cIdx), cTorArgs);
             Store32(ptr.i32, imm32(type.typeIndex));
             ptr.type = type;
         }
@@ -6155,7 +6257,8 @@ static if (is(BCGen))
         }
 
         auto lhs = genExpr(ae.e1, "AssertExp.e1");
-        if (lhs.type.type == BCTypeEnum.i32 || lhs.type.type == BCTypeEnum.Ptr || lhs.type.type == BCTypeEnum.Struct)
+        if (lhs.type.type == BCTypeEnum.i32 || lhs.type.type == BCTypeEnum.Ptr || lhs.type.type == BCTypeEnum.Struct
+            || lhs.type.type == BCTypeEnum.Class)
         {
             Assert(lhs.i32, addError(ae.loc,
                 ae.msg ? ae.msg.toString : "Assert Failed"));
@@ -6550,14 +6653,32 @@ static if (is(BCGen))
 
             if (dve.e1.type.ty == Tclass && fd.isVirtualMethod())
             {
+                isFunctionPtr = true;
+                fnValue = genTemporary(i32Type);
                 auto bcType = toBCType(dve.e1.type);
+
                 addVirtualCall(bcType, fd);
 
-                auto typeId = genTemporary(i32Type);
-                Load32(typeId, thisPtr.i32);
-                uint fIdx = _sharedCtfeState.getFunctionIndex(fd);
-                fnValue = vtblLoad(bcType, typeId, fIdx);
-                bailout("A virtual call ... Oh No! -- " ~ ce.toString);
+                Comment("loadVtblPtr");
+                auto vtblPtr = genTemporary(i32Type);
+                if (ClassMetaData.VtblOffset)
+                {
+                    Add3(vtblPtr, thisPtr.i32, imm32(ClassMetaData.VtblOffset));
+                    Load32(vtblPtr, vtblPtr);
+                }
+                else
+                {
+                    Load32(vtblPtr, thisPtr.i32);
+                }
+                int fIdx = _sharedCtfeState.getFunctionIndex(fd);
+
+                int vtblIndex = fd.vtblIndex;
+
+                Comment("vtblIndex ==" ~ vtblIndex.to!string ~ "  for " ~ fd.toString);
+                Comment("vtblLoad");
+                enum sizeofVtblEntry = 4;
+                IndexedScaledLoad32(fnValue.i32, vtblPtr.i32, imm32(vtblIndex), sizeofVtblEntry);
+                //bailout("A virtual call ... Oh No! -- " ~ ce.toString);
             }
             else
             {
@@ -6761,29 +6882,85 @@ static if (is(BCGen))
     {
         assert(t.type == BCTypeEnum.Class);
         assert(fd.isVirtualMethod);
+        auto vtblIdx = fd.vtblIndex;
+        assert(vtblIdx != -1);
 
         ClassDeclaration vtblRoot = _sharedCtfeState.classDeclTypePointers[t.typeIndex - 1];
 
-        auto id = fd.ident;
-        auto tf = cast(TypeFunction)fd.type;
-
-        for (; vtblRoot;)
+        BCClass* bcClass = &_sharedCtfeState.classTypes[t.typeIndex - 1];
+        foreach (uvi; bcClass.usedVtblIdxs)
         {
-            auto bc = vtblRoot.baseClass;
-            if (bc && !bc.findFunc(id, tf))
-                break;
+            if (uvi == vtblIdx)
+                return ;
         }
 
-        // now vtblRoot should be the first class which has the function.
-        // let's add the correct FunctionIndex into the slot for t.typeIndex
-        // inside out cozy little vtbl
+        bcClass.usedVtblIdxs ~= vtblIdx;
+
+        int fIdx = _sharedCtfeState.getFunctionIndex(fd);
+        if (!fIdx)
+        {
+            addUncompiledFunction(fd, &fIdx, true);
+        }
     }
 
-    BCValue vtblLoad(BCType t, BCValue typeId, int fnIdx)
+    void buildVtbls()
     {
-        assert(t.type == BCTypeEnum.Class);
-        return BCValue.init;
+        foreach(ci;0 .. _sharedCtfeState.classCount)
+        {
+            auto ct = &_sharedCtfeState.classTypes[ci];
+            auto cdtp = _sharedCtfeState.classDeclTypePointers[ci];
+            int maxIdx;
+            uint[] vtbl = new uint[](16);
+            vtbl.length = 16;
 
+            if (ct.parentIdx)
+            {
+                const pct = &_sharedCtfeState.classTypes[ct.parentIdx - 1];
+            outerLoop: foreach(puvi;pct.usedVtblIdxs)
+                {
+                    foreach(uvi;ct.usedVtblIdxs)
+                    {
+                        if (puvi == uvi)
+                            continue outerLoop;
+                    }
+                    ct.usedVtblIdxs ~= puvi;
+                }
+            }
+            foreach(vti;ct.usedVtblIdxs)
+            {
+                if (vti > maxIdx)
+                {
+                    maxIdx = vti;
+                    if (maxIdx >= vtbl.length)
+                    {
+                        vtbl.length = maxIdx + 1;
+                    }
+                }
+                auto vtblEntry = cdtp.vtbl[vti];
+                auto fd = vtblEntry.isFuncDeclaration();
+                assert(fd, "vtblEntry is no funcDecl ? -- " ~ vtblEntry.toString);
+                auto fIdx = _sharedCtfeState.getFunctionIndex(fd);
+                if (!fIdx)
+                {
+                    addUncompiledFunction(fd, &fIdx, true);
+                }
+                assert(fIdx);
+                vtbl[vti] = fIdx - 1;
+            }
+            import std.stdio; writeln("ct:", cdtp.toString, " vtbl:", vtbl[0 .. maxIdx + 1]);
+            const vtblLength = maxIdx + 1;
+
+            const vtblPtr = _sharedExecutionState.heap.heapSize;
+            foreach(vti;0 .. vtblLength)
+            {
+                const idx = vtblPtr + (vti * 4);
+                _sharedExecutionState.heap._heap[idx] = vtbl[vti];
+            }
+            _sharedExecutionState.heap.heapSize += vtblLength * 4;
+            ct.vtblPtr = vtblPtr;
+
+        }
+        compileUncompiledFunctions();
     }
 
     override void visit(ReturnStatement rs)
@@ -6892,6 +7069,22 @@ static if (is(BCGen))
                 bailout("Cannot do cast toType:" ~ to!string(toType.type) ~ " -- "~ ce.toString);
                 return ;
             }
+        }
+        else if (fromType.type == BCTypeEnum.f23 || fromType.type == BCTypeEnum.f52)
+        {
+            if (fromType.type == BCTypeEnum.f23)
+            {
+                const from = retval;
+                retval = genTemporary(toType);
+                F32ToI(retval, from);
+            }
+            else if (toType.type == BCTypeEnum.f52)
+            {
+                const from = retval;
+                retval = genTemporary(toType);
+                F64ToI(retval, from);
+            }
+
         }
         else if (fromType.type == BCTypeEnum.i32 || fromType.type == BCTypeEnum.i64)
         {
