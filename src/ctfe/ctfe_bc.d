@@ -24,7 +24,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -76,6 +76,12 @@ struct UncompiledFunction
                       okay since we can not statically
                       proof if it is actually called */
     }
+}
+
+struct UncompiledDynamicCast
+{
+    BCType toType;
+    int fnIdx;
 }
 
 struct SwitchFixupEntry
@@ -2010,6 +2016,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     uint fixupTableCount;
     uint uncompiledFunctionCount;
     uint uncompiledConstructorCount;
+    uint uncompiledDynamicCastCount;
     uint scopeCount;
     uint processedArgs;
     uint switchStateCount;
@@ -2085,6 +2092,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     BCScope[16] scopes = void;
     BoolExprFixupEntry[ubyte.max] fixupTable = void;
     UncompiledFunction[ubyte.max] uncompiledConstructors = void;
+    UncompiledDynamicCast[ubyte.max] uncompiledDynamicCasts = void;
     UncompiledFunction[ubyte.max * 8] uncompiledFunctions = void;
     SwitchState[16] switchStates = void;
 
@@ -2123,6 +2131,20 @@ extern (C++) final class BCV(BCGenT) : Visitor
     uint current_line;
 
     uint uniqueCounter = 1;
+
+    int getDynamicCastIndex(BCType toType)
+    {
+        assert(toType.type == BCTypeEnum.Class);
+        foreach (dynCast; uncompiledDynamicCasts[0 .. uncompiledDynamicCastCount])
+        {
+            if (dynCast.toType == toType)
+            {
+                return dynCast.fnIdx;
+            }
+        }
+        return 0;
+    }
+
 
     extern(D) BCValue addError(Loc loc, string msg, BCValue v1 = BCValue.init, BCValue v2 = BCValue.init, BCValue v3 = BCValue.init, BCValue v4 = BCValue.init)
     {
@@ -2809,6 +2831,23 @@ public:
         }
 
 
+        void addDynamicCast(BCType toType, int *cIdxP)
+        {
+            if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
+            {
+                bailout("UncompiledFunctions overflowed");
+                return ;
+            }
+
+            const fnIdx = ++_sharedCtfeState.functionCount;
+            _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) uncompiledDynamicCastCount);
+            uncompiledDynamicCasts[uncompiledDynamicCastCount] = 
+                UncompiledDynamicCast(toType, fnIdx);
+            ++uncompiledDynamicCastCount;
+            *cIdxP = fnIdx;
+        }
+
+
     }
     else
     {
@@ -2820,6 +2859,11 @@ public:
         void addUncompiledConstructor(CtorDeclaration ctor, BCType type, int *cIdxP)
         {
             assert(0, "We don't support Functions!\nHow do you expect me to add a constructor?");
+        }
+
+        void addDynamicCast(BCType toType, int *cIdxP)
+        {
+            assert(0, "We don't support Functions!\nHow do you expect me to add a dynamicCast?");
         }
     }
 
@@ -2971,10 +3015,48 @@ public:
         }
     }
 
-    void compileUncompiledConstructors()
+    void compileUncompiledDynamicCasts()
     {
-        // this function will be the very last thing executed;
-        
+        foreach(udc;uncompiledDynamicCasts[0 .. uncompiledDynamicCastCount])
+        {
+            assert(udc.toType.type == BCTypeEnum.Class, 
+                "Either " ~ udc.toType.to!string ~ "is not a class");
+            auto toClass = _sharedCtfeState.classTypes[udc.toType.typeIndex - 1];
+
+            auto p1 = genParameter(i32Type);
+            beginFunction(udc.fnIdx, null);
+            {
+                auto vtblPtr = genLocal(i32Type, "vtblPtr");
+                auto found = genLocal(i32Type, "found");
+
+                Set(vtblPtr.i32, p1.i32);
+                auto LbeginLoop = genLabel();
+                {
+                    auto nullVtblCJ = beginCndJmp(vtblPtr);
+                    Load32(vtblPtr.i32, vtblPtr.i32);
+
+                    Eq3(found, vtblPtr, imm32(toClass.vtblPtr));
+                    auto foundVtblPtrCJ = beginCndJmp(found, true);
+                    endJmp(beginJmp(), LbeginLoop);
+                    auto LRetP1 = genLabel();
+                    {
+                        Ret(p1);
+                    }
+                    endCndJmp(foundVtblPtrCJ, LRetP1);
+                    auto LRetNull = genLabel();
+                    {
+                        Ret(bcNull);
+                    }
+                    endCndJmp(nullVtblCJ, LRetNull);
+                    
+                    
+                }
+            }
+            endFunction();
+
+        }
+
+        uncompiledDynamicCastCount = 0;
     }
 
     override void visit(FuncDeclaration fd)
@@ -3265,6 +3347,19 @@ static if (is(BCGen))
                 {
                     goto case TOK.TOKadd;
                 }
+            }
+            break;
+        case TOK.TOKidentity:
+            {
+                auto lhs = genExpr(e.e1);
+                auto rhs = genExpr(e.e2);
+                if (!lhs || !rhs)
+                {
+                    bailout("could not gen lhs or rhs for " ~ e.toString);
+                   return ;
+                }
+
+                Eq3(retval.i32, lhs.i32, rhs.i32);
             }
             break;
         case TOK.TOKquestion:
@@ -6769,14 +6864,12 @@ static if (is(BCGen))
                 {
                     Load32(vtblPtr, thisPtr.i32);
                 }
-                int fIdx = _sharedCtfeState.getFunctionIndex(fd);
-
                 int vtblIndex = fd.vtblIndex;
 
                 Comment("vtblIndex ==" ~ vtblIndex.to!string ~ "  for " ~ fd.toString);
                 Comment("vtblLoad");
                 enum sizeofVtblEntry = 4;
-                IndexedScaledLoad32(fnValue.i32, vtblPtr.i32, imm32(vtblIndex), sizeofVtblEntry);
+                IndexedScaledLoad32(fnValue.i32, vtblPtr.i32, imm32(vtblIndex + 1), sizeofVtblEntry);
                 //bailout("A virtual call ... Oh No! -- " ~ ce.toString);
             }
             else
@@ -7015,6 +7108,8 @@ static if (is(BCGen))
             if (ct.parentIdx)
             {
                 const pct = &_sharedCtfeState.classTypes[ct.parentIdx - 1];
+                assert(pct.vtblPtr, "the parent must have a vtbl ptr!");
+                vtbl[0] = pct.vtblPtr;
             outerLoop: foreach(puvi;pct.usedVtblIdxs)
                 {
                     foreach(uvi;ct.usedVtblIdxs)
@@ -7029,7 +7124,7 @@ static if (is(BCGen))
             {
                 if (vti > maxIdx)
                 {
-                    maxIdx = vti;
+                    maxIdx = vti  + 1;
                     if (maxIdx >= vtbl.length)
                     {
                         vtbl.length = maxIdx + 1;
@@ -7044,7 +7139,7 @@ static if (is(BCGen))
                     addUncompiledFunction(fd, &fIdx, true);
                 }
                 assert(fIdx);
-                vtbl[vti] = fIdx;
+                vtbl[vti + 1] = fIdx;
             }
             const vtblLength = maxIdx + 1;
 
@@ -7123,15 +7218,19 @@ static if (is(BCGen))
             import std.stdio;
 
             writeln("CastExp: ", ce.toString());
-            writeln("CastToBCType: ", toBCType(ce.type).type);
-            writeln("CastFromBCType: ", toBCType(ce.e1.type).type);
+            writeln("FromType: ", ce.e1.type.toString);
+            writeln("ToType: ", ce.to.toString);
+            writeln("CastToBCType: ", toBCType(ce.to));
+            writeln("CastFromBCType: ", toBCType(ce.e1.type));
         }
 
-        auto toType = toBCType(ce.type);
+        auto toType = toBCType(ce.to);
         auto fromType = toBCType(ce.e1.type);
 
         retval = genExpr(ce.e1, "CastExp.e1");
-        if (toType == fromType)
+        // for some reason Dynamic casts only see the baseClass
+        // as toType ?
+        if (toType.type != BCTypeEnum.Class && toType == fromType)
         {
             //newCTFE does not need to cast
         }
@@ -7239,6 +7338,19 @@ static if (is(BCGen))
             _sharedCtfeState.sliceTypes[_sharedCtfeState.sliceCount++] = BCSlice(BCType(BCTypeEnum.i8));
             retval.type = BCType(BCTypeEnum.Slice, _sharedCtfeState.sliceCount);
             //retval.type = toType;
+        }
+        else if (toType.type == BCTypeEnum.Class && fromType.type == BCTypeEnum.Class)
+        {
+            // A dynamic cast needs to call a function since we may don't know the vtbl ptrs yet
+            int castFnIdx = getDynamicCastIndex(toType);
+            if (!castFnIdx)
+            {
+                addDynamicCast(toType, &castFnIdx);
+            }
+            auto from = retval;
+            retval = genTemporary(toType);
+            Comment("DynamicCastCall: ");
+            Call(retval.i32, imm32(castFnIdx), [from]);
         }
         else
         {

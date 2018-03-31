@@ -257,6 +257,7 @@ struct CompiledCtfeFunction
             alias visit = super.visit;
         public:
             CompiledCtfeFunction* ccf;
+            bool hasErrors = false; /// Tree has hasErrors
 
             extern (D) this(CompiledCtfeFunction* ccf)
             {
@@ -278,7 +279,7 @@ struct CompiledCtfeFunction
                     return;
                 }
                 .error(e.loc, "CTFE internal error: ErrorExp in %s\n", ccf.func ? ccf.func.loc.toChars() : ccf.callingloc.toChars());
-                assert(0);
+                hasErrors = true;
             }
 
             override void visit(DeclarationExp e)

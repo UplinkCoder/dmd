@@ -26,6 +26,8 @@ int testClassStuff ()
 
   D e = new E();
   assert(cast(int)e.f() == 2);
+  assert((cast(D)c2 is c2), "Dynamic cast not working");
+  assert(!(cast(E)c2 is c2), "Dynamic cast not working");
 
   return c1.i + c2.i + c3.i;
 }
