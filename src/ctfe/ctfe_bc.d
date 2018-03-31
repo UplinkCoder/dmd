@@ -2793,7 +2793,7 @@ public:
                 bailout("UncompiledFunctions overflowed");
                 return ;
             }
-            printf("UncompiledConstructor: %s\n", ctor.toString().ptr);
+//            printf("UncompiledConstructor: %s\n", ctor.toString().ptr);
             if (!ctor)
             {
                 ctor = cast(CtorDeclaration)
@@ -2860,7 +2860,7 @@ public:
                     auto osp = sp;
                 }
                 beginFunction(fnIdx, cast(void*) null);
-                    printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
+                    // printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
                     if (ClassMetaData.VtblOffset)
                     {
                         auto vtblPtrPtr = genTemporary(i32Type);
@@ -7046,7 +7046,6 @@ static if (is(BCGen))
                 assert(fIdx);
                 vtbl[vti] = fIdx;
             }
-            import std.stdio; writeln("ct:", cdtp.toString, " vtbl:", vtbl[0 .. maxIdx + 1]);
             const vtblLength = maxIdx + 1;
 
             const vtblPtr = _sharedExecutionState.heap.heapSize;
