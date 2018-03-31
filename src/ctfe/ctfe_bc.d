@@ -24,7 +24,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -424,6 +424,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         bcv.buildVtbls();
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledFunctions(true);
+        bcv.compileUncompiledDynamicCasts();
         static if (is(BCGen))
         {
             bcv.ip = myIp;
@@ -3023,20 +3024,35 @@ public:
                 "Either " ~ udc.toType.to!string ~ "is not a class");
             auto toClass = _sharedCtfeState.classTypes[udc.toType.typeIndex - 1];
 
-            auto p1 = genParameter(i32Type);
-            beginFunction(udc.fnIdx, null);
-            {
-                auto vtblPtr = genLocal(i32Type, "vtblPtr");
-                auto found = genLocal(i32Type, "found");
+            auto osp = sp;
 
-                Set(vtblPtr.i32, p1.i32);
+            auto p1 = genParameter(i32Type);
+            beginFunction(udc.fnIdx - 1, null);
+            {
+                auto vtblPtr = genTemporary(i32Type);
+                auto vtblPtrAddr = genTemporary(i32Type);
+                auto found = genTemporary(i32Type);
+
+                if (ClassMetaData.VtblOffset)
+                {
+                    Add3(vtblPtrAddr, p1.i32, imm32(ClassMetaData.VtblOffset));
+                }
+                else
+                {
+                    Set(vtblPtrAddr, p1.i32);
+                }
+
                 auto LbeginLoop = genLabel();
                 {
-                    auto nullVtblCJ = beginCndJmp(vtblPtr);
-                    Load32(vtblPtr.i32, vtblPtr.i32);
+                    auto nullVtblCJ = beginCndJmp(vtblPtrAddr);
+                    Load32(vtblPtr.i32, vtblPtrAddr.i32);
 
                     Eq3(found, vtblPtr, imm32(toClass.vtblPtr));
                     auto foundVtblPtrCJ = beginCndJmp(found, true);
+                    {
+                        Set(vtblPtrAddr, vtblPtr);
+                    }
+
                     endJmp(beginJmp(), LbeginLoop);
                     auto LRetP1 = genLabel();
                     {
@@ -3048,11 +3064,18 @@ public:
                         Ret(bcNull);
                     }
                     endCndJmp(nullVtblCJ, LRetNull);
-                    
-                    
                 }
             }
             endFunction();
+            
+            static if (is(BCGen))
+            {
+                _sharedCtfeState.functions[udc.fnIdx - 1] = BCFunction(cast(void*) null,
+                    udc.fnIdx, BCFunctionTypeEnum.Bytecode,
+                    cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
+                    // get rid of dup!
+                    byteCodeArray[0 .. ip].idup);
+            }
 
         }
 
@@ -3351,6 +3374,7 @@ static if (is(BCGen))
             break;
         case TOK.TOKidentity:
             {
+                Comment("BeginIdentity");
                 auto lhs = genExpr(e.e1);
                 auto rhs = genExpr(e.e2);
                 if (!lhs || !rhs)
@@ -3360,6 +3384,7 @@ static if (is(BCGen))
                 }
 
                 Eq3(retval.i32, lhs.i32, rhs.i32);
+                Comment("EndIdenttity");
             }
             break;
         case TOK.TOKquestion:
@@ -6854,11 +6879,13 @@ static if (is(BCGen))
                 addVirtualCall(bcType, fd);
 
                 Comment("loadVtblPtr");
+
                 auto vtblPtr = genTemporary(i32Type);
                 if (ClassMetaData.VtblOffset)
                 {
-                    Add3(vtblPtr, thisPtr.i32, imm32(ClassMetaData.VtblOffset));
-                    Load32(vtblPtr, vtblPtr);
+                    auto vtblPtrAddr = genTemporary(i32Type);
+                    Add3(vtblPtrAddr, thisPtr.i32, imm32(ClassMetaData.VtblOffset));
+                    Load32(vtblPtr, vtblPtrAddr);
                 }
                 else
                 {
@@ -7342,6 +7369,8 @@ static if (is(BCGen))
         else if (toType.type == BCTypeEnum.Class && fromType.type == BCTypeEnum.Class)
         {
             // A dynamic cast needs to call a function since we may don't know the vtbl ptrs yet
+            Comment("DynamicCastBegin:");
+            
             int castFnIdx = getDynamicCastIndex(toType);
             if (!castFnIdx)
             {
@@ -7349,8 +7378,10 @@ static if (is(BCGen))
             }
             auto from = retval;
             retval = genTemporary(toType);
-            Comment("DynamicCastCall: ");
             Call(retval.i32, imm32(castFnIdx), [from]);
+
+            Comment("DynamicCastEnd");
+            
         }
         else
         {
