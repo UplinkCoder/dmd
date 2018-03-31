@@ -2545,6 +2545,10 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
         case LongInst.Assert:
             {
+                debug
+                {
+                    writeln("ip:", ip, "Assert(&", opRefOffset, " *",  *opRef, ")");
+                }
                 if (*opRef == 0)
                 {
                     BCValue retval = imm32(hi);

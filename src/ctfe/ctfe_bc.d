@@ -2897,13 +2897,13 @@ public:
                 const tIdx = uf.type.typeIndex - 1;
                 auto bcClass = &_sharedCtfeState.classTypes[tIdx];
                 auto cdtp = _sharedCtfeState.classDeclTypePointers[tIdx]; 
-                beginParameters();
-                    auto p1 = genParameter(i32Type, "thisPtr");
-                endParameters();
                 static if (is(BCGen))
                 {
                     auto osp = sp;
                 }
+                beginParameters();
+                    auto p1 = genParameter(i32Type, "thisPtr");
+                endParameters();
                 beginFunction(fnIdx, cast(void*) null);
                     // printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
                     if (ClassMetaData.VtblOffset)
@@ -3024,7 +3024,10 @@ public:
                 "Either " ~ udc.toType.to!string ~ "is not a class");
             auto toClass = _sharedCtfeState.classTypes[udc.toType.typeIndex - 1];
 
-            auto osp = sp;
+            static if (is(BCGen))
+            {
+                auto osp = sp;
+            }
 
             auto p1 = genParameter(i32Type);
             beginFunction(udc.fnIdx - 1, null);
@@ -3075,8 +3078,9 @@ public:
                     cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
                     // get rid of dup!
                     byteCodeArray[0 .. ip].idup);
+                    sp = osp;
             }
-
+            
         }
 
         uncompiledDynamicCastCount = 0;
@@ -7235,6 +7239,9 @@ static if (is(BCGen))
 
     override void visit(CastExp ce)
     {
+        //FIXME have this work with assignTo
+        //
+
         lastLoc = ce.loc;
 
         Line(ce.loc.linnum);
@@ -7377,7 +7384,7 @@ static if (is(BCGen))
                 addDynamicCast(toType, &castFnIdx);
             }
             auto from = retval;
-            retval = genTemporary(toType);
+            retval = genLocal(toType, "DynamicCastResult" ~ to!string(uniqueCounter++));
             Call(retval.i32, imm32(castFnIdx), [from]);
 
             Comment("DynamicCastEnd");
