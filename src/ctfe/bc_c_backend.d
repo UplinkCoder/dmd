@@ -428,7 +428,7 @@ pure:
     {
         sameLabel = false;
         code ~= "\theapPtr._heap[" ~ toCode(to) ~ "] = (" ~ toCode(from) ~ " & uint.max);\n";
-        code ~= "\theapPtr._heap[" ~ toCode(to) ~ " + 4] = (" ~ toCode(from) ~ " >> 32);\n";
+        code ~= "\theapPtr._heap[" ~ toCode(to) ~ " + 4] = ((" ~ toCode(from) ~ " & 0xFF_FF_FF_FF_00_00_00_00) >> 32);\n";
     }
 
 

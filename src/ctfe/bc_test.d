@@ -297,5 +297,38 @@ bool test(BCGenT)()
     static assert(() {
         BCHeap heap; return testLoad64([], &heap);
     }().imm64.imm64 == 0x13371337DEADBEEF);
+
+    static immutable testStore64 = BCGenFunction!(BCGenT, () {
+        BCGenT gen;
+        with (gen)
+        {
+            Initialize();
+            scope (exit) Finalize();
+            {
+                beginFunction(0);
+
+                auto t64 = genLocal(BCType(BCTypeEnum.i64), "t64");
+                auto t64_2 = genLocal(BCType(BCTypeEnum.i64), "t64_2");
+                auto mem = genLocal(BCType(BCTypeEnum.i32), "mem");
+                auto mem4 = genLocal(BCType(BCTypeEnum.i32), "mem4");
+
+                Alloc(mem, imm32(8));
+                Set(t64, imm32(0x13371337));
+                Lsh3(t64, t64, imm32(32));
+                Or3(t64, t64, imm32(0xDEADBEEF));
+                Store64(mem, t64);
+                Load64(t64_2, mem);
+                Ret(t64_2);
+
+                endFunction();
+            }
+        }
+        return gen;
+    });
+
+    static assert(() {
+        BCHeap heap; return testStore64([], &heap);
+    }().imm64.imm64 == 0x13371337DEADBEEF);
+
     return true;
 }
