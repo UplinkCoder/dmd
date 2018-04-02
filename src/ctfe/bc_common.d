@@ -374,6 +374,16 @@ BCValue imm32(uint value) pure @trusted
     return ret;
 }
 
+BCValue imm64(ulong value) pure @trusted
+{
+    BCValue ret = void;
+    ret.vType = BCValueType.Immediate;
+    ret.type.type = BCTypeEnum.i64;
+    ret.type.flags = BCTypeFlags.None;
+    ret.imm64 = value;
+    return ret;
+}
+
 BCValue i32(BCValue val) pure @safe
 {
     val.type.type = BCTypeEnum.i32;
