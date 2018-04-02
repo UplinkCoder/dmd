@@ -367,6 +367,10 @@ BCValue imm32(uint value) pure @trusted
     ret.type.type = BCTypeEnum.i32;
     ret.type.flags = BCTypeFlags.None;
     ret.imm32 = value;
+    if (!__ctfe)
+    {
+        ret.imm64 &= uint.max;
+    }
     return ret;
 }
 
