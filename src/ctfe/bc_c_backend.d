@@ -181,6 +181,8 @@ pure:
             v = v.i32;
         else if (v.type.type == BCTypeEnum.Struct)
             v = v.i32;
+        else if (v.type.type == BCTypeEnum.Class)
+            v = v.i32;
         else if (v.type.type == BCTypeEnum.Function)
             v = v.i32;
         // the next one is highly dubious
@@ -707,6 +709,21 @@ pure:
     {
         code ~= "\tdouble tmp = " ~ toCode(source) ~ ";\n" ~
             toCode(target) ~ " = cast(long*)  &tmp\n";
+    }
+
+    void F32ToI(BCValue target, BCValue source)
+    {
+        //code ~= "\tfloat tmp = " ~ toCode(source) ~ ";\n" ~
+        //toCode(target) ~ " = cast(int*) &tmp\n";
+        assert(0);
+    }
+
+
+    void F64ToI(BCValue target, BCValue source)
+    {
+        //code ~= "\tdouble tmp = " ~ toCode(source) ~ ";\n" ~
+        //   toCode(target) ~ " = cast(long*)  &tmp\n";
+        assert(0);
     }
 
     void Comment(string comment)
