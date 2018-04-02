@@ -97,7 +97,7 @@ struct C_BCGen
         return (
             (
             (fname is null) ? "((BCValue[] args, BCHeap* heapPtr) @safe {\n"
-            : "BCValue " ~ fname ~ "(BCValue[] args) {\n") ~ "\n\tint stackOffset;\n\tBCValue retval;\n\nint[" ~ to!string(
+            : "BCValue " ~ fname ~ "(BCValue[] args) {\n") ~ "\n\tint stackOffset;\n\tBCValue retval;\n\nlong[" ~ to!string(
             align4(sp + 400)) ~ "] stack;\n\tint cond;\n\n" ~ q{
         foreach(i, arg;args)
         {
@@ -106,7 +106,7 @@ struct C_BCGen
             stack[stackOffset+(4*(i+1))] = arg.imm32;
         }
                 } ~ cast(
-            string) code ~ q{return fn0(args);} ~ ((fname is null) ? "\n})" : "\n}"));
+            string) code ~ q{return fn0(args, heapPtr);} ~ ((fname is null) ? "\n})" : "\n}"));
     }
 
 
@@ -421,7 +421,7 @@ pure:
         sameLabel = false;
         //assert(to.vType == BCValueType.StackValue);
         code ~= "\t" ~ toCode(to) ~ " |= heapPtr._heap[" ~ toCode(from) ~ "];\n";
-        code ~= "\t" ~ toCode(to) ~ " |= (heapPtr._heap[" ~ toCode(from) ~ " + 4] >> 32);\n";
+        code ~= "\t" ~ toCode(to) ~ " |= (cast(ulong)(heapPtr._heap[" ~ toCode(from) ~ " + 4]) << 32);\n";
     }
 
     void Store64(BCValue to, BCValue from)
@@ -663,7 +663,14 @@ pure:
     void Ret(BCValue val)
     {
         sameLabel = false;
-        code ~= "\treturn BCValue(Imm32(" ~ toCode(val) ~ "));\n";
+        if (val.type.type == BCTypeEnum.i64)
+        {
+            code ~= "\treturn BCValue(Imm64(" ~ toCode(val) ~ "));\n";
+        }
+        else
+        {
+            code ~= "\treturn BCValue(Imm32(cast(int)" ~ toCode(val) ~ "));\n";
+        }
     }
 
     void Byte3(BCValue result, BCValue word, BCValue idx)

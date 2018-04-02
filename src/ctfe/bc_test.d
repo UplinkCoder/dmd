@@ -205,90 +205,7 @@ bool test(BCGenT)()
 
         return gen;
     });
-    /* String Layout has changed therefore this test will no longer produce the same result
-    static immutable testString = BCGenFunction!(BCGenT, () {
-        BCGenT gen;
 
-        with (gen)
-        {
-            beginFunction();
-            auto jmp1 = beginJmp();
-            auto label1 = genLabel(); //currSp();//SP[4]
-            incSp();
-            Set(BCValue(StackAddr(4), BCType(BCTypeEnum.i32)), BCValue(Imm32(0)));
-            //currSp();//SP[8]
-            incSp();
-            Set(BCValue(StackAddr(8), BCType(BCTypeEnum.i32)), BCValue(Imm32(0)));
-            //currSp();//SP[12]
-            incSp();
-            Set(BCValue(StackAddr(12), BCType(BCTypeEnum.i32)), BCValue(Imm32(64)));
-            auto label2 = genLabel();
-            Lt3(BCValue.init, BCValue(StackAddr(8), BCType(BCTypeEnum.i32)),
-                BCValue(StackAddr(12), BCType(BCTypeEnum.i32)));
-            auto cndJmp1 = beginCndJmp();
-            auto label3 = genLabel(); //currSp();//SP[16]
-            incSp();
-            Set(BCValue(StackAddr(16), BCType(BCTypeEnum.i32)),
-                BCValue(StackAddr(8), BCType(BCTypeEnum.i32))); //currSp();//SP[20]
-            incSp();
-            auto tmp1 = genTemporary(BCType(BCTypeEnum.i32)); //SP[24]
-            Set(tmp1.i32, BCValue(Imm32(0)));
-            Set(BCValue(StackAddr(20), BCType(BCTypeEnum.i32)), tmp1); //currSp();//SP[28]
-            incSp();
-            Set(BCValue(StackAddr(28), BCType(BCTypeEnum.i32)), BCValue(Imm32(0)));
-            auto label4 = genLabel();
-            auto tmp2 = genTemporary(BCType(BCTypeEnum.i32)); //SP[32]
-            Load32(tmp2, BCValue(StackAddr(20), BCType(BCTypeEnum.i32)));
-            Lt3(tmp2, BCValue(StackAddr(28), BCType(BCTypeEnum.i32)), tmp2);
-            auto cndJmp2 = beginCndJmp(tmp2,);
-            auto label5 = genLabel(); //currSp();//SP[36]
-            incSp();
-            auto tmp3 = genTemporary(BCType(BCTypeEnum.i32)); //SP[40]
-            Add3(tmp3, BCValue(StackAddr(20), BCType(BCTypeEnum.i32)), BCValue(Imm32(1)));
-            auto tmp4 = genTemporary(BCType(BCTypeEnum.i32)); //SP[44]
-            auto tmp5 = genTemporary(BCType(BCTypeEnum.i32)); //SP[48]
-            Mod3(tmp5, BCValue(StackAddr(28), BCType(BCTypeEnum.i32)), BCValue(Imm32(4)));
-            Div3(tmp4, BCValue(StackAddr(28), BCType(BCTypeEnum.i32)), BCValue(Imm32(4)));
-            Add3(tmp3, tmp3, tmp4);
-            Load32(tmp2, tmp3);
-            Byte3(tmp2, tmp2, tmp5);
-            Set(BCValue(StackAddr(36), BCType(BCTypeEnum.i32)), tmp2);
-            Add3(BCValue(StackAddr(4), BCType(BCTypeEnum.i32)),
-                BCValue(StackAddr(4), BCType(BCTypeEnum.i32)),
-                BCValue(StackAddr(36), BCType(BCTypeEnum.i32)));
-            auto label6 = genLabel();
-            Add3(BCValue(StackAddr(28), BCType(BCTypeEnum.i32)),
-                BCValue(StackAddr(28), BCType(BCTypeEnum.i32)), BCValue(Imm32(1)));
-            auto label7 = genLabel();
-            auto jmp2 = beginJmp();
-            endJmp(jmp2, label4);
-            auto label8 = genLabel();
-            endCndJmp(cndJmp2, label8);
-            auto label9 = genLabel();
-            Add3(BCValue(StackAddr(8), BCType(BCTypeEnum.i32)),
-                BCValue(StackAddr(8), BCType(BCTypeEnum.i32)), BCValue(Imm32(1)));
-            auto label10 = genLabel();
-            auto jmp3 = beginJmp();
-            endJmp(jmp3, label2);
-            auto label11 = genLabel();
-            endCndJmp(cndJmp1, label11);
-            Ret(BCValue(StackAddr(4), BCType(BCTypeEnum.i32)));
-            auto label12 = genLabel();
-            endJmp(jmp1, label12);
-            auto jmp4 = beginJmp();
-            endJmp(jmp4, label1);
-            endFunction();
-        }
-        return gen;
-    });
-
-    static assert(testString([], ({
-        BCHeap* h1 = new BCHeap();
-        h1.pushString("This is the world we live in.".ptr,
-            cast(uint) "This is the World we live in.".length);
-        return h1;
-    }())) == BCValue(Imm32(166784)));
-*/
     static immutable testCndJmp = BCGenFunction!(BCGenT, () {
         BCGenT gen;
         with (gen)
@@ -351,5 +268,34 @@ bool test(BCGenT)()
     static assert(testCmpInst([], null) == BCValue(Imm32(1)));
 
 
+    static immutable testLoad64 = BCGenFunction!(BCGenT, () {
+        BCGenT gen;
+        with (gen)
+        {
+            Initialize();
+            scope (exit) Finalize();
+            {
+                beginFunction(0);
+
+                auto t64 = genLocal(BCType(BCTypeEnum.i64), "t64");
+                auto mem = genLocal(BCType(BCTypeEnum.i32), "mem");
+                auto mem4 = genLocal(BCType(BCTypeEnum.i32), "mem4");
+
+                Alloc(mem, imm32(8));
+                Add3(mem4, mem, imm32(4));
+                Store32(mem4, imm32(0x13371337));
+                Store32(mem, imm32(0xDEADBEEF));
+                Load64(t64, mem);
+                Ret(t64);
+
+                endFunction();
+            }
+        }
+        return gen;
+    });
+
+    static assert(() {
+        BCHeap heap; return testLoad64([], &heap);
+    }().imm64.imm64 == 0x13371337DEADBEEF);
     return true;
 }

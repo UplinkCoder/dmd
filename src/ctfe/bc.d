@@ -2713,7 +2713,10 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 debug
                 {
                     import std.stdio;
-                    writeln(ip,":Store[",*lhsRef,"] = ",*rhs & uint.max);
+                    if (!__ctfe)
+                    {
+                        writeln(ip,":Store[",*lhsRef,"] = ",*rhs & uint.max);
+                    }
                 }
 
             }
@@ -2728,7 +2731,10 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 debug
                 {
                     import std.stdio;
-                    writeln(ip,":Loaded[",*rhs,"] = ",*lhsRef);
+                    if (!__ctfe)
+                    {
+                        writeln(ip,":Loaded[",*rhs,"] = ",*lhsRef);
+                    }
                 }
             }
             break;
@@ -2957,7 +2963,10 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
                 debug
                 {
-                    writefln("Alloc(#%d) = &%d", allocSize, *lhsRef);
+                    if (!__ctfe)
+                    {
+                        writefln("Alloc(#%d) = &%d", allocSize, *lhsRef);
+                    }
                 }
 
             }
@@ -3079,6 +3088,7 @@ int[] testRelJmp()
 }
 
 static assert(interpret_(testRelJmp(), []) == imm32(12));
+
 import ddmd.ctfe.bc_test;
 
 static assert(test!BCGen());
