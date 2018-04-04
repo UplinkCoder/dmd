@@ -2869,9 +2869,10 @@ final class Parser : Lexer
                         //if ((storageClass & STCscope) && (storageClass & (STCref | STCout)))
                             //error("scope cannot be ref or out");
 
+                        Token* t;
                         if (tpl && token.value == TOKidentifier)
                         {
-                            Token* t = peek(&token);
+                            t = peek(&token);
                             if (t.value == TOKcomma || t.value == TOKrparen || t.value == TOKdotdotdot)
                             {
                                 Identifier id = Identifier.generateId("__T");
@@ -2885,11 +2886,11 @@ final class Parser : Lexer
                                 ai = token.ident;
                                 nextToken();
                             }
-                            else goto _else;
+                            else
+                                goto Lelse;
                         }
                         else
-                        {
-                        _else:
+                    Lelse:
                             at = parseType(&ai);
                         }
                         ae = null;
