@@ -616,7 +616,7 @@ else
             bct = i32Type;
 
         if (bct != i32Type && bct != BCType(BCTypeEnum.i64))
-            assert(0, "can currently only create params of i32Type not: " ~ enumToString(bct.type));
+            assert(0, "can currently only create params of i32Type not: " ~ to!string(bct.type));
         //parameters[parameterCount] =
         auto r = BCValue(BCParameter(parameterCount++, bct, StackAddr(0)));
         return r;
@@ -1138,6 +1138,7 @@ else
     void F64ToI(BCValue _to, BCValue value){ assert(0, __PRETTY_FUNCTION__ ~ " not implemented"); }
     void F32ToI(BCValue _to, BCValue value)
     {
+
         assert(0, __PRETTY_FUNCTION__ ~ " not implemented"); 
     }
 
