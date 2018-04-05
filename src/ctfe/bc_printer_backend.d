@@ -126,27 +126,27 @@ struct Print_BCGen
         {
         case BCValueType.Immediate:
             {
-                if (val.type == BCTypeEnum.i32)
+                if (val.type.type == BCTypeEnum.i32)
                 {
                     result ~= "Imm32(" ~ to!string(val.imm32.imm32) ~ ")";
                 }
-                else if (val.type == BCTypeEnum.i64)
+                else if (val.type.type == BCTypeEnum.i64)
                 {
                     result ~= "Imm64(" ~ to!string(val.imm64.imm64) ~ ")";
                 }
-                else if (val.type == BCTypeEnum.f23)
+                else if (val.type.type == BCTypeEnum.f23)
                 {
                     result ~= "Imm23f(" ~ to!string(*cast(float*)&val.imm32.imm32) ~ ")";
                 }
-                else if (val.type == BCTypeEnum.f52)
+                else if (val.type.type == BCTypeEnum.f52)
                 {
                     result ~= "Imm52f(" ~ to!string(*cast(double*)&val.imm64.imm64) ~ ")";
                 }
-                else if (val.type == BCTypeEnum.Null)
+                else if (val.type.type == BCTypeEnum.Null)
                 {
                     result ~= "Imm32(0/*null*/)";
                 }
-                else if (val.type == BCTypeEnum.Array)
+                else if (val.type.type == BCTypeEnum.Array)
                 {
                     result ~= "Imm32(" ~ to!string(val.imm32.imm32) ~ "/*Array*/)";
                 }
@@ -291,7 +291,7 @@ struct Print_BCGen
     {
         sameLabel = false;
         auto tmpAddr = sp.addr;
-        sp += isBasicBCType(bct) ? align4(basicTypeSize(bct)) : 4;
+        sp += isBasicBCType(bct) ? align4(basicTypeSize(bct.type)) : 4;
 
         result ~= indent ~ "auto tmp" ~ to!string(++temporaryCount) ~ functionSuffix ~ " = genTemporary(" ~ print(
             bct) ~ ");//SP[" ~ to!string(tmpAddr) ~ "]\n";
@@ -302,7 +302,7 @@ struct Print_BCGen
     {
         sameLabel = false;
         auto localAddr = sp.addr;
-        sp += isBasicBCType(bct) ? align4(basicTypeSize(bct)) : 4;
+        sp += isBasicBCType(bct) ? align4(basicTypeSize(bct.type)) : 4;
 
         auto localName = name ? name ~ "_" ~ to!string(++localCount) : "local" ~ to!string(++localCount);
 

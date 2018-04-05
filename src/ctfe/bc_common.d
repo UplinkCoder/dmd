@@ -199,8 +199,8 @@ enum BCTypeFlags : ubyte
 struct BCType
 {
     BCTypeEnum type;
-    alias type this;
-    uint typeIndex;
+    uint typeIndex = 0;
+
     // additional information
     BCTypeFlags flags;
 
@@ -365,6 +365,7 @@ BCValue imm32(uint value) pure @trusted
     BCValue ret = void;
     ret.vType = BCValueType.Immediate;
     ret.type.type = BCTypeEnum.i32;
+    ret.type.typeIndex = 0;
     ret.type.flags = BCTypeFlags.None;
     ret.imm32 = value;
     if (!__ctfe)

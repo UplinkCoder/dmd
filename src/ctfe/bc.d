@@ -767,7 +767,7 @@ pure:
         }
         else if (rhs.vType == BCValueType.Immediate)
         {
-            if  (basicTypeSize(rhs.type) <= 4)
+            if  (basicTypeSize(rhs.type.type) <= 4)
             {
                 //Change the instruction into the corresponding Imm Instruction;
                 inst += (LongInst.ImmAdd - LongInst.Add);
@@ -1161,7 +1161,7 @@ pure:
 
     void Ret(BCValue val)
     {
-        LongInst inst = basicTypeSize(val.type) == 8 ? LongInst.Ret64 : LongInst.Ret32;
+        LongInst inst = basicTypeSize(val.type.type) == 8 ? LongInst.Ret64 : LongInst.Ret32;
         val = pushOntoStack(val);
         if (isStackValueOrParameter(val))
         {
@@ -3067,7 +3067,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     }
 }
 
-int[] testRelJmp()
+auto testRelJmp()
 {
     BCGen gen;
     with (gen)
@@ -3083,12 +3083,13 @@ int[] testRelJmp()
         Add3(result, result, BCValue(Imm32(1)));
         genJump(evalCond);
         Finalize();
-        return byteCodeArray[0 .. ip].dup;
+        return gen;
     }
 }
 
-static assert(interpret_(testRelJmp(), []) == imm32(12));
+static assert(testRelJmp().interpret([]) == imm32(12));
 
 import ddmd.ctfe.bc_test;
 
 static assert(test!BCGen());
+
