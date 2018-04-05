@@ -323,7 +323,7 @@ else
         else if (val.vType == BCValueType.Immediate)
         {
              
-            if (val.type == BCTypeEnum.i64)
+            if (val.type.type == BCTypeEnum.i64)
                 rv = gcc_jit_context_new_rvalue_from_long(ctx, i64type, val.imm64.imm64);
             else
                 rv = gcc_jit_context_new_cast(ctx, currentLoc, gcc_jit_context_new_rvalue_from_int(ctx, u32type, val.imm32.imm32), i64type);
@@ -526,6 +526,7 @@ else
 
         gcc_jit_context_dump_to_file(ctx, "ctx.c", 1);
         result = gcc_jit_context_compile(ctx);
+        gcc_jit_comtext_release(ctx);
     }
 
     void beginFunction(uint fnId, void* fd = null)
