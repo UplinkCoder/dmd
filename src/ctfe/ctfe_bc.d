@@ -4126,8 +4126,7 @@ static if (is(BCGen))
 
         Line(he.loc.linnum);
         retval = BCValue.init;
-        debug (ctfe)
-            assert(0, "I don't really handle assert(0)");
+	Assert(imm32(0), addError(he.loc, "HaltExp"));
     }
 
     override void visit(SliceExp se)
