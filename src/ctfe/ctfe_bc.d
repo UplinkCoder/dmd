@@ -6748,7 +6748,7 @@ static if (is(BCGen))
         else if (unrolledLoopState)
         {
             unrolledLoopState.continueFixups[unrolledLoopState.continueFixupCount++] = beginJmp();
-        }
+bcZerox	        }
         else
         {
             continueFixups[continueFixupCount++] = beginJmp();
@@ -6977,8 +6977,8 @@ static if (is(BCGen))
 
         assert(ce.arguments.dim <= nParameters);
 
-        uint lastArgIndx = cast(uint)(ce.arguments.dim > nParameters ? ce.arguments.dim : nParameters);
-        bc_args.length = lastArgIndx + !!(thisPtr);
+        uint lastArgIdx = cast(uint)(ce.arguments.dim > nParameters ? ce.arguments.dim : nParameters);
+        bc_args.length = lastArgIdx + !!(thisPtr);
 
         foreach (i, arg; *ce.arguments)
         {
@@ -7024,7 +7024,7 @@ static if (is(BCGen))
 +/
         if (thisPtr)
         {
-            bc_args[lastArgIndx] = thisPtr;
+            bc_args[lastArgIdx] = thisPtr;
         }
 
         static if (is(BCFunction) && is(typeof(_sharedCtfeState.functionCount)))
