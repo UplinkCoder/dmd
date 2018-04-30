@@ -188,6 +188,8 @@ else
     jtype i64type;
     jtype u32type;
     jtype u64type;
+	jtype f23type;
+	jtype f53type;
 
     private void print_int(BCValue v)
     {
@@ -884,7 +886,6 @@ else
 
     void And3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -904,7 +905,6 @@ else
 
     void Or3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        //assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -924,7 +924,6 @@ else
 
     void Xor3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -944,7 +943,6 @@ else
 
     void Lsh3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        //assert(lhs.type == i32Type || && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -963,7 +961,6 @@ else
     }
     void Rsh3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -983,7 +980,6 @@ else
 
     void Mod3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -1139,8 +1135,12 @@ else
     void F64ToI(BCValue _to, BCValue value){ assert(0, __PRETTY_FUNCTION__ ~ " not implemented"); }
     void F32ToI(BCValue _to, BCValue value)
     {
-
-        assert(0, __PRETTY_FUNCTION__ ~ " not implemented"); 
+		gcc_jit_block_add_assignment(block, currentLoc,
+			lvalue(_to),
+			gcc_jit_context_new_cast(ctx, currentLoc, 
+				rvalue(value), i64type
+			)
+		);
     }
 
 
