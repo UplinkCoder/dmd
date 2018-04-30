@@ -453,7 +453,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
         }
         else static if (UseGCCJITBackend)
         {
-            assert(0, "binding to gccjit's run is not yet implemented");
+            auto retval = bcv.gen.run(0, bc_args, &_sharedExecutionState.heap);
         }
         else
         {
@@ -773,7 +773,7 @@ struct BCUnion
 
 }
 
-struct BCClass 
+struct BCClass
 {
     uint parentIdx; /// 0 is object
     uint size;
@@ -1886,7 +1886,7 @@ extern (C++) final class BCTypeVisitor : Visitor
         lastLoc = cd.loc;
         bool died = true;
 
-        int parentIdx; 
+        int parentIdx;
 
         if (cd.baseClass)
         {
@@ -1900,7 +1900,7 @@ extern (C++) final class BCTypeVisitor : Visitor
 
         foreach(VarDeclaration f;cd.fields)
         {
-            ct.addField(toBCType(f.type), f._init ? !!f._init.isVoidInitializer : false); 
+            ct.addField(toBCType(f.type), f._init ? !!f._init.isVoidInitializer : false);
         }
 
         if (parentIdx)
@@ -2225,7 +2225,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         import ddmd.lexer : Loc;
 
         void Load32(BCValue _to, BCValue from, size_t line = __LINE__)
-        {   
+        {
             Assert(from.i32, addError(Loc.init,
                     "Load Source may not be null in line: " ~ to!string(line)));
             gen.Load32(_to, from);
@@ -2827,7 +2827,7 @@ public:
 
             const fnIdx = ++_sharedCtfeState.functionCount;
             _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) ctor);
-            uncompiledConstructors[uncompiledConstructorCount] = 
+            uncompiledConstructors[uncompiledConstructorCount] =
                 UncompiledFunction(ctor, fnIdx, type);
             ++uncompiledConstructorCount;
             *cIdxP = fnIdx;
@@ -2844,7 +2844,7 @@ public:
 
             const fnIdx = ++_sharedCtfeState.functionCount;
             _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) uncompiledDynamicCastCount);
-            uncompiledDynamicCasts[uncompiledDynamicCastCount] = 
+            uncompiledDynamicCasts[uncompiledDynamicCastCount] =
                 UncompiledDynamicCast(toType, fnIdx);
             ++uncompiledDynamicCastCount;
             *cIdxP = fnIdx;
@@ -2898,7 +2898,7 @@ public:
                 assert(uf.type.type == BCTypeEnum.Class && uf.type.typeIndex);
                 const tIdx = uf.type.typeIndex - 1;
                 auto bcClass = &_sharedCtfeState.classTypes[tIdx];
-                auto cdtp = _sharedCtfeState.classDeclTypePointers[tIdx]; 
+                auto cdtp = _sharedCtfeState.classDeclTypePointers[tIdx];
                 static if (is(BCGen))
                 {
                     auto osp = sp;
@@ -3006,7 +3006,7 @@ public:
 
         if (uncompiledFunctionCount > lastUncompiledFunction)
             goto LuncompiledFunctions;
-        
+
         clearArray(uncompiledFunctions, uncompiledFunctionCount);
         // not sure if the above clearArray does anything
         uncompiledFunctionCount = 0;
@@ -3022,7 +3022,7 @@ public:
     {
         foreach(udc;uncompiledDynamicCasts[0 .. uncompiledDynamicCastCount])
         {
-            assert(udc.toType.type == BCTypeEnum.Class, 
+            assert(udc.toType.type == BCTypeEnum.Class,
                 "Either " ~ udc.toType.to!string ~ "is not a class");
             auto toClass = _sharedCtfeState.classTypes[udc.toType.typeIndex - 1];
 
@@ -3034,9 +3034,12 @@ public:
             auto p1 = genParameter(i32Type);
             beginFunction(udc.fnIdx - 1, null);
             {
+                auto rv = genTemporary(i32Type);
                 auto vtblPtr = genTemporary(i32Type);
                 auto vtblPtrAddr = genTemporary(i32Type);
                 auto found = genTemporary(i32Type);
+
+                Set(rv, p1.i32);
 
                 if (ClassMetaData.VtblOffset)
                 {
@@ -3059,20 +3062,20 @@ public:
                     }
 
                     endJmp(beginJmp(), LbeginLoop);
-                    auto LRetP1 = genLabel();
-                    {
-                        Ret(p1);
-                    }
-                    endCndJmp(foundVtblPtrCJ, LRetP1);
                     auto LRetNull = genLabel();
                     {
-                        Ret(bcNull);
+                        Set(rv, imm32(0));
                     }
                     endCndJmp(nullVtblCJ, LRetNull);
+                    auto LRet = genLabel();
+                    {
+                        Ret(rv);
+                    }
+                    endCndJmp(foundVtblPtrCJ, LRet);
                 }
             }
             endFunction();
-            
+
             static if (is(BCGen))
             {
                 _sharedCtfeState.functions[udc.fnIdx - 1] = BCFunction(cast(void*) null,
@@ -3082,7 +3085,7 @@ public:
                     byteCodeArray[0 .. ip].idup);
                     sp = osp;
             }
-            
+
         }
 
         uncompiledDynamicCastCount = 0;
@@ -3153,9 +3156,9 @@ public:
 
             if (fd.isVirtualMethod())
             {
-                assert(fd.vtblIndex != -1, "virtual method with vtblIdx of -1, seems invlaid -- " ~ fd.toString);                
+                assert(fd.vtblIndex != -1, "virtual method with vtblIdx of -1, seems invlaid -- " ~ fd.toString);
             }
-            
+
             beginFunction(fnIdx - 1, cast(void*)fd);
             visit(fbody);
             if (fd.type.nextOf.ty == Tvoid)
@@ -3934,7 +3937,7 @@ static if (is(BCGen))
             //Lt3(inBounds,  idx, arrayLength);
             Assert(indexed.i32, addError(ie.loc, "we indexed a null array -- " ~ ie.toString));
             auto basePtr = getBase(indexed);
-             
+
             Mul3(offset, idx, imm32(elemSize));
             Add3(ptr, offset, basePtr);
             if (!retval || !ptr)
@@ -4126,7 +4129,7 @@ static if (is(BCGen))
 
         Line(he.loc.linnum);
         retval = BCValue.init;
-	Assert(imm32(0), addError(he.loc, "HaltExp"));
+        Assert(imm32(0), addError(he.loc, "HaltExp"));
     }
 
     override void visit(SliceExp se)
@@ -4570,7 +4573,7 @@ static if (is(BCGen))
             }
 
             auto ty = _struct.memberTypes[i];
-            if (!ty.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.String, BCTypeEnum.Slice, BCTypeEnum.Array, 
+            if (!ty.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.String, BCTypeEnum.Slice, BCTypeEnum.Array,
                 BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64, BCTypeEnum.f23, BCTypeEnum.f52,
                 BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32]))
             {
@@ -4856,7 +4859,7 @@ static if (is(BCGen))
 
                 ctor = cast (FuncDeclaration)
                         _sharedCtfeState.classDeclTypePointers[type.typeIndex - 1];
-            }            
+            }
             auto cIdx = _sharedCtfeState.getFunctionIndex(ctor);
             if (!cIdx)
             {
@@ -5041,7 +5044,7 @@ static if (is(BCGen))
         return align4(structType.size) + StructMetaData.VoidInitBitfieldOffset;
     }
 
-    /// Params: 
+    /// Params:
     ///     fIndex => fieldIndex of the field to be set to void/nonVoid
     ///     nonVoid => true if seting to nonVoid false if setting to Void
     void setMemberVoidInit(BCValue structPtr, int fIndex, bool nonVoid)
@@ -6258,7 +6261,7 @@ static if (is(BCGen))
                             Alloc(lhs.i32, sizeImm32);
                             endCndJmp(CJLhsIsNull, genLabel());
                         }
-                    
+
 
                         MemCpy(lhs.i32, rhs.i32, sizeImm32);
                     }
@@ -6748,7 +6751,7 @@ static if (is(BCGen))
         else if (unrolledLoopState)
         {
             unrolledLoopState.continueFixups[unrolledLoopState.continueFixupCount++] = beginJmp();
-		}
+                }
         else
         {
             continueFixups[continueFixupCount++] = beginJmp();
@@ -7013,7 +7016,7 @@ static if (is(BCGen))
                 bc_args[i] = argHeapRef;
             }
         }
-/+ this seems to be bogus 
+/+ this seems to be bogus
         //put in the default args
         foreach(dai;ce.arguments.dim .. nParameters)
         {
@@ -7378,7 +7381,7 @@ static if (is(BCGen))
         {
             // A dynamic cast needs to call a function since we may don't know the vtbl ptrs yet
             Comment("DynamicCastBegin:");
-            
+
             int castFnIdx = getDynamicCastIndex(toType);
             if (!castFnIdx)
             {
@@ -7389,7 +7392,7 @@ static if (is(BCGen))
             Call(retval.i32, imm32(castFnIdx), [from]);
 
             Comment("DynamicCastEnd");
-            
+
         }
         else
         {

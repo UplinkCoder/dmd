@@ -38,7 +38,7 @@ else
     import std.conv;
     import std.string;
 
-    static struct FunctionState 
+    static struct FunctionState
     {
         jlvalue[64] parameters;
         ubyte parameterCount;
@@ -104,9 +104,9 @@ else
                 Load32(t32_hi,mem4);
                 Lsh3(t64_hi, t32_hi, imm32(32));
                 print_ptr(rvalue(t64_hi), "t64_hi");
-                Or3(t64_hi, t64_hi, t32_lo); 
+                Or3(t64_hi, t64_hi, t32_lo);
                 print_ptr(rvalue(t64_hi), "t64_hi");
-                
+
                 //Or3(t64, t64_hi, t32_lo);
                 Load64(t64, mem);
                 print_ptr(rvalue(t64), "t64");
@@ -132,10 +132,10 @@ else
 
         assert(result, "No result. Did you try to run before calling Finalize?");
 
-        alias fType = 
+        alias fType =
             extern (C) ReturnType function(uint fnId, long[max_params] args,
                 uint* heapSize, uint* heap, ReturnType* returnValue);
-                
+
 
         auto func = cast(fType)
             gcc_jit_result_get_code(result, "__Runner__");
@@ -144,7 +144,7 @@ else
 
         foreach(i, arg;args)
         {
-            fnArgs[i] = arg.imm64.imm64; 
+            fnArgs[i] = arg.imm64.imm64;
         }
 
         ReturnType returnValue;
@@ -188,8 +188,8 @@ else
     jtype i64type;
     jtype u32type;
     jtype u64type;
-	jtype f23type;
-	jtype f53type;
+        jtype f23type;
+        jtype f52type;
 
     private void print_int(BCValue v)
     {
@@ -324,7 +324,7 @@ else
         }
         else if (val.vType == BCValueType.Immediate)
         {
-             
+
             if (val.type.type == BCTypeEnum.i64)
                 rv = gcc_jit_context_new_rvalue_from_long(ctx, i64type, val.imm64.imm64);
             else
@@ -374,7 +374,7 @@ else
     jtype heapType;
     jtype returnType;
     jfunc dispatcherFn;
-    jstruct returnType_struct; 
+    jstruct returnType_struct;
     jtype paramArrayType;
 
     jfunc memcpy;
@@ -389,6 +389,8 @@ else
         u64type = gcc_jit_context_get_int_type(ctx, 8, 0);
         i32type =  gcc_jit_context_get_int_type(ctx, 4, 1);//gcc_jit_context_get_int_type(ctx, 32, 1);
         i64type = gcc_jit_context_get_int_type(ctx, 8, 1);
+                f23type = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+                f52type = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_DOUBLE);
 
         paramArrayType = gcc_jit_context_new_array_type(ctx, currentLoc, i64type, max_params);
 
@@ -448,7 +450,7 @@ else
             null, GCC_JIT_FUNCTION_EXPORTED, i64type,
             "__Runner__",
             cast(int)runParams.length, &runParams[0], 0
-        );    
+        );
 
         dispatcherFn = gcc_jit_context_new_function(ctx,
             null, GCC_JIT_FUNCTION_INTERNAL, i64type,
@@ -464,10 +466,10 @@ else
         dispArgs[3] = gcc_jit_param_as_rvalue(runParams[3]);
 
         auto runnerBlock = gcc_jit_function_new_block(runnerFn, "Runner");
-        auto dispCall = 
+        auto dispCall =
             gcc_jit_context_new_call(ctx, currentLoc, dispatcherFn, 4, &dispArgs[0]);
         gcc_jit_block_add_eval(runnerBlock, currentLoc, dispCall);
-        gcc_jit_block_add_assignment(runnerBlock, currentLoc, 
+        gcc_jit_block_add_assignment(runnerBlock, currentLoc,
             gcc_jit_rvalue_dereference(gcc_jit_param_as_rvalue(runParams[4]), currentLoc),
             rvalue(returnVal)
         );
@@ -535,7 +537,7 @@ else
     {
         insideFunction = true;
         writeln("parameterCount: ", parameterCount);
-        writeln ("functionIndex: ", (&functionStates[0])  - currentFunctionState);
+        writeln ("functionIndex: ", (currentFunctionState - &functionStates[0]));
         static if (is(typeof(() {import ddmd.func : FuncDeclaration; })))
         {
             import ddmd.func : FuncDeclaration;
@@ -742,7 +744,7 @@ else
 
     void Lt3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        auto cmp = 
+        auto cmp =
             gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_LT, rvalue(lhs), rvalue(rhs));
 
         auto _result = result ? lvalue(result) : flag;
@@ -754,7 +756,7 @@ else
 
     void Le3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        auto cmp = 
+        auto cmp =
             gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_LE, rvalue(lhs), rvalue(rhs));
 
         auto _result = result ? lvalue(result) : flag;
@@ -766,7 +768,7 @@ else
 
     void Gt3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        auto cmp = 
+        auto cmp =
             gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_GT, rvalue(lhs), rvalue(rhs));
 
         auto _result = result ? lvalue(result) : flag;
@@ -778,19 +780,19 @@ else
 
     void Ge3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        auto cmp = 
+        auto cmp =
             gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_GE, rvalue(lhs), rvalue(rhs));
 
         auto _result = result ? lvalue(result) : flag;
         if (result)
             cmp = gcc_jit_context_new_cast(ctx, currentLoc, cmp, i64type);
 
-        gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);    
+        gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);
     }
 
     void Eq3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        auto cmp = 
+        auto cmp =
             gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_EQ, rvalue(lhs), rvalue(rhs));
 
         auto _result = result ? lvalue(result) : flag;
@@ -1006,7 +1008,7 @@ else
             char* file;
         }
     }
-    // 
+    //
 
 
 
@@ -1021,7 +1023,7 @@ else
 
         auto callArgs =
             gcc_jit_function_new_local(func, currentLoc, paramArrayType, "callArgs");
-            
+
         foreach(i, arg; args)
         {
             gcc_jit_block_add_assignment(block, currentLoc,
@@ -1040,7 +1042,7 @@ else
 
             assert(functions[fn.imm32 - 1].func);
             auto call = gcc_jit_context_new_call(
-                ctx, currentLoc, 
+                ctx, currentLoc,
                 functions[fn.imm32 - 1].func, 3, &fnArgs[1]
             );
 
@@ -1049,7 +1051,7 @@ else
         else
         {
             auto call = gcc_jit_context_new_call(
-                ctx, currentLoc, 
+                ctx, currentLoc,
                 dispatcherFn, 4, &fnArgs[0]
             );
 
@@ -1060,7 +1062,7 @@ else
 
     void Load32(BCValue _to, BCValue from)
     {
-        gcc_jit_block_add_assignment(block, currentLoc, 
+        gcc_jit_block_add_assignment(block, currentLoc,
             lvalue(_to),
             gcc_jit_context_new_cast(ctx, currentLoc,
                 rvalue(gcc_jit_context_new_array_access(ctx, currentLoc, rvalue(_heap), rvalue(from))),
@@ -1071,7 +1073,7 @@ else
 
     void Store32(BCValue _to, BCValue value)
     {
-        gcc_jit_block_add_assignment(block, currentLoc, 
+        gcc_jit_block_add_assignment(block, currentLoc,
             gcc_jit_context_new_array_access(ctx, currentLoc, rvalue(_heap), rvalue(_to)),
             gcc_jit_context_new_cast(ctx, currentLoc,
                 rvalue(value),
@@ -1085,7 +1087,7 @@ else
         auto rValueHeap = rvalue(_heap);
         auto rValueFrom = rvalue(from);
         auto lValueTo = lvalue(_to);
-        gcc_jit_block_add_assignment(block, currentLoc, 
+        gcc_jit_block_add_assignment(block, currentLoc,
             lValueTo,
             gcc_jit_context_new_cast(ctx, currentLoc,
                 rvalue(gcc_jit_context_new_array_access(ctx, currentLoc, rValueHeap, rValueFrom)),
@@ -1093,7 +1095,7 @@ else
             )
         );
 
-        auto highAddr = gcc_jit_context_new_binary_op(ctx, currentLoc, 
+        auto highAddr = gcc_jit_context_new_binary_op(ctx, currentLoc,
             GCC_JIT_BINARY_OP_PLUS, i64type, rValueFrom, rvalue(4)
         );
 
@@ -1116,7 +1118,7 @@ else
     void Store64(BCValue _to, BCValue value)
     {
         auto rValueHeap = rvalue(_heap);
-        gcc_jit_block_add_assignment(block, currentLoc, 
+        gcc_jit_block_add_assignment(block, currentLoc,
             gcc_jit_context_new_array_access(ctx, currentLoc, rvalue(_heap), rvalue(_to)),
             gcc_jit_context_new_cast(ctx, currentLoc,
                 rvalue(value),
@@ -1132,16 +1134,15 @@ else
     void F64ToI(BCValue _to, BCValue value){ assert(0, __PRETTY_FUNCTION__ ~ " not implemented"); }
     void F32ToI(BCValue _to, BCValue value)
     {
-		gcc_jit_block_add_assignment(block, currentLoc,
-			lvalue(_to),
-			gcc_jit_context_new_cast(ctx, currentLoc, 
-				gcc_jit_context_new_cast(ctx, currentLoc, 
-					rvalue(value), f23type
-				),
-				i64type
-				rvalue(value), i64type
-			)
-		);
+        gcc_jit_block_add_assignment(block, currentLoc,
+            lvalue(_to),
+            gcc_jit_context_new_cast(ctx, currentLoc,
+                gcc_jit_context_new_cast(ctx, currentLoc,
+                    rvalue(value), f23type
+                ),
+                i64type
+           )
+       );
     }
 
 
@@ -1152,7 +1153,7 @@ else
 
     void Line(uint line)
     {
-        //if (blockCount) 
+        //if (blockCount)
         //    gcc_jit_block_add_comment(block, currentLoc, ("# Line (" ~ to!string(line) ~ ")").toStringz);
     }
 
