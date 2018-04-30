@@ -6748,7 +6748,7 @@ static if (is(BCGen))
         else if (unrolledLoopState)
         {
             unrolledLoopState.continueFixups[unrolledLoopState.continueFixupCount++] = beginJmp();
-bcZerox	        }
+		}
         else
         {
             continueFixups[continueFixupCount++] = beginJmp();
@@ -7213,7 +7213,7 @@ bcZerox	        }
             () {
                 with (BCTypeEnum)
                 {
-                    enum a = [c8, i8, c32, i32, i64, f23, f52, Slice, Array, Struct, string8];
+                    enum a = [c8, i8, c16, i16, c32, i32, i64, f23, f52, Slice, Array, Struct, string8];
                     return cast(typeof(a[0])[a.length]) a;
                 }
             } ();
