@@ -486,7 +486,7 @@ else
             auto i2 = i * 2;
             blocks[i2] = gcc_jit_function_new_block(dispatcherFn, null);
 
-            jrvalue args[3];
+            jrvalue[3] args;
             args[0] = gcc_jit_param_as_rvalue(dispParams[1]);
             args[1] = gcc_jit_param_as_rvalue(dispParams[2]);
             args[2] = gcc_jit_param_as_rvalue(dispParams[3]);
