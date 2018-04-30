@@ -829,7 +829,6 @@ else
 
     void Sub3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -848,7 +847,6 @@ else
 
     void Mul3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -867,7 +865,6 @@ else
 
     void Div3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
@@ -1142,6 +1139,7 @@ else
 					rvalue(value), f23type
 				),
 				i64type
+				rvalue(value), i64type
 			)
 		);
     }
