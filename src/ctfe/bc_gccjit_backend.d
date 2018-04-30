@@ -528,7 +528,7 @@ else
 
         gcc_jit_context_dump_to_file(ctx, "ctx.c", 1);
         result = gcc_jit_context_compile(ctx);
-        gcc_jit_comtext_release(ctx);
+        gcc_jit_context_release(ctx);
     }
 
     void beginFunction(uint fnId, void* fd = null)
@@ -1138,7 +1138,10 @@ else
 		gcc_jit_block_add_assignment(block, currentLoc,
 			lvalue(_to),
 			gcc_jit_context_new_cast(ctx, currentLoc, 
-				rvalue(value), i64type
+				gcc_jit_context_new_cast(ctx, currentLoc, 
+					rvalue(value), f23type
+				),
+				i64type
 			)
 		);
     }
