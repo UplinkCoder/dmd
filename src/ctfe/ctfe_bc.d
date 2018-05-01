@@ -3736,6 +3736,7 @@ static if (is(BCGen))
 
         Line(se.loc.linnum);
         //bailout();
+        auto var = se.var;
         auto vd = se.var.isVarDeclaration();
         auto fd = se.var.isFuncDeclaration();
         if (vd)
@@ -3745,18 +3746,34 @@ static if (is(BCGen))
 
             if (v)
             {
+				long index = -1;
+                if (var.type.ty != Tstruct && var.type.ty != Tclass)
+                {
+                    index = se.offset / var.type.nextOf().size(Loc.init);
+                }
+                else
+                {
+                    bailout("Cannot currently handle struct or class offsets");
+                }
+
+                if (index == -1)
+                    bailout("could not compute index");
+
+				printf("found offset %d index:%d \n", se.offset, index);
+				
                 // Everything in here is highly suspicious!
                 // FIXME Design!
                 // Things that are already heapValues
                 // don't need to be stored ((or do they ??) ... do we need to copy) ?
 
                 retval.type = _sharedCtfeState.pointerOf(v.type);
+/*
                 if (v.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.Slice]))
                 {
-                    bailout("HeapValues are currently unsupported for SymOffExps -- " ~ se.toString);
+					//bailout("HeapValues are currently unsupported for SymOffExps -- " ~ se.toString);
                     return ;
                 }
-
+*/
                 bailout(v && _sharedCtfeState.size(v.type) < 4, "only addresses of 32bit values or less are supported for now: " ~ se.toString);
                 auto addr = genTemporary(i32Type);
                 Alloc(addr, imm32(align4(_sharedCtfeState.size(v.type))));
