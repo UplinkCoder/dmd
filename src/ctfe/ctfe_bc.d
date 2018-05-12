@@ -3395,6 +3395,19 @@ static if (is(BCGen))
                 Comment("EndIdenttity");
             }
             break;
+        case TOK.TOKnotidentity:
+            {
+                auto lhs = genExpr(e.e1);
+                auto rhs = genExpr(e.e2);
+                if (!lhs || !rhs)
+                {
+                    bailout("could not gen lhs or rhs for " ~ e.toString);
+                    return ;
+                }
+
+                Neq3(retval.i32, lhs.i32, rhs.i32);
+            }
+            break;
         case TOK.TOKquestion:
             {
         Comment(": ? begin ");
