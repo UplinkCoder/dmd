@@ -1925,7 +1925,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
             }
             break;
-        case BCTypeEnum.Struct, BCTypeEnum.String, BCTypeEnum.Array, BCTypeEnum.Ptr:
+        case BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Ptr:
             {
                 // This might need to be removed again?
                 *(&stackP[argOffset / 4]) = arg.heapAddr.addr;

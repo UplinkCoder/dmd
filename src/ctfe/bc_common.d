@@ -176,7 +176,6 @@ enum BCTypeEnum : ubyte
     f106, /// 128 bit float mantissa has 106 bit (52+52)
 
     string8,
-    String = string8,
     string16,
     string32,
 
@@ -248,7 +247,7 @@ const(ubyte) toParamCode(const BCValue val) pure @safe @nogc
     else if (val.type.type == BCTypeEnum.Struct)
         return 0b0010;
     else if (val.type.type == BCTypeEnum.Slice
-            || val.type.type == BCTypeEnum.Array || val.type.type == BCTypeEnum.String)
+            || val.type.type == BCTypeEnum.Array || val.type.type == BCTypeEnum.string8)
         return 0b0011;
     else
         assert(0, "ParameterType unsupported");

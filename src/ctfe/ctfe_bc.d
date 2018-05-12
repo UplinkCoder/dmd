@@ -1283,7 +1283,7 @@ struct SharedCtfeState(BCGenT)
                 }
                 return size(_array.elementType) * _array.length + SliceDescriptor.Size;
             }
-        case BCTypeEnum.String:
+        case BCTypeEnum.string8:
         case BCTypeEnum.Ptr:
         case BCTypeEnum.Slice:
             {
@@ -1492,7 +1492,7 @@ Expression toExpression(const BCValue value, Type expressionType,
             {
                 BCValue elmVal;
                 // FIXME: TODO: add the other string types here as well
-                if (baseType.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.String]))
+                if (baseType.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.string8]))
                 {
                     elmVal = imm32(arrayBase + offset);
                 }
@@ -1598,7 +1598,7 @@ Expression toExpression(const BCValue value, Type expressionType,
                     imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.heapAddr.addr + offset + 4)) << 32;
                     elm = toExpression(imm64, type);
                 }
-                else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.String]))
+                else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))
                 {
                     elm = toExpression(imm32(value.imm32 + offset), type);
                 }
@@ -1869,7 +1869,6 @@ extern (C++) final class BCTypeVisitor : Visitor
             uint classIndex = _sharedCtfeState.getClassIndex(cd);
             return classIndex ? BCType(BCTypeEnum.Class, classIndex) : BCType.init;
         }
-
         else if (t.ty == Tfunction)
         {
             return BCType(BCTypeEnum.Function);
@@ -3463,7 +3462,7 @@ static if (is(BCGen))
                         Alloc(oneElementSlicePtr, imm32(8));
                         Add3(oneElementSliceElement, oneElementSlicePtr, imm32(4));
                         Store32(oneElementSlicePtr, imm32(1));
-                        Store32(oneElementSliceElement, rhs);
+                                                                      Store32(oneElementSliceElement, rhs);
                         rhs = oneElementSlicePtr;
                         rhs.type = lhs.type;
                         rhs.vType = lhs.vType;
@@ -3895,14 +3894,14 @@ static if (is(BCGen))
 
             writeln("IndexedType", indexed.type.type.to!string);
         }
-        if (!indexed.type.type.anyOf([BCTypeEnum.String, BCTypeEnum.Array, BCTypeEnum.Slice, BCTypeEnum.Ptr]))
+        if (!indexed.type.type.anyOf([BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Slice, BCTypeEnum.Ptr]))
         {
             bailout("Unexpected IndexedType: " ~ to!string(indexed.type.type) ~ " ie: " ~ ie
                 .toString);
             return;
         }
 
-        bool isString = (indexed.type.type == BCTypeEnum.String);
+        bool isString = (indexed.type.type == BCTypeEnum.string8);
         auto idx = genExpr(ie.e2).i32; // HACK
         BCValue ptr = genTemporary(i32Type);
         version (ctfe_noboundscheck)
@@ -3964,7 +3963,7 @@ static if (is(BCGen))
             }
             retval.heapRef = BCHeapRef(ptr);
 
-            if (elemType.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.Array, BCTypeEnum.String, BCTypeEnum.Slice]))
+            if (elemType.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.Array, BCTypeEnum.string8, BCTypeEnum.Slice]))
             {
                 // on structs we return the ptr!
                 Set(retval.i32, ptr);
@@ -4325,7 +4324,7 @@ static if (is(BCGen))
                 //FIXME horrible hack to make slice members work
                 // Systematize somehow!
 
-                if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.String]))
+                if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.string8]))
                     Set(retval.i32, ptr);
                 else if (_sharedCtfeState.size(ptr.type) == 8)
                     Load64(retval.i32, ptr);
@@ -4498,7 +4497,7 @@ static if (is(BCGen))
                     MemCpy(imm32(arrayAddr.imm32 + offset), elexpr_sv, imm32(heapAdd));
                 }
             }
-            else if (elexpr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Slice, BCTypeEnum.String]))
+            else if (elexpr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Slice, BCTypeEnum.string8]))
             {
                 if (elexpr.type.type == BCTypeEnum.Array && (!elexpr.type.typeIndex || elexpr.type.typeIndex > _sharedCtfeState.arrayCount))
                 {
@@ -4590,7 +4589,7 @@ static if (is(BCGen))
             }
 
             auto ty = _struct.memberTypes[i];
-            if (!ty.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.String, BCTypeEnum.Slice, BCTypeEnum.Array,
+            if (!ty.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Slice, BCTypeEnum.Array,
                 BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64, BCTypeEnum.f23, BCTypeEnum.f52,
                 BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32]))
             {
@@ -4656,7 +4655,7 @@ static if (is(BCGen))
                 else
                     Set(fieldAddr, rv_stackValue);
                 // abi hack for slices slice;
-                if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.String, BCTypeEnum.Ptr]))
+                if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Ptr]))
                 {
                     // copy Member
                     MemCpy(fieldAddr, elexpr, imm32(_size));
@@ -4671,7 +4670,7 @@ static if (is(BCGen))
             else
             {
                 bailout(elexpr.vType != BCValueType.Immediate, "When struct-literals are used as arguments all initializers, have to be immediates");
-                if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.String]))
+                if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))
                 {
                     immutable size_t targetAddr = structVal.imm32 + offset;
                     immutable size_t sourceAddr = elexpr.imm32;
@@ -4704,7 +4703,7 @@ static if (is(BCGen))
         Line(de.loc.linnum);
         if (currentIndexed.type.type == BCTypeEnum.Array
             || currentIndexed.type.type == BCTypeEnum.Slice
-            || currentIndexed.type.type == BCTypeEnum.String)
+            || currentIndexed.type.type == BCTypeEnum.string8)
         {
             retval = getLength(currentIndexed);
             assert(retval);
@@ -4915,7 +4914,7 @@ static if (is(BCGen))
         Line(ale.loc.linnum);
         auto array = genExpr(ale.e1);
         auto arrayType = array.type.type;
-        if (arrayType == BCTypeEnum.String || arrayType == BCTypeEnum.Slice || arrayType == BCTypeEnum.Array)
+        if (arrayType == BCTypeEnum.string8 || arrayType == BCTypeEnum.Slice || arrayType == BCTypeEnum.Array)
         {
             retval = getLength(array);
         }
@@ -5748,7 +5747,7 @@ static if (is(BCGen))
         }
         else
         {
-            retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.String));
+            retval = assignTo ? assignTo : genTemporary(BCType(BCTypeEnum.string8));
             Set(retval.i32, stringAddr.i32);
         }
     }
@@ -5870,7 +5869,7 @@ static if (is(BCGen))
         {
 
         }
-        else if (lhs.type.type == BCTypeEnum.String
+        else if (lhs.type.type == BCTypeEnum.string8
             || lhs.type.type == BCTypeEnum.Slice || lhs.type.type.Array)
         {
 
@@ -6289,7 +6288,7 @@ static if (is(BCGen))
                 {
                     Set(lhs.i32, rhs.i32);
                 }
-                else if ((lhs.type.type == BCTypeEnum.String && rhs.type.type == BCTypeEnum.String) ||
+                else if ((lhs.type.type == BCTypeEnum.string8 && rhs.type.type == BCTypeEnum.string8) ||
                     (lhs.type.type == BCTypeEnum.Slice && rhs.type.type == BCTypeEnum.Array) ||
                     (lhs.type.type == BCTypeEnum.Slice && rhs.type.type == BCTypeEnum.Slice))
                 {
@@ -6316,7 +6315,7 @@ static if (is(BCGen))
 
                     copyArray(&lhsBase, &rhsBase, lhsLength, _sharedCtfeState.size(lhsBaseType));
                 }
-                else if ((lhs.type.type == BCTypeEnum.Slice || lhs.type.type == BCTypeEnum.String) && rhs.type.type == BCTypeEnum.Null)
+                else if ((lhs.type.type == BCTypeEnum.Slice || lhs.type.type == BCTypeEnum.string8) && rhs.type.type == BCTypeEnum.Null)
                 {
                     Alloc(lhs.i32, imm32(SliceDescriptor.Size));
                 }
@@ -6557,7 +6556,7 @@ static if (is(BCGen))
                 return;
             }
 
-            bool stringSwitch = lhs.type.type == BCTypeEnum.String;
+            bool stringSwitch = lhs.type.type == BCTypeEnum.string8;
 
             if (ss.cases.dim > beginCaseStatements.length)
                 assert(0, "We will not have enough array space to store all cases for gotos");
