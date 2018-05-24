@@ -3759,7 +3759,7 @@ static if (is(BCGen))
             if (v)
             {
 				long index = -1;
-                if (var.type.ty != Tstruct && var.type.ty != Tclass)
+                if (var.type.ty == Tarray || var.type.ty == Tsarray)
                 {
                     index = se.offset / var.type.nextOf().size(Loc.init);
                 }
@@ -4820,18 +4820,26 @@ static if (is(BCGen))
             retval = genTemporary(baseType);
         }
 
-        auto tmp = genTemporary(baseType);
+        auto bts = basicTypeSize(baseType.type);
 
-        if (baseType.type != BCTypeEnum.i32)
+        if (bts && bts <= 4)
         {
-           bailout("can only deal with i32 ptrs at the moement");
-           return ;
+           Load32(retval, addr);
         }
+        else if (bts && bts <= 8)
+        {
+            Load64(retval, addr);
+        }
+        else
+        {
+            bailout("Only 4 byte or 8 byte basic type are supported");
+            return ;
+        }
+
         // FIXME when we are ready to support more than i32Ptr the direct calling of load
         // has to be replaced by a genLoadForType() function that'll convert from
         // heap+representation to stack+representation.
 
-        Load32(retval, addr);
         if (!isFunctionPtr)
         {
             retval.heapRef = BCHeapRef(addr);
