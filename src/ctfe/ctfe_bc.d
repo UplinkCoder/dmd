@@ -1873,6 +1873,11 @@ extern (C++) final class BCTypeVisitor : Visitor
         {
             return BCType(BCTypeEnum.Function);
         }
+        else if (t.ty == Tdelegate)
+        {
+            ///TODO URGENT introduce Delegate Type
+            return BCType(BCTypeEnum.Function);
+        }
 
         debug (ctfe)
             assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString);
@@ -3742,6 +3747,27 @@ static if (is(BCGen))
 
     }
 
+    override void visit(DelegateExp de) {
+        import ddmd.asttypename;
+
+        auto fIdx = _sharedCtfeState.getFunctionIndex(de.func);
+        if (!fIdx)
+        {
+            addUncompiledFunction(de.func, &fIdx);
+        }
+
+        if (!fIdx)
+        {
+            bailout("Function inside DelegateExp could not be build: ");
+            return ;
+        }
+
+        auto fn = BCValue(Imm32(fIdx));
+        fn.type.type = BCTypeEnum.Function;
+
+        auto ctx = genExpr(de.e1);
+    }
+
     override void visit(SymOffExp se)
     {
         lastLoc = se.loc;
@@ -4006,6 +4032,8 @@ static if (is(BCGen))
 
     void fixupContinue(uint oldContinueFixupCount, BCLabel continueHere)
     {
+        //FIXME: I don't think we should have a global continueHere
+	// which does not properly stack
         lastContinue = continueHere;
         foreach (Jmp; continueFixups[oldContinueFixupCount .. continueFixupCount])
         {
@@ -4029,7 +4057,7 @@ static if (is(BCGen))
         stmt.accept(this);
         result.end = genLabel();
 
-        // Now let's fixup thoose breaks
+        // Now let's fixup thoose breaks and continues
         if (setCurrent)
         {
             switchFixup = oldSwitchFixup;
@@ -4604,7 +4632,7 @@ static if (is(BCGen))
             auto ty = _struct.memberTypes[i];
             if (!ty.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Slice, BCTypeEnum.Array,
                 BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64, BCTypeEnum.f23, BCTypeEnum.f52,
-                BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32]))
+                BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.Function]))
             {
                 bailout( "can only deal with ints and uints atm. not: (" ~ to!string(ty.type) ~ ", " ~ to!string(
                         ty.typeIndex) ~ ")");
@@ -5245,6 +5273,7 @@ static if (is(BCGen))
         Line(ve.loc.linnum);
         auto vd = ve.var.isVarDeclaration;
         auto symd = ve.var.isSymbolDeclaration;
+        auto fd = ve.var.isFuncDeclaration;
 
         debug (ctfe)
         {
@@ -5310,6 +5339,10 @@ static if (is(BCGen))
             retval = genExpr(sl);
             //assert(0, "SymbolDeclarations are not supported for now" ~ .type.size.to!string);
             //auto vs = symd in syms;
+
+        }
+        else if (fd)
+        {
 
         }
         else
@@ -5395,6 +5428,10 @@ static if (is(BCGen))
                 {
                     MemCpy(var.i32, _init.i32, imm32(SliceDescriptor.Size));
                     //Set(var.i32, _init.i32);
+                }
+                else if (_init.type.type == BCTypeEnum.Function && var.type.type == BCTypeEnum.Function)
+                {
+                    Set(var.i32, _init.i32);
                 }
                 else
                 {
@@ -6788,7 +6825,7 @@ static if (is(BCGen))
         else if (unrolledLoopState)
         {
             unrolledLoopState.continueFixups[unrolledLoopState.continueFixupCount++] = beginJmp();
-                }
+        }
         else
         {
             continueFixups[continueFixupCount++] = beginJmp();
@@ -6938,7 +6975,7 @@ static if (is(BCGen))
                 }
                 int vtblIndex = fd.vtblIndex;
 
-                Comment("vtblIndex ==" ~ vtblIndex.to!string ~ "  for " ~ fd.toString);
+                Comment("vtblIndex == " ~ vtblIndex.to!string ~ "  for " ~ fd.toString);
                 Comment("vtblLoad");
                 enum sizeofVtblEntry = 4;
                 IndexedScaledLoad32(fnValue.i32, vtblPtr.i32, imm32(vtblIndex + 1), sizeofVtblEntry);
@@ -7253,7 +7290,7 @@ static if (is(BCGen))
             () {
                 with (BCTypeEnum)
                 {
-                    enum a = [c8, i8, c16, i16, c32, i32, i64, f23, f52, Slice, Array, Struct, string8];
+                    enum a = [c8, i8, c16, i16, c32, i32, i64, f23, f52, Slice, Array, Struct, string8, Function];
                     return cast(typeof(a[0])[a.length]) a;
                 }
             } ();
@@ -7663,4 +7700,3 @@ static if (is(BCGen))
         }
     }
 }
-

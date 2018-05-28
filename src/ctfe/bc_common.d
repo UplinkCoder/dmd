@@ -1,5 +1,10 @@
 module ddmd.ctfe.bc_common;
 
+/// functions with index skipFn will be skipped
+/// calling them is equivlent to an expensive nop
+/// this is true for direct and indirect calls
+enum skipFn = uint.max;
+
 struct CndJmpBegin
 {
     BCAddr at;

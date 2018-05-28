@@ -38,3 +38,5 @@ int testClassStuff ()
   return c1.i + c2.i + c3.i;
 }
 static assert(testClassStuff == 1 + 2 + 3);
+static assert(testClassStuff == 1 + 2 + 3);
+static assert(testClassStuff == 1 + 2 + 3);

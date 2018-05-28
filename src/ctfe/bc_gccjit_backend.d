@@ -483,6 +483,11 @@ else
         jblock[] blocks;
         blocks.length = functionCount*2 + 2;
         jrvalue fnIdx = gcc_jit_param_as_rvalue(dispParams[0]);
+        
+        auto skipFn_cnd_blk =
+            gcc_jit_function_new_block(dispaterFn, "skipFnCnd");
+	
+
         foreach(int i, f; functions[0 .. functionCount])
         {
             auto i2 = i * 2;
@@ -500,6 +505,10 @@ else
 
         }
 
+        gcc_jit_block_end_with_conditional(skipFn_cnd_blk, currentLoc,
+            gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_EQ, rvalue(fnIdx), gcc_jit_context_new_rvalue_from_int(ctx, i32type, skipFn)),
+            blocks[0], blocks[functionCount*2 + 1]
+        );
 
         blocks[functionCount*2] = gcc_jit_function_new_block(dispatcherFn, "wrongFunctionPtrs");
         gcc_jit_block_end_with_return(blocks[functionCount*2], currentLoc, rvalue(imm32(-1)));

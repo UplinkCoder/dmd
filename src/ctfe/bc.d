@@ -2886,6 +2886,10 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     call.fn.imm32 :
                     (stackP[call.fn.stackAddr.addr / 4] & uint.max)
                 );
+
+                if (fn == skipFn)
+                    continue;
+
                 auto stackOffsetCall = stackOffset + call.callerSp;
                 if (!__ctfe)
                 {
