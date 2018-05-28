@@ -1,0 +1,502 @@
+diff --git a/src/ctfe/ctfe_bc.d b/src/ctfe/ctfe_bc.d
+index 27e322b..2f9eaa8 100644
+--- a/src/ctfe/ctfe_bc.d
++++ b/src/ctfe/ctfe_bc.d
+@@ -12,6 +12,9 @@ import ddmd.statement;
+ import ddmd.sideeffect;
+ import ddmd.visitor;
+ import ddmd.arraytypes : Expressions, VarDeclarations;
++
++import ddmd.trace;
++
+ /**
+  * Written By Stefan Koch in 2016-18
+  */
+@@ -177,6 +180,8 @@ struct BlackList
+ 
+ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression thisExp)
+ {
++    mixin(traceString("fd", "newCTFE_full"));
++
+     Expression[] _args;
+     if (thisExp)
+     {
+@@ -388,6 +393,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _t
+ 
+     if (!bcv.IGaveUp)
+     {
++        mixin(traceString("fd", "newCTFE_execution"));
++
+         import std.algorithm;
+         import std.range;
+         import std.datetime : StopWatch;
+diff --git a/src/dinterpret.d b/src/dinterpret.d
+index 017fe1c..c48b4a7 100644
+--- a/src/dinterpret.d
++++ b/src/dinterpret.d
+@@ -36,6 +36,8 @@ import ddmd.tokens;
+ import ddmd.utf;
+ import ddmd.visitor;
+ 
++import ddmd.trace;
++
+ enum CtfeGoal : int
+ {
+     ctfeNeedRvalue,     // Must return an Rvalue (== CTFE value)
+@@ -674,6 +676,7 @@ public:
+  */
+ extern (C++) void ctfeCompile(FuncDeclaration fd)
+ {
++    mixin(traceString("fd"));
+     debug (LOGCOMPILE)
+     {
+         printf("\n%s FuncDeclaration::ctfeCompile %s\n", fd.loc.toChars(), fd.toChars());
+@@ -710,6 +713,7 @@ extern (C++) void ctfeCompile(FuncDeclaration fd)
+  */
+ extern (C++) Expression ctfeInterpret(Expression e)
+ {
++    mixin(traceString("e"));
+     if (e.op == TOKerror)
+         return e;
+     assert(e.type); // https://issues.dlang.org/show_bug.cgi?id=14642
+@@ -796,6 +800,7 @@ extern (C++) Expression ctfeInterpretForPragmaMsg(Expression e)
+  */
+ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expressions* arguments, Expression thisarg)
+ {
++    mixin(traceString("fd"));
+     debug (LOG)
+     {
+         printf("\n********\n%s FuncDeclaration::interpret(istate = %p) %s\n", fd.loc.toChars(), istate, fd.toChars());
+diff --git a/src/dtemplate.d b/src/dtemplate.d
+index 162aae4..83f3fa3 100644
+--- a/src/dtemplate.d
++++ b/src/dtemplate.d
+@@ -41,6 +41,8 @@ import ddmd.root.rootobject;
+ import ddmd.tokens;
+ import ddmd.visitor;
+ 
++import ddmd.trace;
++
+ //debug = FindExistingInstance; // print debug stats of findExistingInstance
+ private enum LOG = false;
+ 
+@@ -568,6 +570,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
+ 
+     override void semantic(Scope* sc)
+     {
++        mixin(traceString("this"));
+         static if (LOG)
+         {
+             printf("TemplateDeclaration.semantic(this = %p, id = '%s')\n", this, ident.toChars());
+@@ -786,6 +789,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
+      */
+     bool evaluateConstraint(TemplateInstance ti, Scope* sc, Scope* paramscope, Objects* dedargs, FuncDeclaration fd)
+     {
++        mixin(traceString("ti"));
+         /* Detect recursive attempts to instantiate this template declaration,
+          * https://issues.dlang.org/show_bug.cgi?id=4072
+          *  void foo(T)(T x) if (is(typeof(foo(x)))) { }
+@@ -2322,6 +2326,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
+      */
+     TemplateInstance findExistingInstance(TemplateInstance tithis, Expressions* fargs)
+     {
++        mixin(traceString("tithis"));
+         //printf("findExistingInstance(%p)\n", tithis);
+         tithis.fargs = fargs;
+         auto tibox = TemplateInstanceBox(tithis);
+@@ -6137,6 +6142,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
+ 
+     void semantic(Scope* sc, Expressions* fargs)
+     {
++        mixin(traceString("this"));
+         //printf("[%s] TemplateInstance.semantic('%s', this=%p, gag = %d, sc = %p)\n", loc.toChars(), toChars(), this, global.gag, sc);
+         version (none)
+         {
+diff --git a/src/expression.d b/src/expression.d
+index f3f8a52..d41c245 100644
+--- a/src/expression.d
++++ b/src/expression.d
+@@ -71,6 +71,8 @@ import ddmd.utf;
+ import ddmd.utils;
+ import ddmd.visitor;
+ 
++import ddmd.trace;
++
+ enum LOGSEMANTIC = false;
+ void emplaceExp(T : Expression, Args...)(void* p, Args args)
+ {
+@@ -7466,6 +7468,7 @@ extern (C++) final class IsExp : Expression
+ 
+     override Expression semantic(Scope* sc)
+     {
++        mixin(traceString("this"));
+         /* is(targ id tok tspec)
+          * is(targ id :  tok2)
+          * is(targ id == tok2)
+diff --git a/src/func.d b/src/func.d
+index 1c64851..0ec07df 100644
+--- a/src/func.d
++++ b/src/func.d
+@@ -48,6 +48,8 @@ import ddmd.target;
+ import ddmd.tokens;
+ import ddmd.visitor;
+ 
++import ddmd.trace;
++
+ /// Inline Status
+ enum ILS : int
+ {
+@@ -2043,6 +2045,7 @@ extern (C++) class FuncDeclaration : Declaration
+      */
+     final bool functionSemantic()
+     {
++        mixin(traceString("this", "functionSemantic"));
+         if (!_scope)
+             return !errors;
+ 
+@@ -2097,6 +2100,7 @@ extern (C++) class FuncDeclaration : Declaration
+      */
+     final bool functionSemantic3()
+     {
++        mixin(traceString("this"));
+         if (semanticRun < PASSsemantic3 && _scope)
+         {
+             /* Forward reference - we need to run semantic3 on this function.
+diff --git a/src/mars.d b/src/mars.d
+index 8a7b229..a883b79 100644
+--- a/src/mars.d
++++ b/src/mars.d
+@@ -59,6 +59,8 @@ import ddmd.utils;
+ import core.stdc.config;
+ extern(C) c_long strtol(inout(char)* nptr, inout(char)** endptr, int base);
+ 
++import ddmd.trace;
++
+ /**
+  * Print DMD's logo on stdout
+  */
+@@ -1575,6 +1577,95 @@ Language changes listed by -transition=id:
+             gendocfile(m);
+         }
+     }
++
++    static if (SYMBOL_TRACE)
++    {
++        // this is debug code we simply hope that we will not need more
++        // then 32 Megabyte of log-buffer;
++        char* fileBuffer = cast(char*)malloc(ushort.max * 512 * 64);
++        char* bufferPos = fileBuffer;
++
++        char[255] fileNameBuffer;
++        import core.stdc.time : ctime, time;
++        auto now = time(null);
++
++        auto timeString = ctime(&now);
++        // replace the ' ' by _ and '\n' or '\r' by '\0'
++        {
++            int len = 0;
++            char c = void;
++            for(;;)
++            {
++                c = timeString[len++];
++                // break on null, just to be safe;
++                if (!c)
++                    break;
++
++                if (c == ' ')
++                    timeString[len - 1] = '_';
++
++                if (c == '\r' || c == '\n')
++                {
++                    timeString[len - 1] = '\0';
++                    break;
++                }
++            }
++        }
++
++        sprintf(&fileNameBuffer[0],
++             "symbol-%s.log".ptr, timeString);
++
++        auto f = File(&fileNameBuffer[0]);
++
++        bufferPos += sprintf(cast(char*) bufferPos, "//");
++        foreach(arg;arguments)
++        {
++            bufferPos += sprintf(bufferPos, "%s ", arg);
++        }
++        bufferPos += sprintf(cast(char*) bufferPos, "\n");
++
++        bufferPos += sprintf(cast(char*) bufferPos,
++            "%s|%s|%s|%s|%s|%s|%s|%s|%s|\n",
++            "inclusive ticks".ptr,
++            "name".ptr, "kind".ptr, "phase".ptr,
++            "location".ptr, "begin_ticks".ptr, "end_ticks".ptr,
++            "begin_mem".ptr, "end_mem".ptr
++        );
++
++        foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count])
++        {
++
++            Loc loc;
++            const (char)* name;
++
++            if (dp.sym !is null)
++            {
++                loc = dp.sym.loc;
++                name = dp.sym.toChars();
++            }
++            else if (dp.exp !is null)
++            {
++                loc = dp.exp.loc;
++                name = dp.exp.toChars();
++            }
++            else 
++                continue; // we probably should assert here, but whaverever.
++
++            // Identifier id = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
++
++            bufferPos += sprintf(cast(char*) bufferPos,
++                "%lld|%s|%s|%s|%s|%lld|%lld|%lld|%lld|\n",
++                dp.end_ticks - dp.begin_ticks,
++                name, &dp.kind[0], &dp.fn[0],
++                loc.toChars(), dp.begin_ticks, dp.end_ticks,
++                dp.begin_mem, dp.end_mem);
++        }
++
++        f.setbuffer(fileBuffer, bufferPos - fileBuffer);
++        f._ref = 1;
++        f.write();
++        free(fileBuffer);
++    }
+     if (!global.params.obj)
+     {
+     }
+diff --git a/src/posix.mak b/src/posix.mak
+index 44187ea..b6619dd 100644
+--- a/src/posix.mak
++++ b/src/posix.mak
+@@ -163,7 +163,7 @@ CXXFLAGS += -g -g3 -DDEBUG=1 -DUNITTEST
+ DFLAGS += -g -debug -unittest
+ endif
+ ifdef ENABLE_RELEASE
+-CXXFLAGS += -O2
++CXXFLAGS += -O2 -g
+ DFLAGS += -O -release -inline
+ endif
+ ifdef ENABLE_PROFILING
+@@ -211,7 +211,7 @@ FRONT_SRCS=$(addsuffix .d,access aggregate aliasthis apply argtypes arrayop	\
+ 	sideeffect statement staticassert target tokens traits utf visitor	\
+ 	typinf utils statement_rewrite_walker statementsem safe blockexit asttypename \
+ 	ctfe/ctfe_bc ctfe/bc ctfe/bc_common ctfe/bc_limits ctfe/bc_test \
+-	ctfe/bc_printer_backend ctfe/bc_c_backend)
++	ctfe/bc_printer_backend ctfe/bc_c_backend trace queryperf)
+ 
+ ifeq ($(D_OBJC),1)
+ 	FRONT_SRCS += objc.d
+diff --git a/src/queryperf.d b/src/queryperf.d
+new file mode 100644
+index 0000000..f4fcdff
+--- /dev/null
++++ b/src/queryperf.d
+@@ -0,0 +1,70 @@
++/**
++ * Taken from druntime/rt/trace.d
++ * Contains support code for code profiling.
++ *
++ * Copyright: Copyright Digital Mars 1995 - 2015.
++ * License: Distributed under the
++ *      $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost Software License 1.0).
++ *    (See accompanying file LICENSE)
++ * Authors:   Walter Bright, Sean Kelly
++ */
++
++module queryperf;
++
++version (Windows)
++{
++    extern (Windows)
++    {
++        export int QueryPerformanceCounter(ulong *);
++        export int QueryPerformanceFrequency(ulong *);
++    }
++}
++else version (D_InlineAsm_X86)
++{
++    extern (D)
++    {
++        void QueryPerformanceCounter(ulong* ctr)
++        {
++            asm
++            {
++                naked                   ;
++                mov       ECX,EAX       ;
++                rdtsc                   ;
++                mov   [ECX],EAX         ;
++                mov   4[ECX],EDX        ;
++                ret                     ;
++            }
++        }
++
++        void QueryPerformanceFrequency(ulong* freq)
++        {
++            *freq = 3579545;
++        }
++    }
++}
++else version (D_InlineAsm_X86_64)
++{
++    extern (D)
++    {
++        void QueryPerformanceCounter(ulong* ctr)
++        {
++            asm
++            {
++                naked                   ;
++                rdtsc                   ;
++                mov   [RDI],EAX         ;
++                mov   4[RDI],EDX        ;
++                ret                     ;
++            }
++        }
++
++        void QueryPerformanceFrequency(ulong* freq)
++        {
++            *freq = 3579545;
++        }
++    }
++}
++else
++{
++    static assert(0);
++}
+diff --git a/src/root/rmem.d b/src/root/rmem.d
+index f77ea31..73b1544 100644
+--- a/src/root/rmem.d
++++ b/src/root/rmem.d
+@@ -12,6 +12,8 @@ module ddmd.root.rmem;
+ 
+ import core.stdc.string;
+ 
++__gshared ulong allocated;
++
+ version (GC)
+ {
+     import core.memory : GC;
+@@ -131,9 +133,12 @@ else
+ 
+     extern (C) void* allocmemory(size_t m_size) nothrow
+     {
++
+         // 16 byte alignment is better (and sometimes needed) for doubles
+         m_size = (m_size + 15) & ~15;
+ 
++        allocated += m_size;
++
+         // The layout of the code is selected so the most common case is straight through
+         if (m_size <= heapleft)
+         {
+diff --git a/src/trace.d b/src/trace.d
+new file mode 100644
+index 0000000..92cd7bd
+--- /dev/null
++++ b/src/trace.d
+@@ -0,0 +1,99 @@
++/**
++ * Compiler implementation of the
++ * $(LINK2 http://www.dlang.org, D programming language).
++ *
++ * Copyright:   Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
++ * Authors:     Stefan Koch
++ * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
++ * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/trace.d, _trace.d)
++ * Documentation:  https://dlang.org/phobos/dmd_trace.html
++ * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/trace.d
++ */
++
++module ddmd.trace;
++import ddmd.dsymbol;
++import ddmd.expression;
++
++enum SYMBOL_TRACE = true;
++
++struct SymbolProfileEntry
++{
++    Dsymbol sym;
++
++    ulong begin_ticks;
++    ulong end_ticks;
++
++    ulong begin_mem;
++    ulong end_mem;
++
++    string kind;
++    string fn;
++
++    Expression exp;
++}
++
++enum ProfileNodeType
++{
++    exp,
++    sym
++}
++
++extern (C) __gshared uint dsymbol_profile_array_count;
++extern (C) __gshared SymbolProfileEntry* dsymbol_profile_array;
++enum dsymbol_profile_array_size = ushort.max * 512; // 32 million entries should do, no ?
++shared static this()
++{
++    static if (SYMBOL_TRACE)
++    {
++        enum alloc_size = dsymbol_profile_array_size * SymbolProfileEntry.sizeof;
++        import core.stdc.stdlib : malloc;
++        if(!dsymbol_profile_array)
++        {
++            dsymbol_profile_array = cast(SymbolProfileEntry*)
++                malloc(alloc_size);
++        }
++        assert(dsymbol_profile_array, "cannot allocate space form dsymbol_profile_array");
++    }
++}
++string traceString(string vname, string fn = null) {
++static if (SYMBOL_TRACE)
++return q{
++    import queryperf : QueryPerformanceCounter;
++    import ddmd.root.rmem : allocated;
++    ulong begin_sema_ticks;
++    ulong end_sema_ticks;
++    ulong begin_sema_mem = allocated;
++
++    auto insert_pos = dsymbol_profile_array_count++;
++    assert(dsymbol_profile_array_count < dsymbol_profile_array_size,
++        "Trying to push more then" ~ dsymbol_profile_array_size.stringof ~ " symbols");
++    QueryPerformanceCounter(&begin_sema_ticks);
++} ~
++`
++    scope(exit)
++    {
++        alias v_type = typeof(` ~ vname ~ `);
++
++        QueryPerformanceCounter(&end_sema_ticks);
++        static if (is(v_type : Dsymbol))
++        {
++            dsymbol_profile_array[insert_pos] =
++                SymbolProfileEntry(`~ vname ~ `,
++            begin_sema_ticks, end_sema_ticks,
++            begin_sema_mem, allocated,
++            v_type.stringof, ` ~ (fn ? `"`~fn~`"` : "__FUNCTION__") ~ `);
++        } else static if (is(v_type : Expression))
++        {
++            dsymbol_profile_array[insert_pos] =
++                SymbolProfileEntry(null,
++            begin_sema_ticks, end_sema_ticks,
++            begin_sema_mem, allocated,
++            v_type.stringof, ` ~ (fn ? `"`~fn~`"` : "__FUNCTION__") ~ ", " ~
++            vname ~ `);
++        }
++        else static assert(0, "we dont know how to deal with: " ~ v_type.stringof);
++    }
++`;
++else
++return "";
++}
