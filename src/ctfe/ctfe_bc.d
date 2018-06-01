@@ -3768,7 +3768,8 @@ static if (is(BCGen))
 				long index = -1;
                 if (var.type.ty == Tarray || var.type.ty == Tsarray)
                 {
-                    index = se.offset / var.type.nextOf().size(Loc.init);
+                    const elemSize = var.type.nextOf().size(Loc.init);
+                    index = elemSize ? se.offset / elemSize : -1;
                 }
                 else
                 {
