@@ -2577,11 +2577,12 @@ public:
 
     void doCat(ref BCValue result, BCValue lhs, BCValue rhs)
     {
+        auto lhsBaseType = _sharedCtfeState.elementType(lhs.type);
+        const elemSize = _sharedCtfeState.size(lhsBaseType);
+
         static if (is(typeof(Cat3) == function)
                 && is(typeof(Cat3(BCValue.init, BCValue.init, BCValue.init, uint.init)) == void))
         {{
-            auto lhsBaseType = _sharedCtfeState.elementType(lhs.type);
-            const elemSize = _sharedCtfeState.size(lhsBaseType);
             if (!elemSize)
             {
                 bailout("Type has no Size " ~ lhsBaseType.to!string);
@@ -2615,12 +2616,10 @@ public:
             auto rhsLength = getLength(rhs);
             auto lhsBase = getBase(lhs);
             auto rhsBase = getBase(rhs);
-            auto lhsBaseType = _sharedCtfeState.elementType(lhs.type);
 
             auto effectiveSize = genTemporary(i32Type);
             auto newLength = genTemporary(i32Type);
             auto newBase = genTemporary(i32Type);
-            auto elemSize = _sharedCtfeState.size(lhsBaseType);
 
             if (!elemSize)
             {
@@ -2934,11 +2933,6 @@ public:
                 }
 
                 continue ;
-            }
-
-            if (forCtor)
-            {
-                Assert(imm32(0), _sharedCtfeState.addError(lastLoc, "Ctor did not return or something"));
             }
 
             beginParameters();
@@ -3387,7 +3381,7 @@ static if (is(BCGen))
             break;
         case TOK.TOKidentity:
             {
-                Comment("BeginIdentity");
+         Comment("BeginIdentity");
                 auto lhs = genExpr(e.e1);
                 auto rhs = genExpr(e.e2);
                 if (!lhs || !rhs)
@@ -3397,7 +3391,7 @@ static if (is(BCGen))
                 }
 
                 Eq3(retval.i32, lhs.i32, rhs.i32);
-                Comment("EndIdenttity");
+        Comment("EndIdenttity");
             }
             break;
         case TOK.TOKnotidentity:
@@ -3471,20 +3465,7 @@ static if (is(BCGen))
                      bailout("for now only concat between T[] and T[] is supported not: " ~ to!string(lhs.type.type) ~" and " ~ to!string(rhs.type.type) ~ e.toString);
                      return ;
                 }
-/*
-                        // a single compatble element
-                        // TODO use better memory management for slices don't just copy everything!!!
-                        auto oneElementSlicePtr = genTemporary(i32Type);
-                        auto oneElementSliceElement = genTemporary(i32Type);
-                        //FIXME this code does currently only work with uint or int;
-                        Alloc(oneElementSlicePtr, imm32(8));
-                        Add3(oneElementSliceElement, oneElementSlicePtr, imm32(4));
-                        Store32(oneElementSlicePtr, imm32(1));
-                                                                      Store32(oneElementSliceElement, rhs);
-                        rhs = oneElementSlicePtr;
-                        rhs.type = lhs.type;
-                        rhs.vType = lhs.vType;
-*/
+
                 if ((canWorkWithType(lhsBaseType) || lhsBaseType.type == BCTypeEnum.c8)
                         && basicTypeSize(lhsBaseType.type) == basicTypeSize(rhsBaseType.type))
                 {
