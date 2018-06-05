@@ -1,0 +1,397 @@
+diff --git a/src/ctfe/bc_common.d b/src/ctfe/bc_common.d
+index 5bfa005..76d31c1 100644
+--- a/src/ctfe/bc_common.d
++++ b/src/ctfe/bc_common.d
+@@ -97,6 +97,10 @@ const(uint) basicTypeSize(const BCTypeEnum bct) @safe pure
+         {
+             return 4;
+         }
++    case Delegate :
++        {
++            return 8;
++        }
+     case Ptr :
+             assert(0, "Ptr is not supposed to be a basicType anymore");
+ 
+@@ -180,6 +184,8 @@ enum BCTypeEnum : ubyte
+     string32,
+ 
+     Function, // synonymous to i32
++    Delegate, // synonymous to {i32, i32}
++
+     //  everything below here is not used by the bc layer.
+     Array,
+     Struct,
+diff --git a/src/ctfe/ctfe_bc.d b/src/ctfe/ctfe_bc.d
+index 31725f5..7350ec9 100644
+--- a/src/ctfe/ctfe_bc.d
++++ b/src/ctfe/ctfe_bc.d
+@@ -63,10 +63,7 @@ struct JumpTarget
+ 
+ struct UncompiledFunction
+ {
+-    union
+-    {
+-        FuncDeclaration fd;
+-    }
++    FuncDeclaration fd;
+     uint fn;
+     union
+     {
+@@ -175,23 +172,9 @@ struct BlackList
+ 
+ }
+ 
+-Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression thisExp)
++Expression evaluateFunction(FuncDeclaration fd, Expressions* args)
+ {
+-    Expression[] _args;
+-    if (thisExp)
+-    {
+-        debug (ctfe)
+-            assert(0, "Implicit State via _this_ is not supported right now");
+-        return null;
+-    }
+-
+-    if (args)
+-        foreach (a; *args)
+-        {
+-            _args ~= a;
+-        }
+-
+-    return evaluateFunction(fd, _args ? _args : [], thisExp);
++    return evaluateFunction(fd, args ? args.data[0 .. args.dim] : []);
+ }
+ 
+ import ddmd.ctfe.bc_common;
+@@ -206,6 +189,13 @@ struct SliceDescriptor
+     enum Size = 16;
+ }
+ 
++struct DelegateDescriptor
++{
++    enum FuncPtrOffset = 0;
++    enum ContextPtrOffset = 4;
++    enum Size = 8;
++}
++
+ /// appended to a struct
+ /// so it's behind the last member
+ struct StructMetaData
+@@ -280,12 +270,14 @@ ulong evaluateUlong(Expression e)
+     return e.toUInteger;
+ }
+ 
++pragma(msg, "sizeof(SharedExecutionState) = ", int(SharedExecutionState.sizeof/1024), "k");
++
+ uint max (uint a, uint b)
+ {
+     return a < b ? b : a;
+ }
+ 
+-Expression evaluateFunction(FuncDeclaration fd, Expression[] args, Expression _this = null)
++Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
+ {
+     _blacklist.defaultBlackList();
+     import std.stdio;
+@@ -1873,6 +1865,10 @@ extern (C++) final class BCTypeVisitor : Visitor
+         {
+             return BCType(BCTypeEnum.Function);
+         }
++        else if (t.ty == Tdelegate)
++        {
++            return BCType(BCTypeEnum.Delegate);
++        }
+ 
+         debug (ctfe)
+             assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString);
+@@ -2074,9 +2070,12 @@ extern (C++) final class BCV(BCGenT) : Visitor
+         retval = BCValue.init;
+         assignTo = BCValue.init;
+         boolres = BCValue.init;
++        _this = BCValue.init;
++        _context = BCValue.init;
+ 
+         labeledBlocks.destroy();
+         vars.destroy();
++        closureVars.destroy();
+     }
+ 
+     UnrolledLoopState* unrolledLoopState;
+@@ -2117,7 +2116,9 @@ extern (C++) final class BCV(BCGenT) : Visitor
+     BCBlock[void* ] labeledBlocks;
+     bool ignoreVoid;
+     BCValue[void* ] vars;
++    uint[void* ] closureVars;
+     BCValue _this;
++    BCValue _context;
+ 
+     VarDeclaration lastConstVd;
+     typeof(gen.genLabel()) lastContinue;
+@@ -2424,7 +2425,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
+ 
+     }
+ 
+-    void IndexedScaledLoad32(BCValue _to, BCValue from, BCValue index, int scale, int line = __LINE__)
++    void IndexedScaledLoad32(BCValue _to, BCValue from, BCValue index, const int scale, int line = __LINE__)
+     {
+         assert(_to.type.type == BCTypeEnum.i32, "_to has to be an i32");
+         assert(from.type.type == BCTypeEnum.i32, "from has to be an i32");
+@@ -2450,6 +2451,33 @@ extern (C++) final class BCV(BCGenT) : Visitor
+         }
+     }
+ 
++    void IndexedScaledStore32(BCValue _to, BCValue from, BCValue index, const int scale, int line = __LINE__)
++    {
++        assert(_to.type.type == BCTypeEnum.i32, "_to has to be an i32");
++        assert(from.type.type == BCTypeEnum.i32, "from has to be an i32");
++        assert(index.type.type == BCTypeEnum.i32, "index has to be an i32");
++
++        static if (is(typeof(gen.IndexedScaledStore32) == function)
++            && is(typeof(gen.IndexedScaledStore32(
++                        BCValue.init, BCValue.init, BCValue.init, int.init
++                        )) == void)
++            && isValidIndexScalar(scale))
++        {
++            gen.IndexedScaledStore32(_to, from, index, scale);
++        }
++
++        else
++        {
++            Comment("ScaledStore from " ~ to!string(line));
++
++            auto ea = genTemporary(i32Type);
++            Mul3(ea, index, imm32(scale));
++            Add3(ea, ea, _to);
++            Load32(ea, from);
++        }
++    }
++
++
+     void StringEq(BCValue result, BCValue lhs, BCValue rhs)
+     {
+ 
+@@ -2506,11 +2534,18 @@ public:
+         processingParameters = false;
+         // add this Pointer as last parameter
+         assert(me);
++
+         if (me.vthis)
+         {
+             _this = genParameter(toBCType(me.vthis.type));
+             setVariable(me.vthis, _this);
+         }
++        if (me.isNested())
++        {
++            _context = genParameter(i32Type);
++            // D's closure has no type
++            // therefore use generic pointer
++        }
+     }
+ 
+     void beginArguments()
+@@ -2557,6 +2592,10 @@ public:
+ 
+             return BCValue.init;
+         }
++        else if (auto closureOffset = (cast(void*) vd) in closureVars)
++        {
++            return closureRef(*closureOffset);
++        }
+         else
+         {
+             return BCValue.init;
+@@ -2570,6 +2609,12 @@ public:
+     }
+ */
+ 
++    BCValue closureRef(uint closureOffset)
++    {
++        bailout("closureRef unsupported");
++        return BCValue.init;
++    }
++
+     void doCat(ref BCValue result, BCValue lhs, BCValue rhs)
+     {
+         static if (is(typeof(Cat3) == function)
+@@ -2661,7 +2706,7 @@ public:
+         return genExpr(expr, false, debugMessage, line);
+     }
+ 
+-    extern (D) BCValue genExpr(Expression expr, bool costumBoolFixup,  string debugMessage = null, uint line = __LINE__)
++    extern (D) BCValue genExpr(Expression expr, bool costumBoolFixup, string debugMessage = null, uint line = __LINE__)
+     {
+ 
+         if (!expr)
+@@ -2676,7 +2721,7 @@ public:
+         }
+         auto oldRetval = retval;
+         import ddmd.asttypename;
+-        // import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
++        import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
+         if (processingArguments)
+         {
+             debug (ctfe)
+@@ -2787,10 +2832,25 @@ public:
+             if (fd.hasNestedFrameRefs /*|| fd.isNested*/)
+             {
+                 // import std.stdio; writeln("fd has closureVars:  ", fd.toString);  //DEBUGLINE
+-                // foreach(v;fd.closureVars)
+-                // {
+-                   // import std.stdio; writeln("closure-var: ", v.toString);  //DEBUGLINE
+-                // }
++                uint closureSize;
++                foreach(v;fd.closureVars)
++                {
++                    closureSize += sharedCtfeState.size(toBCType(v.type), true);
++                    setClosureVariable(v, closureSize);
++                    import std.stdio; writeln("closure-var: ", v.toString);  //DEBUGLINE
++                }
++                BCValue newClosure;
++                Alloc(newClosure, imm32(closureSize + 4));
++                // TODO allow nested closure_context via linked list
++                //Store32(newClosure, _context.i32);
++
++                foreach(v;fd.closureVars)
++                {
++                    closureSize += sharedCtfeState.size(toBCType(v.type), true)  + 4;
++                    import std.stdio; writeln("closure-var: ", v.toString);  //DEBUGLINE
++                }
++                _context = newClosure;
++
+                 bailout("cannot deal with closures of any kind: " ~ fd.toString);
+                 return ;
+             }
+@@ -4140,6 +4200,39 @@ static if (is(BCGen))
+         bailout("Cannot handle Expression: " ~ e.astTypeName ~  " :: " ~ e.toString);
+     }
+ 
++    override void visit (DelegateExp de)
++    {
++        auto dgType = toBCType(de.type);
++        auto dg = genTemporary(dgType);
++        Alloc(dg.i32, imm32(DelegateDescriptor.Size), dgType);
++        Comment("Store FunctionPtr");
++        IndexedScaledStore32(dg.i32,
++            imm32(_sharedCtfeState.getFunctionIndex(de.func)),
++            imm32(DelegateDescriptor.FuncPtrOffset / 4),
++            4
++        );
++        Comment("Store ContextPtr");
++
++        BCValue context;
++        auto contextType = toBCType(de.e1.type);
++        printf("ContextType: %s\n", de.e1.type.toPrettyChars(true));
++        if (contextType.type == BCTypeEnum.Function)
++        {
++            context = _context;
++        }
++        else
++        {
++            context = _this;
++        }
++
++        IndexedScaledStore32(dg.i32,
++            context.i32,
++            imm32(DelegateDescriptor.ContextPtrOffset / 4),
++            4
++        );
++        retval = dg;
++    }
++
+     override void visit(NullExp ne)
+     {
+         lastLoc = ne.loc;
+@@ -5237,6 +5330,7 @@ static if (is(BCGen))
+         Line(ve.loc.linnum);
+         auto vd = ve.var.isVarDeclaration;
+         auto symd = ve.var.isSymbolDeclaration;
++        auto fd = ve.var.isFuncDeclaration;
+ 
+         debug (ctfe)
+         {
+@@ -5304,9 +5398,15 @@ static if (is(BCGen))
+             //auto vs = symd in syms;
+ 
+         }
++        else if (fd)
++        {
++            retval = imm32(_sharedCtfeState.getFunctionIndex(fd));
++            retval.type.type = BCTypeEnum.Function;
++        }
+         else
+         {
+-            assert(0, "VarExpType unkown");
++            import ddmd.asttypename;
++            assert(0, "VarExpType unkown: " ~ ve.var.astTypeName);
+         }
+ 
+         debug (ctfe)
+@@ -5456,6 +5556,11 @@ static if (is(BCGen))
+         vars[cast(void*) vd] = var;
+     }
+ 
++    void setClosureVariable(VarDeclaration vd, int closureOffset)
++    {
++        closureVars[cast(void*) vd] = closureOffset;
++    }
++
+     static bool canHandleBinExpTypes(const BCTypeEnum lhs, const BCTypeEnum rhs) pure
+     {
+         return ((lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.f23 || lhs == BCTypeEnum.f52)
+@@ -6038,7 +6143,7 @@ static if (is(BCGen))
+             () {
+                 with(BCTypeEnum)
+                 {
+-                    return [i8, i32, i64, f23, f52];
++                    return [i8, i32, i64, f23, f52, Function, Delegate];
+                 }
+             } ();
+ 
+@@ -6314,6 +6419,10 @@ static if (is(BCGen))
+ 
+                     MemCpy(lhs.i32, rhs.i32, imm32(SliceDescriptor.Size));
+                 }
++                else if (lhs.type.type == BCTypeEnum.Delegate && rhs.type.type == BCTypeEnum.Delegate)
++                {
++                    MemCpy(lhs.i32, rhs.i32, imm32(basicTypeSize(BCTypeEnum.Delegate)));
++                }
+                 else if (lhs.type.type == BCTypeEnum.Array && rhs.type.type == BCTypeEnum.Array)
+                 {
+                     auto lhsBase = getBase(lhs);
+@@ -7010,7 +7119,7 @@ static if (is(BCGen))
+         assert(ce.arguments.dim <= nParameters);
+ 
+         uint lastArgIdx = cast(uint)(ce.arguments.dim > nParameters ? ce.arguments.dim : nParameters);
+-        bc_args.length = lastArgIdx + !!(thisPtr);
++        bc_args.length = lastArgIdx + !!(thisPtr) + (fd ? fd.isNested() : 0);
+ 
+         foreach (i, arg; *ce.arguments)
+         {
+@@ -7059,6 +7168,11 @@ static if (is(BCGen))
+             bc_args[lastArgIdx] = thisPtr;
+         }
+ 
++        if (fd ? fd.isNested() : false)
++        {
++            bc_args[lastArgIdx + !!thisPtr] = _context;
++        }
++
+         static if (is(BCFunction) && is(typeof(_sharedCtfeState.functionCount)))
+         {
+ 
+diff --git a/src/dinterpret.d b/src/dinterpret.d
+index 12b9f56..97ff85e 100644
+--- a/src/dinterpret.d
++++ b/src/dinterpret.d
+@@ -817,8 +817,9 @@ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expres
+      // try bc-evaluator if the interpreter has not already begun
+     if (!istate && !thisarg && !fd.isThis && !fd.needThis && !fd.isNested)
+     {
++        assert(!thisarg);
+         import ddmd.ctfe.ctfe_bc;
+-        if (auto e = evaluateFunction(fd, arguments, thisarg))
++        if (auto e = evaluateFunction(fd, arguments))
+         {
+             return e;
+         }
