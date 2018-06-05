@@ -2881,9 +2881,9 @@ public:
         foreach (uf; forCtor ? uncompiledConstructors[0 .. uncompiledConstructorCount] :
                                uncompiledFunctions[lastUncompiledFunction .. uncompiledFunctionCount])
         {
-            if (!forCtor && _blacklist.isInBlacklist(uf.fd.ident))
+            if (_blacklist.isInBlacklist(uf.fd.ident))
             {
-                bailout("Bail out on blacklisted");
+                bailout("Bail out on blacklisted: " ~ uf.fd.ident.toString());
                 return;
             }
 
