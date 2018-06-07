@@ -7,15 +7,19 @@ struct R
 
 int square_of_x_plus_x(int x) pure
 {
-    static int echo(int x) {return x;}
-
-    int fnC(int y) pure
+    int passThrough(int y) pure
     {
-        auto z = (x * y);
-        x = 12;
-        return z;
+        int y2 = x;
+        int fnC() pure
+        {
+            auto z = (x * y);
+            x = 12;
+            y2 = y * 2;
+            return z;
+        }
+        return fnC();
     }
-    return x + fnC(x);
+    return x + passThrough(x);
 }
 
 pragma(msg, square_of_x_plus_x(7));

@@ -12,6 +12,7 @@ import ddmd.statement;
 import ddmd.sideeffect;
 import ddmd.visitor;
 import ddmd.arraytypes : Expressions, VarDeclarations;
+import ddmd.root.rmem;
 /**
  * Written By Stefan Koch in 2016-18
  */
@@ -196,6 +197,45 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args, Expression th
 
 import ddmd.ctfe.bc_common;
 
+struct ClosureVariableDescriptor
+{
+    BCValue value;
+    int offset;
+    int depth;
+}
+
+ClosureVariableDescriptor* searchInParent(FuncDeclaration fd, VarDeclaration vd)
+{
+    ClosureVariableDescriptor* cvd = null;
+    int offset;
+    int depth = -1;
+
+    while(fd)
+    {
+        depth++;
+        offset = 0;
+        if (!cvd) foreach(cv;fd.closureVars)
+        {
+            if (cv == vd)
+            {
+                cvd = cast (ClosureVariableDescriptor*)
+                    allocmemory(ClosureVariableDescriptor.sizeof);
+                cvd.offset = offset;
+                cvd.depth = depth;
+                break;
+            }
+            else
+            {
+                offset += _sharedCtfeState.size(_sharedCtfeState.btv.toBCType(cv.type), true);
+            }
+        }
+
+        fd = fd.parent.isFuncDeclaration();
+    }
+    
+    return cvd;
+    
+}
 
 struct SliceDescriptor
 {
@@ -2562,6 +2602,12 @@ public:
 
             return BCValue.init;
         }
+        else if (auto cv = searchInParent(me, vd))
+        {
+            printf("We got a closureVar for: %s .. {depth = %d, offset = %d}\n", // DEBUGLINE
+                vd.toChars, cv.depth, cv.offset);
+            return BCValue.init;
+        }
         else
         {
             return BCValue.init;
@@ -2787,18 +2833,18 @@ public:
 //                       bailout("default args unsupported");
 //                }
 
-
+            /+
             if (fd.hasNestedFrameRefs /*|| fd.isNested*/)
             {
-                // import std.stdio; writeln("fd has closureVars:  ", fd.toString);  //DEBUGLINE
-                // foreach(v;fd.closureVars)
-                // {
-                   // import std.stdio; writeln("closure-var: ", v.toString);  //DEBUGLINE
-                // }
+                import std.stdio; writeln("fd has closureVars:  ", fd.toString);  //DEBUGLINE
+                foreach(v;fd.closureVars)
+                {
+                   import std.stdio; writeln("closure-var: ", v.toString);  //DEBUGLINE
+                }
                 bailout("cannot deal with closures of any kind: " ~ fd.toString);
                 return ;
             }
-
+            +/
             if (fd.fbody)
             {
                 const fnIdx = ++_sharedCtfeState.functionCount;
