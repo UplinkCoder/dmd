@@ -5,25 +5,17 @@ struct R
 }
 
 
-struct CLT0
-{
-    void *previousClosure;
-    int v1;
-}
-
-
-R square(int x)
+int square_of_x_plus_x(int x) pure
 {
     static int echo(int x) {return x;}
 
-    int fnC(int y)
+    int fnC(int y) pure
     {
         auto z = (x * y);
-	x = 1;
-	return z;
+        x = 12;
+        return z;
     }
-    auto addr = &fnC;
-    return R(addr, fnC(echo(x)) + x);
+    return x + fnC(x);
 }
 
-pragma(msg, square(5));
+pragma(msg, square_of_x_plus_x(7));
