@@ -817,8 +817,9 @@ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expres
      // try bc-evaluator if the interpreter has not already begun
     if (!istate && !thisarg && !fd.needThis && !fd.isNested)
     {
+        assert(!thisarg);
         import ddmd.ctfe.ctfe_bc;
-        if (auto e = evaluateFunction(fd, arguments, thisarg))
+        if (auto e = evaluateFunction(fd, arguments))
         {
             return e;
         }

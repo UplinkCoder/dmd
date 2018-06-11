@@ -102,6 +102,10 @@ const(uint) basicTypeSize(const BCTypeEnum bct) @safe pure
         {
             return 4;
         }
+    case Delegate :
+        {
+            return 8;
+        }
     case Ptr :
             assert(0, "Ptr is not supposed to be a basicType anymore");
 
@@ -185,6 +189,8 @@ enum BCTypeEnum : ubyte
     string32,
 
     Function, // synonymous to i32
+    Delegate, // synonymous to {i32, i32}
+
     //  everything below here is not used by the bc layer.
     Array,
     Struct,
