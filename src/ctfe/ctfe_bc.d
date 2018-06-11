@@ -196,7 +196,7 @@ ClosureVariableDescriptor* searchInParent(FuncDeclaration fd, VarDeclaration vd)
     while(fd)
     {
         depth++;
-        offset = 0;
+        offset = 4; // initialze to 4 because of the parent closure pointer
         if (!cvd) foreach(cv;fd.closureVars)
         {
             if (cv == vd)
@@ -2116,7 +2116,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         assignTo = BCValue.init;
         boolres = BCValue.init;
         _this = BCValue.init;
-        _context = BCValue.init;
+        closureChain = BCValue.init;
 
         labeledBlocks.destroy();
         vars.destroy();
@@ -2160,8 +2160,13 @@ extern (C++) final class BCV(BCGenT) : Visitor
     BCBlock[void* ] labeledBlocks;
     bool ignoreVoid;
     BCValue[void* ] vars;
+
+    /// current this pointer
     BCValue _this;
-    BCValue _context;
+
+    /// pointer to a back-linked list of contexts
+    /// the link (at offset 0) points to the parent
+    BCValue closureChain;
 
     VarDeclaration lastConstVd;
     typeof(gen.genLabel()) lastContinue;
@@ -2585,7 +2590,7 @@ public:
         }
         if (me.isNested())
         {
-            _context = genParameter(i32Type);
+            closureChain = genParameter(i32Type);
             // D's closure has no type
             // therefore use generic pointer
         }
@@ -2639,6 +2644,17 @@ public:
         {
             printf("We got a closureVar for: %s .. {depth = %d, offset = %d}\n", // DEBUGLINE
                 vd.toChars, cv.depth, cv.offset);
+            auto cvp = genTemporary(i32Type);
+
+            assert(closureChain);
+            Set(cvp, closureChain.i32);
+
+            foreach(_; 0 .. cv.depth)
+                Load32(cvp, cvp);
+
+            Add3(cvp, cvp, imm32(cv.offset));
+
+            //TODO FIXME we cannot just return cvp here.
             return BCValue.init;
         }
         else
@@ -4233,7 +4249,7 @@ static if (is(BCGen))
         printf("ContextType: %s\n", de.e1.type.toPrettyChars(true));
         if (contextType.type == BCTypeEnum.Function)
         {
-            context = _context;
+            context = closureChain;
         }
         else
         {
@@ -4445,7 +4461,7 @@ static if (is(BCGen))
                 //FIXME horrible hack to make slice members work
                 // Systematize somehow!
 
-                if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.string8]))
+                if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8]))
                     Set(retval.i32, ptr);
                 else if (_sharedCtfeState.size(ptr.type) == 8)
                     Load64(retval.i32, ptr);
@@ -4471,26 +4487,66 @@ static if (is(BCGen))
         {
             auto cd = (cast(TypeClass) dve.e1.type).sym;
             auto ti = _sharedCtfeState.getClassIndex(cd);
+            bailout(!ti, "Don't know the class for: " ~ cd.toString);
 
-            int fieldIndex = -1;
-            /// 0 means this, 1 means super, 2 means super.super and so on
-            int level = 0;
-
+            int fIndex = -1;
+            int offset = -1;
+            BCClass* c = &_sharedCtfeState.classTypes[ti - 1];
+        
             FindField: while(cd)
             {
                 foreach(int i,f;cd.fields)
                 {
                     if (dve.var == f)
                     {
-                        fieldIndex = i;
+                        fIndex = i;
                         break FindField;
                     }
                 }
                 cd = cd.baseClass;
-                level++;
+                c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
             }
 
-            bailout("Class.field still has to be implemented fi:" ~ fieldIndex.to!string ~ " lvl:" ~ level.to!string);
+            if (fIndex != -1)
+                offset = c.offset(fIndex);
+
+
+            BCType varType = c.memberTypes[fIndex];
+            if (!varType.type)
+            {
+                bailout("class " ~ to!string(fIndex) ~ " has an empty type... This must not happen! -- " ~ dve.toString);
+                return ;
+            }
+
+            retval = (assignTo && assignTo.vType == BCValueType.StackValue) ? assignTo : genTemporary(
+                toBCType(dve.type));
+            
+            auto lhs = genExpr(dve.e1, "DotVarExp: dve.e1");
+
+            if (!(isStackValueOrParameter(lhs) || lhs.vType == BCValueType.Temporary))
+            {
+                bailout("Unexpected lhs-type: " ~ to!string(lhs.vType));
+                return;
+            }
+            
+            auto ptr = genTemporary(varType);
+            Add3(ptr.i32, lhs.i32, imm32(offset));
+            //FIXME horrible hack to make slice members work
+            // Systematize somehow!
+            
+            if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8]))
+                Set(retval.i32, ptr);
+            else if (_sharedCtfeState.size(ptr.type) == 8)
+                Load64(retval.i32, ptr);
+            else
+                Load32(retval.i32, ptr);
+            if (!ptr)
+            {
+                bailout("could not gen :" ~ dve.toString);
+                return ;
+            }
+            retval.heapRef = BCHeapRef(ptr);
+            //bailout("Class.field still has to be implemented fi:" ~ fieldIndex.to!string ~ " lvl:" ~ level.to!string);
         }
         else
         {
@@ -6138,22 +6194,34 @@ static if (is(BCGen))
 
         if (ae.e1.op == TOKdotvar)
         {
-            // Assignment to a struct member
+            // Assignment to a struct or class member
             // needs to be handled differently
             auto dve = cast(DotVarExp) ae.e1;
-            auto _struct = dve.e1;
-            if (_struct.type.ty != Tstruct)
+            auto aggregate = dve.e1;
+            auto aggTy = aggregate.type.ty;
+
+
+            if (aggTy != Tstruct && aggTy != Tclass)
             {
                 bailout("only structs are supported for now");
                 return;
             }
-            auto structDeclPtr = (cast(TypeStruct) dve.e1.type).sym;
-            auto structTypeIndex = _sharedCtfeState.getStructIndex(structDeclPtr);
-            if (!structTypeIndex)
+
+            auto isStruct = (aggTy == Tstruct);
+
+            auto structDeclPtr = (cast(TypeStruct) aggregate.type).sym;
+            auto classDeclPtr = (cast(TypeClass) aggregate.type).sym;
+            
+            auto aggregateTypeIndex = 
+                (isStruct ? _sharedCtfeState.getStructIndex(structDeclPtr)
+                          : _sharedCtfeState.getClassIndex(classDeclPtr));
+
+            if (!aggregateTypeIndex)
             {
-                bailout("could not get StructType");
+                bailout("could not get Type of struct or class");
                 return;
             }
+
             auto vd = dve.var.isVarDeclaration();
             assert(vd);
 
@@ -6161,7 +6229,7 @@ static if (is(BCGen))
 
             auto fIndex = findFieldIndexByName(structDeclPtr, vd);
             assert(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
-            auto bcStructType = _sharedCtfeState.structTypes[structTypeIndex - 1];
+            auto bcStructType = _sharedCtfeState.structTypes[aggregateTypeIndex - 1];
             auto fieldType = bcStructType.memberTypes[fIndex];
             // import std.stdio; writeln("got fieldType: ", fieldType); //DEBUGLINE
 
@@ -6180,10 +6248,10 @@ static if (is(BCGen))
                 return;
             }
 
-            auto lhs = genExpr(_struct);
+            auto lhs = genExpr(aggregate);
             if (!lhs)
             {
-                bailout("could not gen: " ~ _struct.toString);
+                bailout("could not gen: " ~ aggregate.toString);
                 return ;
             }
 
@@ -7196,7 +7264,7 @@ static if (is(BCGen))
 
         if (fd ? fd.isNested() : false)
         {
-            bc_args[lastArgIdx + !!thisPtr] = _context;
+            bc_args[lastArgIdx + !!thisPtr] = closureChain;
         }
 
         static if (is(BCFunction) && is(typeof(_sharedCtfeState.functionCount)))
