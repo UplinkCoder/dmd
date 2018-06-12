@@ -25,7 +25,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -2120,6 +2120,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
         labeledBlocks.destroy();
         vars.destroy();
+        closureVarOffsets.destroy();
     }
 
     UnrolledLoopState* unrolledLoopState;
@@ -2160,6 +2161,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     BCBlock[void* ] labeledBlocks;
     bool ignoreVoid;
     BCValue[void* ] vars;
+    uint[void* ] closureVarOffsets;
 
     /// current this pointer
     BCValue _this;
@@ -2315,7 +2317,6 @@ extern (C++) final class BCV(BCGenT) : Visitor
         import std.stdio;
         void Set(BCValue lhs, BCValue rhs, size_t line = __LINE__)
         {
-            if (lhs.type.type == BCTypeEnum.string8 || lhs.type.type == BCTypeEnum.string8)
             writeln("Set(", lhs.toString, ", ", rhs.toString, ") called at: ", line);
             gen.Set(lhs, rhs);
         }
@@ -2585,12 +2586,12 @@ public:
 
         if (me.vthis)
         {
-            _this = genParameter(toBCType(me.vthis.type));
+            _this = genParameter(toBCType(me.vthis.type), "thisPtr");
             setVariable(me.vthis, _this);
         }
         if (me.isNested())
         {
-            closureChain = genParameter(i32Type);
+            closureChain = genParameter(i32Type, "closureChain");
             // D's closure has no type
             // therefore use generic pointer
         }
@@ -2609,7 +2610,7 @@ public:
         insideArgumentProcessing = false;
     }
 
-    BCValue getVariable(VarDeclaration vd)
+    BCValue getVariable(VarDeclaration vd, VarExp ve = null)
     {
         import ddmd.declaration : STCmanifest, STCstatic, STCimmutable;
 
@@ -2642,20 +2643,28 @@ public:
         }
         else if (auto cv = searchInParent(me, vd))
         {
-            printf("We got a closureVar for: %s .. {depth = %d, offset = %d}\n", // DEBUGLINE
-                vd.toChars, cv.depth, cv.offset);
+            printf("We got a closureVar for: %s .. {depth = %d, offset = %d} for: %s\n", // DEBUGLINE
+                &vd.toString[0], cv.depth, cv.offset, &me.toString[0]);
+            Comment("closureVarLoad '" ~ cast(string)vd.ident.toString() ~ "'  for Level: " ~ to!string(cv.depth));
             auto cvp = genTemporary(i32Type);
 
             assert(closureChain);
-            Set(cvp, closureChain.i32);
+            Assert(closureChain, addError(ve ? ve.loc : vd.loc, "no closure-chain-pointer is null"));
+            Set(cvp, closureChain);
 
-            foreach(_; 0 .. cv.depth)
+            foreach(level; 0 .. cv.depth)
+            {
+                Assert(cvp, addError(vd.loc, "closureVarLoad '" ~ cast(string)vd.ident.toString() ~ "'  for Level: *** " ~ to!string(level) ~ " ***"));
                 Load32(cvp, cvp);
+            }
 
             Add3(cvp, cvp, imm32(cv.offset));
 
             //TODO FIXME we cannot just return cvp here.
-            return BCValue.init;
+            auto var = genLocal(toBCType(vd.type), cast(string)vd.ident.toString);
+            var.heapRef = BCHeapRef(cvp);
+            setVariable(vd, var);
+            return var;
         }
         else
         {
@@ -3260,6 +3269,41 @@ public:
             }
 
             beginFunction(fnIdx - 1, cast(void*)fd);
+            //TODO it seems that hasNstedFrameRefs does not work transitively!
+            if (fd.closureVars.dim)
+            {
+                uint closureChainSize = 4; 
+
+                foreach(ref v;fd.closureVars)
+                {
+                    setClosureVarOffset(v, closureChainSize);
+                    closureChainSize += _sharedCtfeState.size(toBCType(v.type), true);
+                }
+               
+                BCValue newClosure = genLocal(i32Type, "newClosure");
+                Alloc(newClosure, imm32(closureChainSize));
+
+                if (me.isNested)
+                {
+                    assert(closureChain);
+                    auto pfd = me.toParent2.isFuncDeclaration(); 
+                    if (pfd && pfd.hasNestedFrameRefs())
+                    {
+                        Assert(closureChain, addError(lastLoc, "Missing parent closure-chain"));
+                    }
+
+                    Store32(newClosure, closureChain);
+                }
+                else
+                {
+                    if (!closureChain)
+                    {
+                        closureChain = newClosure;
+                    }
+                }
+                Set(closureChain, newClosure);
+            }
+
             visit(fbody);
             if (fd.type.nextOf.ty == Tvoid)
             {
@@ -5434,7 +5478,7 @@ static if (is(BCGen))
 
         if (vd)
         {
-            auto sv = getVariable(vd);
+            auto sv = getVariable(vd, ve);
             debug (ctfe)
             {
                 //assert(sv, "Variable " ~ ve.toString ~ " not in StackFrame");
@@ -5604,7 +5648,7 @@ static if (is(BCGen))
             bailout("could not get type for:" ~ vd.toString);
             return ;
         }
-        bool refParam;
+
         if (processingParameters)
         {
             if (vd.storage_class & STCref)
@@ -5638,9 +5682,15 @@ static if (is(BCGen))
         retval = var;
     }
 
-    void setVariable(VarDeclaration vd, BCValue var)
+    void setVariable(VarDeclaration vd, BCValue var, bool inClosure = false)
     {
         vars[cast(void*) vd] = var;
+    }
+
+    void setClosureVarOffset(VarDeclaration vd, uint offset)
+    {
+        assert(offset, "offset can never be 0");
+        closureVarOffsets[cast(void*) vd] = offset;
     }
 
     static bool canHandleBinExpTypes(const BCTypeEnum lhs, const BCTypeEnum rhs) pure
@@ -7262,7 +7312,7 @@ static if (is(BCGen))
             bc_args[lastArgIdx] = thisPtr;
         }
 
-        if (fd ? fd.isNested() : false)
+        if (fd ? fd.isNested() && me.closureVars.dim : false)
         {
             bc_args[lastArgIdx + !!thisPtr] = closureChain;
         }
