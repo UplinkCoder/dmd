@@ -25,7 +25,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -191,7 +191,9 @@ ClosureVariableDescriptor* searchInParent(FuncDeclaration fd, VarDeclaration vd)
 {
     ClosureVariableDescriptor* cvd = null;
     int offset;
-    int depth = -1;
+    // if we don't have closureVars ourselfs then we don't need to load our ptr
+    // therefore we then start at level -2 rather then -1
+    int depth = (fd.closureVars.dim ? -1 : -2);
 
     while(fd)
     {
@@ -1431,7 +1433,7 @@ Expression toExpression(const BCValue value, Type expressionType,
 
     if (value.vType == BCValueType.Error)
     {
-        assert(value.type == i32Type);
+        assert(value.type.type == BCTypeEnum.i32, "Error.type is: " ~ _sharedCtfeState.typeToString(value.type));
         assert(value.imm32, "Errors are 1 based indexes");
         import ddmd.ctfeexpr : CTFEExp;
 
@@ -2989,6 +2991,43 @@ public:
         }
     }
 
+    void allocateAndLinkClosure(FuncDeclaration fd)
+    {
+        assert(fd.closureVars.dim);
+
+        uint closureChainSize = 4;
+
+        foreach(ref v;fd.closureVars)
+        {
+            setClosureVarOffset(v, closureChainSize);
+            closureChainSize += _sharedCtfeState.size(toBCType(v.type), true);
+        }
+
+        BCValue newClosure = genLocal(i32Type, "newClosure");
+        Alloc(newClosure, imm32(closureChainSize));
+
+        if (fd.isNested())
+        {
+            assert(closureChain);
+            auto pfd = fd.toParent2().isFuncDeclaration();
+            if (pfd && pfd.hasNestedFrameRefs())
+            {
+                Assert(closureChain, addError(lastLoc, "Missing parent closure-chain"));
+            }
+
+            Store32(newClosure, closureChain);
+        }
+        else
+        {
+            if (!closureChain)
+            {
+                closureChain = newClosure;
+            }
+        }
+        Set(closureChain, newClosure);
+    }
+
+
     void compileUncompiledFunctions(bool forCtor = false)
     {
         uint lastUncompiledFunction;
@@ -3071,6 +3110,10 @@ public:
 
             Line(me.loc.linnum);
             beginFunction(fnIdx - 1, cast(void*)me);
+
+            if (me.closureVars.dim)
+                allocateAndLinkClosure(me);
+
             me.fbody.accept(this);
 
             static if (is(BCGen))
@@ -3278,38 +3321,7 @@ public:
             beginFunction(fnIdx - 1, cast(void*)fd);
             //TODO it seems that hasNstedFrameRefs does not work transitively!
             if (fd.closureVars.dim)
-            {
-                uint closureChainSize = 4; 
-
-                foreach(ref v;fd.closureVars)
-                {
-                    setClosureVarOffset(v, closureChainSize);
-                    closureChainSize += _sharedCtfeState.size(toBCType(v.type), true);
-                }
-               
-                BCValue newClosure = genLocal(i32Type, "newClosure");
-                Alloc(newClosure, imm32(closureChainSize));
-
-                if (me.isNested)
-                {
-                    assert(closureChain);
-                    auto pfd = me.toParent2.isFuncDeclaration(); 
-                    if (pfd && pfd.hasNestedFrameRefs())
-                    {
-                        Assert(closureChain, addError(lastLoc, "Missing parent closure-chain"));
-                    }
-
-                    Store32(newClosure, closureChain);
-                }
-                else
-                {
-                    if (!closureChain)
-                    {
-                        closureChain = newClosure;
-                    }
-                }
-                Set(closureChain, newClosure);
-            }
+                allocateAndLinkClosure(fd);
 
             visit(fbody);
             if (fd.type.nextOf.ty == Tvoid)
@@ -7322,6 +7334,18 @@ static if (is(BCGen))
         if (fd ? fd.isNested() && me.closureVars.dim : false)
         {
             bc_args[lastArgIdx + !!thisPtr] = closureChain;
+            // now we need to store back into the closure
+            auto closureptr_offset = genLocal(i32Type, "closureptr_offset");
+            foreach(cv, offset; closureVarOffsets)
+            {
+                // here the "gen." is needed although it should be found via
+                // alias this
+                //TODO investiage bug!
+                gen.Add3(closureptr_offset, closureChain, imm32(offset));
+                BCValue var = getVariable(cast(VarDeclaration) cv);
+                var.heapRef = BCHeapRef(closureptr_offset);
+                StoreToHeapRef(var);
+            }
         }
 
         static if (is(BCFunction) && is(typeof(_sharedCtfeState.functionCount)))
