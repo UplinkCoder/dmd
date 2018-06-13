@@ -2650,8 +2650,6 @@ public:
         }
         else if (auto cv = searchInParent(me, vd))
         {
-            printf("We got a closureVar for: %s .. {depth = %d, offset = %d} for: %s\n", // DEBUGLINE
-                &vd.toString[0], cv.depth, cv.offset, &me.toString[0]);
             Comment("closureVarLoad '" ~ cast(string)vd.ident.toString() ~ "'  for Level: " ~ to!string(cv.depth));
             auto cvp = genTemporary(i32Type);
 
@@ -2661,13 +2659,11 @@ public:
 
             foreach(level; 0 .. cv.depth)
             {
-                Assert(cvp, addError(vd.loc, "closureVarLoad '" ~ cast(string)vd.ident.toString() ~ "'  for Level: *** " ~ to!string(level) ~ " ***"));
                 Load32(cvp, cvp);
             }
 
             Add3(cvp, cvp, imm32(cv.offset));
 
-            //TODO FIXME we cannot just return cvp here.
             auto var = genLocal(toBCType(vd.type), cast(string)vd.ident.toString);
             var.heapRef = BCHeapRef(cvp);
             setVariable(vd, var);
@@ -7380,6 +7376,23 @@ static if (is(BCGen))
             uint arguments_dim = cast(uint) ce.arguments.dim;
             //FIXME figure out what we do in the case where we have more arguments than parameters
             //TEMPORARY: for now it seems to be enough to only iterate the min of args and params
+
+            if (fd ? fd.isNested() && me.closureVars.dim : false)
+            {
+                bc_args[lastArgIdx + !!thisPtr] = closureChain;
+                // now we need to store back into the closure
+                auto closureptr_offset = genLocal(i32Type, "closureptr_offset");
+                foreach(cv, offset; closureVarOffsets)
+                {
+                    // here the "gen." is needed although it should be found via
+                    // alias this
+                    //TODO investiage bug!
+                    gen.Add3(closureptr_offset, closureChain, imm32(offset));
+                    BCValue var = getVariable(cast(VarDeclaration) cv);
+                    var.heapRef = BCHeapRef(closureptr_offset);
+                    LoadFromHeapRef(var);
+                }
+            }
 
             foreach(i, ref arg;bc_args)
             {
