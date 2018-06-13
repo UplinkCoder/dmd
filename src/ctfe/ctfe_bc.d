@@ -2584,7 +2584,12 @@ public:
         // add this Pointer as last parameter
         assert(me);
 
-        if (me.vthis)
+        if (me.vthis
+            // make sure vthis is not a void pointer
+            // this can happen with closures
+            && !(me.vthis.type.ty == Tpointer
+                && me.vthis.type.nextOf().ty == Tvoid)
+        )
         {
             _this = genParameter(toBCType(me.vthis.type), "thisPtr");
             setVariable(me.vthis, _this);
@@ -3017,6 +3022,7 @@ public:
                 {
                     auto osp = sp;
                 }
+                vars.destroy();
                 beginParameters();
                     auto p1 = genParameter(i32Type, "thisPtr");
                 endParameters();
@@ -3045,7 +3051,7 @@ public:
 
                 continue ;
             }
-
+            vars.destroy();
             beginParameters();
             auto parameters = me.parameters;
             if (parameters)
@@ -3228,6 +3234,7 @@ public:
         Line(fd.loc.linnum);
         if (auto fbody = fd.fbody.isCompoundStatement)
         {
+            vars.destroy();
             beginParameters();
             if (fd.parameters)
                 foreach (i, p; *(fd.parameters))
@@ -7145,11 +7152,11 @@ static if (is(BCGen))
         }
         else if (ce.e1.op == TOKdotvar)
         {
-            Expression _this;
+            Expression ethis;
             DotVarExp dve = cast(DotVarExp)ce.e1;
 
             // Calling a member function
-            _this = dve.e1;
+            ethis = dve.e1;
             import std.stdio;
 
             if (!dve.var || !dve.var.isFuncDeclaration())
@@ -7194,8 +7201,8 @@ static if (is(BCGen))
                 // non-virtual so the function
             }
             /*
-            if (_this.op == TOKdottype)
-                _this = (cast(DotTypeExp)dve.e1).e1;
+            if (ethis.op == TOKdottype)
+                ethis = (cast(DotTypeExp)dve.e1).e1;
             }
             */
 
