@@ -25,7 +25,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -1909,11 +1909,6 @@ extern (C++) final class BCTypeVisitor : Visitor
         }
         else if (t.ty == Tdelegate)
         {
-            ///TODO URGENT introduce Delegate Type
-            return BCType(BCTypeEnum.Function);
-        }
-        else if (t.ty == Tdelegate)
-        {
             return BCType(BCTypeEnum.Delegate);
         }
 
@@ -2524,14 +2519,13 @@ extern (C++) final class BCV(BCGenT) : Visitor
             auto ea = genTemporary(i32Type);
             Mul3(ea, index, imm32(scale));
             Add3(ea, ea, _to);
-            Load32(ea, from);
+            Store32(ea, from);
         }
     }
 
 
     void StringEq(BCValue result, BCValue lhs, BCValue rhs)
     {
-
         static if (is(typeof(StrEq3) == function)
                 && is(typeof(StrEq3(BCValue.init, BCValue.init, BCValue.init)) == void))
         {
@@ -2549,7 +2543,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             auto ptr1 = getBase(lhs);
             auto ptr2 = getBase(rhs);
             Set(offset, len1);
-
+            Comment("streq loop");
             auto e1 = genTemporary(i32Type);
             auto e2 = genTemporary(i32Type);
 
@@ -4296,6 +4290,7 @@ static if (is(BCGen))
         auto dg = genTemporary(dgType);
         Alloc(dg.i32, imm32(DelegateDescriptor.Size), dgType);
         Comment("Store FunctionPtr");
+
         IndexedScaledStore32(dg.i32,
             imm32(_sharedCtfeState.getFunctionIndex(de.func)),
             imm32(DelegateDescriptor.FuncPtrOffset / 4),
