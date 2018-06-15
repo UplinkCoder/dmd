@@ -6582,7 +6582,7 @@ static if (is(BCGen))
                     auto lhsBase = getBase(lhs);
                     auto rhsBase = getBase(rhs);
                     auto lhsLength = getLength(lhs);
-                    auto rhsLength = getLength(lhs);
+                    auto rhsLength = getLength(rhs);
                     auto sameLength = genTemporary(i32Type);
                     auto lhsBaseType = _sharedCtfeState.elementType(lhs.type);
 
