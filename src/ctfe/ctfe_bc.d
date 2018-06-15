@@ -6635,13 +6635,13 @@ static if (is(BCGen))
                     const structType = &_sharedCtfeState.structTypes[lhs.type.typeIndex - 1];
 
                     // HACK allocate space for struct if structPtr is zero
-                    auto structZeroJmp = beginCndJmp(lhs.i32, true);
+                    auto JstructNotNull = beginCndJmp(lhs.i32, true);
                     auto structSize = _sharedCtfeState.size(lhs.type);
                     Alloc(lhs.i32, imm32(structType.size), lhs.type);
 
                     initStruct(lhs, structType);
 
-                    endCndJmp(structZeroJmp, genLabel());
+                    endCndJmp(JstructNotNull, genLabel());
                 }
                 else if (lhs.type.type == BCTypeEnum.Class && rhs.type.type == BCTypeEnum.Class)
                 {
