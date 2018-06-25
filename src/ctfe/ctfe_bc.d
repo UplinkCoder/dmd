@@ -25,7 +25,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -436,11 +436,12 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
 
         BCValue[4] errorValues;
         StopWatch sw;
+        StopWatch asw;
         sw.start();
+        asw.start();        
         bcv.beginArguments();
         BCValue[] bc_args;
         bc_args.length = args.length;
-        bcv.beginArguments();
         foreach (i, arg; args)
         {
             bc_args[i] = bcv.genExpr(arg, "Arguments");
@@ -454,6 +455,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
 
         }
         bcv.endArguments();
+        asw.stop();
         bcv.compileUncompiledFunctions();
         bcv.buildVtbls();
         // we build the vtbls now let's build the constructors
@@ -503,7 +505,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
                 &_sharedExecutionState.heap, &_sharedCtfeState.functions[0], &bcv.calls[0],
                 &errorValues[0], &errorValues[1], &errorValues[2], &errorValues[3],
                 &_sharedCtfeState.errors[0], _sharedExecutionState.stack[], bcv.stackMap());
-            /*            if (fd.ident == Identifier.idPool("extractAttribFlags"))
+/*            if (fd.ident == Identifier.idPool("extractAttribFlags"))
             {
                 import ddmd.hdrgen;
                 import ddmd.root.outbuffer;
@@ -525,7 +527,10 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         assert(ft.nextOf);
 
         static if (perf)
+        {
             writeln("Executing bc for " ~ fd.ident.toString ~ " took " ~ sw.peek.usecs.to!string ~ " us");
+            writeln(asw.peek.usecs.to!string ~ " us were spent doing argument processing");
+        }
         {
             static if (perf)
             {

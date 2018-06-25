@@ -1,6 +1,8 @@
 
 /// iterative binary search
 
+import p4m;
+
 int ibs_find (const (uint[]) arr, uint v)
 {
     return binarySearch(arr, 0, cast(int)(arr.length), v);
@@ -32,4 +34,6 @@ int binarySearch(const (uint[]) arr, int l, int r, uint x)
     return -1;
 }
  
-static assert(ibs_find(array, 21) == 7);
+//static assert(ibs_find(array, 21) == 7);
+pragma(msg, ibs_find(primes, 3904591));
+pragma(msg, ibs_find(primes, 1811041));
