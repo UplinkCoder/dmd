@@ -651,7 +651,7 @@ pure:
 
     void Line(uint line)
     {
-        emitLongInst(LongInst.Line, StackAddr(0), Imm32(line));
+       //  emitLongInst(LongInst.Line, StackAddr(0), Imm32(line));
     }
 
     void Comment(string comment)
