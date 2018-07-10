@@ -43,6 +43,14 @@ enum BCBlockJumpTarget
     Continue,
 }
 
+enum GenExprFlags
+{
+
+    None,
+    customBoolFixup = 0x1,
+    asAddress = 0x2,
+}
+
 struct BCBlockJump
 {
     BCAddr at;
@@ -2774,10 +2782,10 @@ public:
 
     extern (D) BCValue genExpr(Expression expr, string debugMessage = null, uint line = __LINE__)
     {
-        return genExpr(expr, false, debugMessage, line);
+        return genExpr(expr, GenExprFlags.None, debugMessage, line);
     }
 
-    extern (D) BCValue genExpr(Expression expr, bool costumBoolFixup, string debugMessage = null, uint line = __LINE__)
+    extern (D) BCValue genExpr(Expression expr, GenExprFlags flags, string debugMessage = null, uint line = __LINE__)
     {
 
         if (!expr)
@@ -2793,6 +2801,7 @@ public:
         auto oldRetval = retval;
         import ddmd.asttypename;
         // import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
+
         if (processingArguments)
         {
             debug (ctfe)
@@ -2822,7 +2831,7 @@ public:
             const oldFixupTableCount = fixupTableCount;
             if (expr)
                 expr.accept(this);
-            if (isBoolExp(expr) && !costumBoolFixup)
+            if (isBoolExp(expr) && !(flags & GenExprFlags.customBoolFixup))
             {
                 if (assignTo)
                 {
@@ -4164,7 +4173,7 @@ static if (is(BCGen))
     }
 
     BCBlock genBlock(Statement stmt, bool setCurrent = false,
-        bool costumBreakContinue = false)
+        bool customBreakContinue = false)
     {
         BCBlock result;
         const oldBreakFixupCount = breakFixupCount;
@@ -4182,7 +4191,7 @@ static if (is(BCGen))
         if (setCurrent)
         {
             switchFixup = oldSwitchFixup;
-            if (!costumBreakContinue)
+            if (!customBreakContinue)
             {
                 fixupContinue(oldContinueFixupCount, result.begin);
                 fixupBreak(oldBreakFixupCount, result.end);
@@ -4305,7 +4314,7 @@ static if (is(BCGen))
 
         BCValue context;
         auto contextType = toBCType(de.e1.type);
-        printf("ContextType: %s\n", de.e1.type.toPrettyChars(true));
+        printf("ContextType: %s\n", de.e1.type.toPrettyChars(true)); //DEBUGLINE
         if (contextType.type == BCTypeEnum.Function)
         {
             context = closureChain;
@@ -4957,7 +4966,11 @@ static if (is(BCGen))
 
         Line(ae.loc.linnum);
         //bailout("We don't handle AddrExp");
-        auto e1 = genExpr(ae.e1, "AddrExp");
+        auto e1 = genExpr(ae.e1, GenExprFlags.asAddress, "AddrExp");
+        static if (is(BCGen == typeof(gen)))
+        {
+            Prt(e1);
+        }
         // import std.stdio; writeln(ae.toString ~ " --  " ~ "e1: " ~ e1.toString); //debugline
 
         if (e1.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64]))
@@ -7879,7 +7892,7 @@ static if (is(BCGen))
             boolres = genTemporary(i32Type);
         }
 
-        auto cond = genExpr(fs.condition, false);
+        auto cond = genExpr(fs.condition);
 
         if (!cond)
         {

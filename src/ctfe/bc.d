@@ -172,6 +172,7 @@ enum LongInst : ushort
     Cat,
     Comment,
     Line,
+    Prt,
 
 }
 //Imm-Instructions and corresponding 2Operand instructions have to be in the same order
@@ -686,6 +687,16 @@ pure:
             default : assert(0);
         }
         }
+    }
+
+    void Prt(BCValue value)
+    {
+        if (value.vType == BCValueType.Immediate)
+            value = pushOntoStack(value);
+
+        byteCodeArray[ip] = ShortInst16(LongInst.Prt, value.stackAddr);
+        byteCodeArray[ip + 1] = 0;
+        ip += 2;
     }
 
     void Not(BCValue result, BCValue val)
@@ -1752,11 +1763,11 @@ string printInstructions(const int* startInstructions, uint length, const string
                 result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 2)) ~ "\n";
             }
             break;
-            /*case LongInst.Prt:
+        case LongInst.Prt:
             {
                 result ~= "Prt " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ " \n";
             }
-            break;*/
+            break;
         case LongInst.Not:
             {
                 result ~= "Not " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ " \n";
@@ -2792,6 +2803,14 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
         case LongInst.RelJmp:
             {
                 ip += (cast(short)(lw >> 16)) - 2;
+            }
+            break;
+        case LongInst.Prt:
+            {
+                if (!__ctfe)
+                {
+                    printf("Addr: %u, Value %p\n", stackP - opRef, *opRef);
+                }
             }
             break;
         case LongInst.Not:
