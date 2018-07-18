@@ -2645,13 +2645,15 @@ public:
         }
         else if ((vd.isDataseg() || vd.storage_class & STCmanifest) && !vd.isCTFE() && vd._init)
         {
+
             if (vd == lastConstVd)
                 bailout("circular initialisation apperantly");
 
             lastConstVd = vd;
             if (auto ci = vd.getConstInitializer())
             {
-                return genExpr(ci);
+                lastConstVd = null;
+                return genExpr(ci, "Const Initializer");
             }
 
             return BCValue.init;
