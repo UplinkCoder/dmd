@@ -2088,6 +2088,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     bool insideArgumentProcessing;
     bool processingParameters;
     bool insideArrayLiteralExp;
+    GenExprFlags exprFlags;
 
     bool IGaveUp;
 
@@ -2787,7 +2788,8 @@ public:
 
     extern (D) BCValue genExpr(Expression expr, GenExprFlags flags, string debugMessage = null, uint line = __LINE__)
     {
-
+        auto oldExprFlags = exprFlags;
+        exprFlags = flags;
         if (!expr)
         {
             import core.stdc.stdio; printf("%s\n", ("Calling genExpr(null) from: " ~ to!string(line) ~ "\0").ptr); //DEBUGLINE
@@ -2872,6 +2874,7 @@ public:
         //        assert(!discardValue || retval.vType != BCValueType.Unknown);
         BCValue ret = retval;
         retval = oldRetval;
+        exprFlags = oldExprFlags;
 
         //        if (processingArguments) {
         //            arguments ~= retval;
@@ -4130,6 +4133,13 @@ static if (is(BCGen))
                 bailout("cannot gen: " ~ ie.toString);
                 return ;
             }
+
+            if (exprFlags & GenExprFlags.asAddress)
+            {
+                retval = ptr;
+                return ;
+            }
+
             retval.heapRef = BCHeapRef(ptr);
 
             if (elemType.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.Array, BCTypeEnum.string8, BCTypeEnum.Slice]))
@@ -4394,8 +4404,10 @@ static if (is(BCGen))
                 );
                 origSlice.type = _sharedCtfeState.sliceOf(_sharedCtfeState.elementType(origSlice.type));
             }
-            currentIndexed = origSlice;
+
             bailout(!origSlice, "could not get slice expr in " ~ se.toString);
+
+            currentIndexed = origSlice;
             auto elemType = _sharedCtfeState.elementType(origSlice.type);
             if (!elemType.type)
             {
@@ -4967,11 +4979,6 @@ static if (is(BCGen))
         Line(ae.loc.linnum);
         //bailout("We don't handle AddrExp");
         auto e1 = genExpr(ae.e1, GenExprFlags.asAddress, "AddrExp");
-        static if (is(BCGen == typeof(gen)))
-        {
-            Prt(e1);
-        }
-        // import std.stdio; writeln(ae.toString ~ " --  " ~ "e1: " ~ e1.toString); //debugline
 
         if (e1.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64]))
         {

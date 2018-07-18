@@ -68,7 +68,7 @@ struct RetainedCall
 enum LongInst : ushort
 {
     //Former ShortInst
-    //Prt,
+    Prt,
     RelJmp,
     Ret32,
     Ret64,
@@ -172,7 +172,6 @@ enum LongInst : ushort
     Cat,
     Comment,
     Line,
-    Prt,
 
 }
 //Imm-Instructions and corresponding 2Operand instructions have to be in the same order
@@ -2809,7 +2808,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             {
                 if (!__ctfe)
                 {
-                    printf("Addr: %u, Value %p\n", stackP - opRef, *opRef);
+                    printf("Addr: %u, Value %p\n", (opRef - stackP) * 4, *opRef);
                 }
             }
             break;

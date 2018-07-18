@@ -1,8 +1,12 @@
-static immutable four = [4, 4, 4, 4];
-
-int fn(const int* x)
+static immutable four = [1, 2, 3, 4];
+int fn(int idx = 2)
 {
-      return x[2];
+    int fn2(const int* x)
+    {
+      return x[idx];
+    }
+
+    return fn2(&four[0]) + *(&four[0]);
 }
 
-static assert(fn(&four[0]) == 4);
+static assert(fn() == 4);
