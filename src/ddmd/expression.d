@@ -15729,9 +15729,9 @@ extern (C++) final class IdentityExp : BinExp
 
         if (e1.type.toBasetype().ty == Tsarray ||
             e2.type.toBasetype().ty == Tsarray)
-            deprecation("identity comparison of static arrays "
-                ~ "implicitly coerces them to slices, "
-                ~ "which are compared by reference");
+            deprecation("identity comparison of static arrays " ~
+                "implicitly coerces them to slices, " ~
+                "which are compared by reference");
 
         return this;
     }
