@@ -3924,7 +3924,17 @@ static if (is(BCGen))
                 }
                 else
                 {
-                    bailout("Cannot currently handle struct or class offsets");
+					if (var.type.ty == Tclass || var.type.ty == Tstruct)
+					{
+                    	bailout("Cannot currently handle struct or class offsets");
+					}
+					else
+					{
+						bailout("Cannot handle SymOffsetExp of type: " ~
+							enumToString(cast(ENUMTY)var.type.ty)
+						);
+					}
+					return ;
                 }
 
                 if (index == -1)
