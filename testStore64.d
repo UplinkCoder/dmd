@@ -1,13 +1,13 @@
 void setVal(long* l)
 {
-   *l = 64 | 64L << 32;
+   *l |= 64 | 64L << 32;
 }
 
 long fn()
 {
-    long l;
+    long l = 32 | 32L << 32;
     setVal(&l);
     return l;
 }
 
-pragma(msg, fn());
+static assert (fn() == (32 | 64 | 32L << 32 | 64L << 32));
