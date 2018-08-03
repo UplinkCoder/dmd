@@ -230,6 +230,8 @@ ClosureVariableDescriptor* searchInParent(FuncDeclaration fd, VarDeclaration vd)
     
 }
 
+enum heapStartAddr = 100;
+
 struct SliceDescriptor
 {
     enum BaseOffset = 0;
@@ -383,12 +385,12 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
                 writeln("top-level function arguments are not supported");
             return null;
         }
-        if (arg.type.ty == Tpointer && (cast(TypePointer)arg.type).nextOf.ty == Tfunction)
+        if (arg.type.ty == Tpointer && (cast(TypePointer) arg.type).nextOf.ty == Tfunction)
         {
             import ddmd.tokens;
             if (arg.op == TOKsymoff)
             {
-                auto se = cast(SymOffExp)arg;
+                auto se = cast(SymOffExp) arg;
                 auto _fd = se.var.isFuncDeclaration;
                 if (!_fd) continue;
                 int fnId = _sharedCtfeState.getFunctionIndex(_fd);
@@ -880,18 +882,16 @@ struct SharedExecutionState
             void* mem = allocmemory(maxHeapSize * uint.sizeof);
             heap._heap = (cast(uint*) mem)[0 .. maxHeapSize];
             heap.heapMax = maxHeapSize;
-            heap.heapSize = 100;
         }
         else
         {
             import core.stdc.string : memset;
 
             memset(&heap._heap[0], 0, heap._heap[0].sizeof * heap.heapSize);
-            heap.heapSize = 100;
         }
+
+        heap.heapSize = heapStartAddr;
     }
-
-
 }
 
 struct SharedCtfeState(BCGenT)
@@ -1058,8 +1058,6 @@ struct SharedCtfeState(BCGenT)
 
         static if (is(BCFunction))
             _sharedCtfeState.functionCount = 0;
-
-
     }
 
 
@@ -1400,7 +1398,7 @@ Expression toExpression(const BCValue value, Type expressionType,
             import std.range;
             import std.algorithm;
             writefln("HeapDump: %s",
-                zip(heapPtr._heap[100 .. heapPtr.heapSize], iota(100, heapPtr.heapSize, 1)).map!(e => e[1].to!string ~ ":" ~ e[0].to!string));
+                zip(heapPtr._heap[heapStartAddr .. heapPtr.heapSize], iota(heapStartAddr, heapPtr.heapSize, 1)).map!(e => e[1].to!string ~ ":" ~ e[0].to!string));
     }
 
     import ddmd.parse : Loc;
