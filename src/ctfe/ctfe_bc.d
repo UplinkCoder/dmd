@@ -25,7 +25,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -3196,7 +3196,7 @@ public:
                 auto osp = sp;
             }
 
-            auto p1 = genParameter(i32Type);
+            auto p1 = genParameter(i32Type, "dyncast_this");
             beginFunction(udc.fnIdx - 1, null);
             {
                 auto rv = genTemporary(i32Type);
@@ -3917,11 +3917,19 @@ static if (is(BCGen))
             if (v)
             {
 				long index = -1;
+
                 if (var.type.ty == Tarray || var.type.ty == Tsarray)
                 {
                     const elemSize = var.type.nextOf().size(Loc.init);
                     index = elemSize ? se.offset / elemSize : -1;
                 }
+				if (isBasicBCType(v.type))
+				{
+					// if we have a basic integarl type here
+					// then we can just take the address of it at offset zero
+					// CAUTION this may be wrong in some cases
+					index = 0;
+				}
                 else
                 {
 					if (var.type.ty == Tclass || var.type.ty == Tstruct)
@@ -3955,11 +3963,10 @@ static if (is(BCGen))
                     return ;
                 }
 */
-                bailout(v && _sharedCtfeState.size(v.type) < 4, "only addresses of 32bit values or less are supported for now: " ~ se.toString);
                 auto addr = genTemporary(i32Type);
                 Alloc(addr, imm32(align4(_sharedCtfeState.size(v.type))));
-                Store32(addr, v);
                 v.heapRef = BCHeapRef(addr);
+                StoreToHeapRef(v);
 
                 setVariable(vd, v);
                 // register as pointer and set the variable to pointer as well;
