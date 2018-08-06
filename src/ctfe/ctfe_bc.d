@@ -25,7 +25,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -1602,13 +1602,14 @@ Expression toExpression(const BCValue value, Type expressionType,
     else
         switch (expressionType.ty)
     {
-/*
+
+    // XXX: case Tenum was commented out .... why ????
     case Tenum:
         {
             result = toExpression(value, (cast(TypeEnum)expressionType).toBasetype);
         }
         break;
-*/
+
     case Tstruct:
         {
             auto sd = (cast(TypeStruct) expressionType).sym;
@@ -1744,7 +1745,7 @@ Expression toExpression(const BCValue value, Type expressionType,
         if (!result)
         {
             import std.stdio;
-            writeln("could not create expression");
+            writeln("could not create expression of type: ", cast(ENUMTY)expressionType.ty);
         }
     }
 
@@ -2672,8 +2673,17 @@ public:
 
             Add3(cvp, cvp, imm32(cv.offset));
 
-            auto var = genLocal(toBCType(vd.type), cast(string)vd.ident.toString);
+            auto bctype = toBCType(vd.type);
+            auto var = genLocal(bctype, cast(string)vd.ident.toString);
+
+            if (bctype.type == BCTypeEnum.Struct)
+            {
+                Comment("Allocate memory for struct_type");
+                Alloc(var, imm32(_sharedCtfeState.size(bctype)));
+            }
+
             var.heapRef = BCHeapRef(cvp);
+            LoadFromHeapRef(var);
             setVariable(vd, var);
             return var;
         }
