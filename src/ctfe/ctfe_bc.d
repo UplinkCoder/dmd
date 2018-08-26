@@ -5147,7 +5147,7 @@ static if (is(BCGen))
         else
             Alloc(ptr, imm32(typeSize), type);
 
-        if (isBasicBCType(type) && typeSize > 4)
+        if (isBasicBCType(type) && typeSize <= 4)
         {
             auto value = ne.arguments && ne.arguments.dim == 1 ? genExpr((*ne.arguments)[0]) : imm32(0);
             Store32(ptr, value.i32);
@@ -5188,7 +5188,7 @@ static if (is(BCGen))
         }
         else
         {
-            bailout("Can only new basic Types under <=4 bytes for now");
+            bailout("Can only new basic Types under <=4 bytes for now -- typeSize: " ~ typeSize.to!string);
         }
 
         // TODO do proper handling of the arguments to the newExp.
