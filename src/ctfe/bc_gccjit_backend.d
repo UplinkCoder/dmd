@@ -87,8 +87,8 @@ else
 
                 beginFunction(0);
 
-                auto t32_lo = genLocal(BCType(BCTypeEnum.i64), "t32_lo");
-                auto t32_hi = genLocal(BCType(BCTypeEnum.i64), "t32_hi");
+                auto t32_lo = genLocal(BCType(BCTypeEnum.i32), "t32_lo");
+                auto t32_hi = genLocal(BCType(BCTypeEnum.i32), "t32_hi");
                 auto t64_hi = genLocal(BCType(BCTypeEnum.i64), "t64_hi");
                 auto t64 = genLocal(BCType(BCTypeEnum.i64), "t64");
                 auto mem = genLocal(BCType(BCTypeEnum.i32), "mem");
@@ -483,10 +483,10 @@ else
         jblock[] blocks;
         blocks.length = functionCount*2 + 2;
         jrvalue fnIdx = gcc_jit_param_as_rvalue(dispParams[0]);
-        
-        auto skipFn_cnd_blk =
-            gcc_jit_function_new_block(dispaterFn, "skipFnCnd");
-	
+
+        jblock skipFn_cnd_blk =
+            gcc_jit_function_new_block(dispatcherFn, "skipFnCnd");
+
 
         foreach(int i, f; functions[0 .. functionCount])
         {
@@ -504,18 +504,19 @@ else
             );
 
         }
-
-        gcc_jit_block_end_with_conditional(skipFn_cnd_blk, currentLoc,
-            gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_EQ, rvalue(fnIdx), gcc_jit_context_new_rvalue_from_int(ctx, i32type, skipFn)),
-            blocks[0], blocks[functionCount*2 + 1]
-        );
+                //printf("%s\n", gcc_jit_object_get_debug_string(gcc_jit_location_as_object(currentLoc)));
 
         blocks[functionCount*2] = gcc_jit_function_new_block(dispatcherFn, "wrongFunctionPtrs");
         gcc_jit_block_end_with_return(blocks[functionCount*2], currentLoc, rvalue(imm32(-1)));
 
         blocks[functionCount*2 + 1] = gcc_jit_function_new_block(dispatcherFn, "setReturnValue");
-
         gcc_jit_block_end_with_return(blocks[functionCount*2 + 1], currentLoc, rvalue(imm32(0)));
+
+        gcc_jit_block_end_with_conditional(skipFn_cnd_blk, currentLoc,
+                gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_EQ, rvalue(fnIdx), gcc_jit_context_new_rvalue_from_int(ctx, i32type, skipFn)),
+                blocks[0], blocks[functionCount*2 + 1]
+        );
+
 
         foreach(int i; 0 .. functionCount)
         {
@@ -534,6 +535,7 @@ else
                 gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_EQ, rvalue(fnIdx), gcc_jit_context_new_rvalue_from_int(ctx, i32type, i)),
                 blocks[i2 + 1], blocks[i2 + 2]
             );
+                printf("%d", __LINE__);
             gcc_jit_block_end_with_jump(blocks[i2 + 1], currentLoc, blocks[functionCount*2 + 1]);
         }
 
@@ -821,7 +823,7 @@ else
 
     void Add3(BCValue result, BCValue lhs, BCValue rhs)
     {
-        assert(lhs.type == i32Type && rhs.type == i32Type);
+//        assert(lhs.type == i32Type && rhs.type == i32Type);
         assert(lhs.isStackValueOrParameter || lhs.vType == BCValueType.Immediate || lhs.vType == BCValueType.Immediate);
         assert(rhs.isStackValueOrParameter || rhs.vType == BCValueType.Immediate);
 
