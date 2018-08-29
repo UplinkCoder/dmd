@@ -1,17 +1,64 @@
-static immutable int[] four = [1, 2, 3, 4];
-
-<<<<<<< 75656c12a57cdc4f6b43df787295aea66221f7dc
-int fn()
+struct S
 {
-    return *(&four[2]);
-=======
-    auto last = &four[0] + (four.length - 1);
-    assert(last == &four[$ - 1]);
-    
-    return fn2(&four[0]) + *(&four[0]);
->>>>>>> Update currently failing
+    size_t[4] a = 1;
+    size_t[4] b = 4;
 }
 
-static assert(fn() == 3);
+S makeS()
+{
+    S s;
+    size_t i;
 
 
+    bool buildNext()
+    {
+        if (i < S.a.length + S.b.length)
+        {
+            if (i < S.a.length)
+            {
+                s.a[i] = i;
+            }
+            else
+            {
+                s.b[i - S.a.length] = i;
+            }
+
+            i++;
+            return true;
+        }
+        return false;
+    }
+
+    while(buildNext()) {}
+
+    return s;
+}
+
+pragma(msg, makeS());
+
+
+struct S2
+{
+  int x;
+  int[2] a;
+}
+
+S2 fn2()
+{
+    S2 s = S2.init;
+
+    void initS()
+    {
+        s.x = 1;
+        s.a[0] = 2;
+        s.a[1] = 3;
+    }
+
+    initS();
+    return s;
+}
+
+
+// pragma(msg, fn2());
+
+//static assert(fn2() == S2(1, [2, 3]));
