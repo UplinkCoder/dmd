@@ -514,7 +514,7 @@ else
 
         gcc_jit_block_end_with_conditional(skipFn_cnd_blk, currentLoc,
                 gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_EQ, rvalue(fnIdx), gcc_jit_context_new_rvalue_from_int(ctx, i32type, skipFn)),
-                blocks[0], blocks[functionCount*2 + 1]
+                blocks[functionCount*2 + 1], blocks[0]
         );
 
 
@@ -1171,6 +1171,7 @@ else
     void Ret(BCValue val)
     {
         gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueImm64Field), rvalue(val));
+        print_ptr(rvalue(val), "Retval");
         gcc_jit_block_end_with_return(block, currentLoc, rvalue(1));
     }
 
