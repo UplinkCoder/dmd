@@ -188,8 +188,8 @@ else
     jtype i64type;
     jtype u32type;
     jtype u64type;
-        jtype f23type;
-        jtype f52type;
+    jtype f23type;
+    jtype f52type;
 
     private void print_int(BCValue v)
     {
@@ -1171,7 +1171,6 @@ else
     void Ret(BCValue val)
     {
         gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueImm64Field), rvalue(val));
-        print_ptr(rvalue(val), "Retval");
         gcc_jit_block_end_with_return(block, currentLoc, rvalue(1));
     }
 
