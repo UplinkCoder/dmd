@@ -169,6 +169,8 @@ pure:
 
     string toCode(BCValue v) pure const
     {
+        string valueString;
+
         if (v.type.type == BCTypeEnum.Char)
             v = v.i32;
         else if (v.type.type == BCTypeEnum.string8)
@@ -199,29 +201,30 @@ pure:
 
         if (v.vType == BCValueType.StackValue)
         {
-            return "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
+            valueString = "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
         }
         else if (v.vType == BCValueType.Parameter)
         {
-            return "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
+            valueString = "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
         }
         else if (v.vType == BCValueType.Local)
         {
-            return "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
+            valueString = "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
         }
         else if (v.vType == BCValueType.Immediate)
         {
-            return to!string(v.imm32.imm32);
+            valueString = to!string(v.imm32.imm32);
         }
         else if (v.vType == BCValueType.Error)
         {
-            return to!string(v.imm32.imm32);
-
+            valueString = to!string(v.imm32.imm32);
         }
         else
         {
             assert(0, "unsupported " ~ to!string(v.vType));
         }
+
+        return valueString; 
     }
 
     BCAddr beginJmp()
