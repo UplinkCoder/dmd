@@ -265,6 +265,7 @@ struct CompiledCtfeFunction
             alias visit = super.visit;
         public:
             CompiledCtfeFunction* ccf;
+            bool hasErrors = false; /// Tree has hasErrors
 
             extern (D) this(CompiledCtfeFunction* ccf)
             {
@@ -286,7 +287,7 @@ struct CompiledCtfeFunction
                     return;
                 }
                 .error(e.loc, "CTFE internal error: ErrorExp in %s\n", ccf.func ? ccf.func.loc.toChars() : ccf.callingloc.toChars());
-                assert(0);
+                hasErrors = true;
             }
 
             override void visit(DeclarationExp e)
@@ -750,6 +751,18 @@ private Expression interpret(FuncDeclaration fd, InterState* istate, Expressions
     // CTFE-compile the function
     if (!fd.ctfeCode)
         ctfeCompile(fd);
+
+     // try bc-evaluator if the interpreter has not already begun
+    if (!istate && !thisarg && !fd.needThis && !fd.isNested)
+    {
+        import dmd.ctfe.ctfe_bc;
+        assert(!thisarg);
+        if (auto e = evaluateFunction(fd, arguments))
+        {
+            return e;
+        }
+    }
+
 
     Type tb = fd.type.toBasetype();
     assert(tb.ty == Tfunction);

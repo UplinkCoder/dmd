@@ -213,7 +213,7 @@ CXXFLAGS += \
 endif
 DFLAGS := -version=MARS $(PIC)
 # Enable D warnings
-DFLAGS += -w -de
+DFLAGS += 
 
 ifneq (,$(DEBUG))
 ENABLE_DEBUG := 1
@@ -278,8 +278,6 @@ endif
 endif
 
 
-######## DMD frontend source files
-
 FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argtypes arrayop	\
 	arraytypes astcodegen attrib builtin canthrow clone complex cond constfold		\
 	cppmangle cppmanglewin ctfeexpr dcast dclass declaration delegatize denum dimport	\
@@ -288,7 +286,9 @@ FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argt
 	hdrgen id impcnvtab imphint init initsem inline inlinecost intrange	\
 	json lib link mars mtype nogc nspace objc opover optimize parse permissivevisitor sapply templateparamsem	\
 	semantic sideeffect statement staticassert target typesem traits transitivevisitor parsetimevisitor visitor	\
-	typinf utils statement_rewrite_walker statementsem staticcond safe blockexit printast))
+	typinf utils statement_rewrite_walker statementsem staticcond safe blockexit printast \
+    asttypename \
+	ctfe/ctfe_bc ctfe/bc ctfe/bc_common ctfe/bc_limits ctfe/bc_test ctfe/bc_printer_backend))
 
 LEXER_SRCS=$(addsuffix .d, $(addprefix $D/, console entity errors globals id identifier lexer tokens utf))
 
