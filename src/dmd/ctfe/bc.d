@@ -1221,6 +1221,7 @@ pure:
         assert(result.vType == BCValueType.Unknown
             || isStackValueOrParameter(result),
             "The result for this must be Empty or a StackValue not: " ~ to!string(result.vType));
+
         if (lhs.vType == BCValueType.Immediate)
         {
             lhs = pushOntoStack(lhs);
@@ -1306,6 +1307,14 @@ string printInstructions(const int* startInstructions, uint length, const string
         //pos += 4;
     }
 
+    string NameOrStackAddress(ushort addr)
+    {
+        return (stackMap ? 
+            localName(stackMap, addr) :
+            "SP[" ~ to!string(addr)~"]"
+        );
+    }
+
     result ~= "Length : " ~ to!string(length) ~ "\n";
     auto arr = startInstructions[0 .. length];
 
@@ -1329,359 +1338,359 @@ string printInstructions(const int* startInstructions, uint length, const string
         {
         case LongInst.SetHighImm:
             {
-                result ~= "SetHigh " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "SetHigh " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmSet:
             {
-                result ~= "Set " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Set " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmAdd:
             {
-                result ~= "Add " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Add " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmSub:
             {
-                result ~= "Sub " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Sub " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmMul:
             {
-                result ~= "Mul " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Mul " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmDiv:
             {
-                result ~= "Div " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Div " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmAnd:
             {
-                result ~= "And " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "And " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmAnd32:
             {
-                result ~= "And32 " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "And32 " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmOr:
             {
-                result ~= "Or " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Or " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmXor:
             {
-                result ~= "Xor " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Xor " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmXor32:
             {
-                result ~= "Xor32 " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Xor32 " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmLsh:
             {
-                result ~= "Lsh " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Lsh " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmRsh:
             {
-                result ~= "Rsh " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Rsh " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmMod:
             {
-                result ~= "Mod " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Mod " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmEq:
             {
-                result ~= "Eq " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Eq " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmNeq:
             {
-                result ~= "Neq " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Neq " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmLt:
             {
-                result ~= "Lt " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Lt " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmGt:
             {
-                result ~= "Gt " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Gt " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmLe:
             {
-                result ~= "Le " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Le " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
         case LongInst.ImmGe:
             {
-                result ~= "Ge " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Ge " ~ NameOrStackAddress(lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
             }
             break;
 
         case LongInst.Add:
             {
-                result ~= "Add " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Add " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Sub:
             {
-                result ~= "Sub " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Sub " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Mul:
             {
-                result ~= "Mul " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Mul " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Div:
             {
-                result ~= "Div " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Div " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Mod:
             {
-                result ~= "Mod " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Mod " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.And:
             {
-                result ~= "And " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "And " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.And32:
             {
-                result ~= "And32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "And32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Or:
             {
-                result ~= "Or " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Or " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Xor:
             {
-                result ~= "Xor " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Xor " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Xor32:
             {
-                result ~= "Xor32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Xor32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Lsh:
             {
-                result ~= "Lsh " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Lsh " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Rsh:
             {
-                result ~= "Rsh " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Rsh " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
 
         case LongInst.FEq32:
             {
-                result ~= "FEq32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FEq32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FNeq32:
             {
-                result ~= "FNeq32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FNeq32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FLt32:
             {
-                result ~= "FLt32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FLt32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FLe32:
             {
-                result ~= "FLe32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FLe32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FGt32:
             {
-                result ~= "FGt32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FGt32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FGe32:
             {
-                result ~= "FGe32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FGe32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.F32ToF64:
             {
-                result ~= "F32ToF64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "F32ToF64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.F32ToI:
             {
-                result ~= "F32ToI " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "F32ToI " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.IToF32:
             {
-                result ~= "IToF32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "IToF32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FAdd32:
             {
-                result ~= "FAdd32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FAdd32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FSub32:
             {
-                result ~= "FSub32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FSub32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FMul32:
             {
-                result ~= "FMul32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FMul32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FDiv32:
             {
-                result ~= "FDiv32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FDiv32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FMod32:
             {
-                result ~= "FMod32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FMod32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
 
         case LongInst.FEq64:
             {
-                result ~= "FEq64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FEq64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FNeq64:
             {
-                result ~= "FNeq64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FNeq64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FLt64:
             {
-                result ~= "FLt64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FLt64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FLe64:
             {
-                result ~= "FLe64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FLe64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FGt64:
             {
-                result ~= "FGt64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FGt64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FGe64:
             {
-                result ~= "FGe64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FGe64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.F64ToF32:
             {
-                result ~= "F64ToF32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "F64ToF32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.F64ToI:
             {
-                result ~= "F64ToI " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "F64ToI " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.IToF64:
             {
-                result ~= "IToF64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "IToF64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FAdd64:
             {
-                result ~= "FAdd64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FAdd64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FSub64:
             {
-                result ~= "FSub64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FSub64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FMul64:
             {
-                result ~= "FMul64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FMul64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FDiv64:
             {
-                result ~= "FDiv64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FDiv64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.FMod64:
             {
-                result ~= "FMod64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "FMod64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
 
         case LongInst.Assert:
             {
-                result ~= "Assert " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", ErrNo #" ~  to!string(hi) ~ "\n";
+                result ~= "Assert " ~ NameOrStackAddress(lw >> 16) ~ ", ErrNo #" ~  to!string(hi) ~ "\n";
             }
             break;
         case LongInst.StrEq:
             {
-                result ~= "StrEq " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "StrEq " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Eq:
             {
-                result ~= "Eq " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Eq " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Neq:
             {
-                result ~= "Neq " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Neq " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
 
         case LongInst.Set:
             {
-                result ~= "Set " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Set " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
 
         case LongInst.Lt:
             {
-                result ~= "Lt " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Lt " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Gt:
             {
-                result ~= "Gt " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Gt " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Le:
             {
-                result ~= "Le " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Le " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Ge:
             {
-                result ~= "Ge " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Ge " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
 
@@ -1704,21 +1713,21 @@ string printInstructions(const int* startInstructions, uint length, const string
 
         case LongInst.JmpNZ:
             {
-                result ~= "JmpNZ " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", &" ~ to!string(
+                result ~= "JmpNZ " ~ NameOrStackAddress(lw >> 16) ~ ", &" ~ to!string(
                     (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
             }
             break;
 
         case LongInst.JmpZ:
             {
-                result ~= "JmpZ " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ ", &" ~ to!string(
+                result ~= "JmpZ " ~ NameOrStackAddress(lw >> 16) ~ ", &" ~ to!string(
                     (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
             }
             break;
 
         case LongInst.HeapLoad32:
             {
-                result ~= "HeapLoad32 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", HEAP[" ~ localName(stackMap, hi >> 16) ~  "]\n";
+                result ~= "HeapLoad32 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", HEAP[" ~ localName(stackMap, hi >> 16) ~  "]\n";
             }
             break;
 
@@ -1730,31 +1739,30 @@ string printInstructions(const int* startInstructions, uint length, const string
 
         case LongInst.HeapLoad64:
             {
-                result ~= "HeapLoad64 " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)) ~ "], HEAP[SP[" ~ to!string(
-                    hi >> 16) ~ "]]\n";
+                result ~= "HeapLoad64 " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", HEAP[" ~ NameOrStackAddress(hi >> 16) ~ "]";
             }
             break;
 
         case LongInst.HeapStore64:
             {
-                result ~= "HeapStore64 HEAP[" ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ "], " ~ localName(stackMap, hi >> 16) ~ "\n";
+                result ~= "HeapStore64 HEAP[" ~ NameOrStackAddress(hi & 0xFFFF) ~ "], " ~ localName(stackMap, hi >> 16) ~ "\n";
             }
             break;
 /*
         case LongInst.ExB:
             {
-                result ~= "ExB " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "ExB " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
 */
         case LongInst.Ret32:
             {
-                result ~= "Ret32 " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ " \n";
+                result ~= "Ret32 " ~ NameOrStackAddress(lw >> 16) ~ " \n";
             }
             break;
         case LongInst.Ret64:
             {
-                result ~= "Ret64 " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ " \n";
+                result ~= "Ret64 " ~ NameOrStackAddress(lw >> 16) ~ " \n";
             }
             break;
         case LongInst.RelJmp:
@@ -1764,28 +1772,28 @@ string printInstructions(const int* startInstructions, uint length, const string
             break;
         case LongInst.Prt:
             {
-                result ~= "Prt " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ " \n";
+                result ~= "Prt " ~ NameOrStackAddress(lw >> 16) ~ " \n";
             }
             break;
         case LongInst.Not:
             {
-                result ~= "Not " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ " \n";
+                result ~= "Not " ~ NameOrStackAddress(lw >> 16) ~ " \n";
             }
             break;
 
         case LongInst.Flg:
             {
-                result ~= "Flg " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ " \n";
+                result ~= "Flg " ~ NameOrStackAddress(lw >> 16) ~ " \n";
             }
             break;
         case LongInst.Call:
             {
-                result ~= "Call " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Call " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Cat:
             {
-                result ~= "Cat " ~ localName(stackMap, lw >> 16) ~ ", " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ ", " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Cat " ~ localName(stackMap, lw >> 16) ~ ", " ~ NameOrStackAddress(hi & 0xFFFF) ~ ", " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.BuiltinCall:
@@ -1795,12 +1803,12 @@ string printInstructions(const int* startInstructions, uint length, const string
             break;
         case LongInst.Alloc:
             {
-                result ~= "Alloc " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ " " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ "\n";
+                result ~= "Alloc " ~ NameOrStackAddress(hi & 0xFFFF) ~ " " ~ NameOrStackAddress(hi >> 16) ~ "\n";
             }
             break;
         case LongInst.MemCpy:
             {
-                result ~= "MemCpy " ~ (stackMap ? localName(stackMap, hi & 0xFFFF) : "SP[" ~ to!string(hi & 0xFFFF)~"]" ) ~ " " ~ (stackMap ? localName(stackMap, hi >> 16) : "SP[" ~ to!string(hi >> 16)~"]" ) ~ " " ~ (stackMap ? localName(stackMap, lw >> 16) : "SP[" ~ to!string(lw >> 16)~"]" ) ~ "\n";
+                result ~= "MemCpy " ~ NameOrStackAddress(hi & 0xFFFF) ~ " " ~ NameOrStackAddress(hi >> 16) ~ " " ~ NameOrStackAddress(lw >> 16) ~ "\n";
             }
             break;
         case LongInst.Comment:
