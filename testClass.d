@@ -2,8 +2,8 @@ class B {}
 
 class C : B
 {
-  int _i;
-  int i() {return (_i = 1, _i); }
+  int _i = 1;
+  int i() {return ( _i); }
 }
 
 class D : C
