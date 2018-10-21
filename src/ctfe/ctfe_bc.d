@@ -1000,7 +1000,10 @@ struct SharedCtfeState(BCGenT)
         {
             auto _size = _sharedCtfeState.size(structType.memberTypes[i]);
             auto endOffset = offset + _size;
-            if (init.length == _size) result[offset .. endOffset] = init[0 .. _size];
+
+            if (init.length == _size)
+                result[offset .. endOffset] = init[0 .. _size];
+
             offset = endOffset;
         }
 
@@ -1052,6 +1055,7 @@ struct SharedCtfeState(BCGenT)
 
         _sharedCtfeState.errorCount = 0;
         _sharedCtfeState.arrayCount = 0;
+        _sharedCtfeState.structCount = 0;
         _sharedCtfeState.sliceCount = 0;
         _sharedCtfeState.pointerCount = 0;
         _sharedCtfeState.errorCount = 0;
@@ -1212,7 +1216,6 @@ struct SharedCtfeState(BCGenT)
         }
         else
         {
-            //debug (ctfe)
             assert(0, "SliceTypeArray overflowed");
         }
     }
@@ -3336,6 +3339,7 @@ public:
             }
 
             beginFunction(fnIdx - 1, cast(void*)fd);
+
             //TODO it seems that hasNstedFrameRefs does not work transitively!
             if (fd.closureVars.dim)
                 allocateAndLinkClosure(fd);
@@ -7384,8 +7388,10 @@ static if (is(BCGen))
                 // here the "gen." is needed although it should be found via
                 // alias this
                 //TODO investiage bug!
+                auto vd = cast(VarDeclaration) cv;
                 gen.Add3(closureptr_offset, closureChain, imm32(offset));
-                BCValue var = getVariable(cast(VarDeclaration) cv);
+                BCValue var = getVariable(vd);
+                printf("Generating Store-Back for %s\n", vd.toChars());
                 var.heapRef = BCHeapRef(closureptr_offset);
                 StoreToHeapRef(var);
             }
