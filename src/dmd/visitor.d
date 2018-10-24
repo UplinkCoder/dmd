@@ -10,12 +10,12 @@
 
 module dmd.visitor;
 
-import dmd.astcodegen;
-import dmd.parsetimevisitor;
-import dmd.tokens;
-import dmd.transitivevisitor;
-import dmd.expression;
-import dmd.root.rootobject;
+public import dmd.astcodegen;
+public import dmd.parsetimevisitor;
+public import dmd.tokens;
+public import dmd.transitivevisitor;
+public import dmd.expression;
+public import dmd.root.rootobject;
 
 // Online documentation: https://dlang.org/phobos/dmd_visitor.html
 
