@@ -383,19 +383,21 @@ else
     void Initialize()
     {
         import core.stdc.stdlib : malloc;
-        functionStates = (cast(FunctionState*)malloc(265*FunctionState.sizeof))[0 .. 265];
+        functionStates = (cast(FunctionState*)malloc(256*FunctionState.sizeof))[0 .. 256];
         ctx = gcc_jit_context_acquire();
+
         u32type = gcc_jit_context_get_int_type(ctx, 4, 0);
         u64type = gcc_jit_context_get_int_type(ctx, 8, 0);
-        i32type =  gcc_jit_context_get_int_type(ctx, 4, 1);//gcc_jit_context_get_int_type(ctx, 32, 1);
+        i32type = gcc_jit_context_get_int_type(ctx, 4, 1);
         i64type = gcc_jit_context_get_int_type(ctx, 8, 1);
-                f23type = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
-                f52type = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_DOUBLE);
+
+        f23type = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+        f52type = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_DOUBLE);
 
         paramArrayType = gcc_jit_context_new_array_type(ctx, currentLoc, i64type, max_params);
 
         jfield[2] fields;
-        fields[0]  = returnValueImm64Field = gcc_jit_context_new_field(ctx, null, i64type, "imm64");
+        fields[0] = returnValueImm64Field = gcc_jit_context_new_field(ctx, null, i64type, "imm64");
         fields[1] = returnValueTypeField = gcc_jit_context_new_field(ctx, null, u32type, "type");
         returnType_struct = gcc_jit_context_new_struct_type(ctx, null, "returnType", 2, &fields[0]);
         returnType = gcc_jit_struct_as_type(returnType_struct);
