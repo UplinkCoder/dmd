@@ -2,8 +2,8 @@ class B {}
 
 class C : B
 {
-  int _i = 1;
-  int i() {return ( _i); }
+  int _i = 2;
+  int i() {return ( 1); }
 }
 
 class D : C
@@ -32,7 +32,7 @@ int testClassStuff ()
   D e = new E();
   assert(cast(int)e.f() == 2);
   assert(c2 is c2, "Identity is broken ?");
-//  assert((cast(D)c3), "Dynamic cast not working");
+  assert((cast(D)c3), "Dynamic cast not working");
   assert(!(cast(E)c2), "Dynamic cast not working");
   assert((cast(C)b1), "Dynamic cast not working");
 
