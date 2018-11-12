@@ -2606,7 +2606,12 @@ public:
             _this = genParameter(toBCType(me.vthis.type), "thisPtr");
             setVariable(me.vthis, _this);
         }
-        if (me.isNested())
+
+        // BUG? checking  me.isClassDeclaration
+        // is need because isNested() on ClassDecls
+        // can fail, messing the state up
+
+        if ((!me.isClassDeclaration) && me.isNested())
         {
             closureChain = genParameter(i32Type, "closureChain");
             // D's closure has no type
