@@ -2608,8 +2608,8 @@ public:
         }
 
         // BUG? checking  me.isClassDeclaration
-        // is need because isNested() on ClassDecls
-        // can fail, messing the state up
+        // is need because we are casting a ClassDecl
+        // into a FuncDecl, for ctor generation
 
         if ((!me.isClassDeclaration) && me.isNested())
         {
