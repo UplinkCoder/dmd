@@ -45,7 +45,6 @@ enum BCBlockJumpTarget
 
 enum GenExprFlags
 {
-
     None,
     customBoolFixup = 0x1,
     asAddress = 0x2,
@@ -4983,7 +4982,6 @@ static if (is(BCGen))
             }
 
             offset += align4(_sharedCtfeState.size(elexpr.type, true));
-
         }
 
         retval = structVal;
@@ -5051,7 +5049,6 @@ static if (is(BCGen))
         {
             writeln("ThisExp", te.toString);
             writeln("te.var:", te.var ? te.var.toString : "null");
-
         }
 
         retval = _this;
@@ -5594,10 +5591,6 @@ static if (is(BCGen))
         }
         else if (fd)
         {
-
-        }
-        else if (fd)
-        {
             retval = imm32(_sharedCtfeState.getFunctionIndex(fd));
             retval.type.type = BCTypeEnum.Function;
         }
@@ -5738,15 +5731,13 @@ static if (is(BCGen))
             {
                 Alloc(var.i32, imm32(SliceDescriptor.Size));
             }
-
-           else if (type.type == BCTypeEnum.Array)
-           {
+            else if (type.type == BCTypeEnum.Array)
+            {
                 Alloc(var.i32, imm32(_sharedCtfeState.size(type)), type);
                 assert(type.typeIndex);
                 auto arrayType = _sharedCtfeState.arrayTypes[type.typeIndex - 1];
                 setArraySliceDesc(var, arrayType);
             }
-
         }
 
         setVariable(vd, var);
@@ -5989,7 +5980,8 @@ static if (is(BCGen))
             retval.type.type = BCTypeEnum.f52;
         }
         else
-            bailout("RealExp unsupported");
+            bailout("RealExp of type " ~ enumToString(cast(ENUMTY)re.type.ty)
+                ~ " unsupported");
     }
 
     override void visit(ComplexExp ce)
