@@ -76,7 +76,7 @@ struct Print_BCGen
 
     @property string functionSuffix()
     {
-        return currentFunctionStateNumber > 0 ? "_fn_" ~ to!string(currentFunctionStateNumber) : "";
+        return currentFunctionStateNumber > 0 ? "_fn_" ~ itos(currentFunctionStateNumber) : "";
     }
 
     alias currentFunctionState this;
@@ -109,13 +109,13 @@ struct Print_BCGen
 
     string print(BCLabel label)
     {
-        return ("label" ~ to!string(label.addr.addr));
+        return ("label" ~ itos(label.addr.addr));
     }
 
     string print(BCType type)
     {
-        return "BCType(BCTypeEnum." ~ to!string(type.type) ~ (
-            isBasicBCType(type) ? ")" : (", " ~ to!string(type.typeIndex) ~ ")"));
+        return "BCType(BCTypeEnum." ~ enumToString(type.type) ~ (
+            isBasicBCType(type) ? ")" : (", " ~ itos(type.typeIndex) ~ ")"));
     }
 
     string print(BCValue val)
@@ -128,19 +128,25 @@ struct Print_BCGen
             {
                 if (val.type.type == BCTypeEnum.i32)
                 {
-                    result ~= "Imm32(" ~ to!string(val.imm32.imm32) ~ ")";
+                    result ~= "Imm32(" ~ itos(val.imm32.imm32) ~ ")";
                 }
                 else if (val.type.type == BCTypeEnum.i64)
                 {
-                    result ~= "Imm64(" ~ to!string(val.imm64.imm64) ~ ")";
+                    result ~= "Imm64(" ~ 
+                        ((cast(ulong)val.imm64.imm64 <= uint.max) 
+                            ? itos(val.imm64.imm64 & uint.max) 
+                            : itos(val.imm64.imm64 & uint.max) ~ " | (" ~
+                                itos(val.imm64.imm64 >> 32) ~" << 32)" 
+                        )
+                    ~ ")";
                 }
                 else if (val.type.type == BCTypeEnum.f23)
                 {
-                    result ~= "Imm23f(" ~ to!string(*cast(float*)&val.imm32.imm32) ~ ")";
+                    result ~= "Imm23f(" ~ floatToString(*cast(float*)&val.imm32.imm32) ~ ")";
                 }
                 else if (val.type.type == BCTypeEnum.f52)
                 {
-                    result ~= "Imm52f(" ~ to!string(*cast(double*)&val.imm64.imm64) ~ ")";
+                    result ~= "Imm52f(" ~ doubleToString(*cast(double*)&val.imm64.imm64) ~ ")";
                 }
                 else if (val.type.type == BCTypeEnum.Null)
                 {
@@ -148,11 +154,11 @@ struct Print_BCGen
                 }
                 else if (val.type.type == BCTypeEnum.Array)
                 {
-                    result ~= "Imm32(" ~ to!string(val.imm32.imm32) ~ "/*Array*/)";
+                    result ~= "Imm32(" ~ itos(val.imm32.imm32) ~ "/*Array*/)";
                 }
                 else
                 {
-                    assert(0, "Unexpected Immediate of Type" ~ to!string(val.type.type));
+                    assert(0, "Unexpected Immediate of Type" ~ enumToString(val.type.type));
                 }
             }
             break;

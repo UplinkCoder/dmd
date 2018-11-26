@@ -96,7 +96,7 @@ bool test(BCGenT)()
 
         with (gen)
         {
-            auto p1 = genParameter(BCType(BCTypeEnum.Char)); //SP[4]
+            auto p1 = genParameter(BCType(BCTypeEnum.c8)); //SP[4]
             beginFunction();
             auto jmp1 = beginJmp();
             auto label1 = genLabel();

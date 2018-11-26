@@ -171,7 +171,7 @@ pure:
     {
         string valueString;
 
-        if (v.type.type == BCTypeEnum.Char)
+        if (v.type.type == BCTypeEnum.c8)
             v = v.i32;
         else if (v.type.type == BCTypeEnum.string8)
             v = v.i32;
