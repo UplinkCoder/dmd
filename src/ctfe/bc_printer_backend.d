@@ -36,8 +36,6 @@ struct ErrorInfo
 
 struct Print_BCGen
 {
-    import std.conv;
-
     struct FunctionState
     {
         uint cndJumpCount;
@@ -167,26 +165,26 @@ struct Print_BCGen
             {
                 if (val.tmpIndex)
                 {
-                    return "tmp" ~ to!string(val.tmpIndex) ~ functionSuffix;
+                    return "tmp" ~ itos(val.tmpIndex) ~ functionSuffix;
                 }
-                result ~= "StackAddr(" ~ to!string(val.stackAddr.addr) ~ "), " ~ print(val.type);
+                result ~= "StackAddr(" ~ itos(val.stackAddr.addr) ~ "), " ~ print(val.type);
             }
             break;
         case BCValueType.Local :
-            auto name = val.name ? val.name ~ "_" ~ to!string(val.localIndex) : "local" ~ to!string(val.localIndex);
+            auto name = val.name ? val.name ~ "_" ~ itos(val.localIndex) : "local" ~ itos(val.localIndex);
             return name ~ functionSuffix;
 
         case BCValueType.Temporary:
             {
-                return "tmp" ~ to!string(val.tmpIndex) ~ functionSuffix;
+                return "tmp" ~ itos(val.tmpIndex) ~ functionSuffix;
             }
         case BCValueType.Parameter:
             {
-                return (val.name ? val.name : "p") ~ "_" ~ to!string(val.paramIndex) ~ functionSuffix;
+                return (val.name ? val.name : "p") ~ "_" ~ itos(val.paramIndex) ~ functionSuffix;
             }
         case BCValueType.Error:
             {
-                string _result = "Imm32(" ~ to!string(val.imm32) ~ ") /*";
+                string _result = "Imm32(" ~ itos(val.imm32) ~ ") /*";
                 if (val.imm32)
                 {
                     auto eInfo = errorInfos[val.imm32 - 1];
@@ -204,7 +202,7 @@ struct Print_BCGen
                 return "BCValue.init";
             }
         default:
-            assert(0, "printing for " ~ to!string(val.vType) ~ " unimplemented ");
+            assert(0, "printing for " ~ enumToString(val.vType) ~ " unimplemented ");
         }
 
         result ~= ")";
@@ -224,7 +222,7 @@ struct Print_BCGen
         {
             result ~= indent ~ "//";
         }
-        result ~= "auto label" ~ to!string(labelCount) ~ " = genLabel();\n";
+        result ~= "auto label" ~ itos(labelCount) ~ " = genLabel();\n";
         return BCLabel(BCAddr(labelCount));
     }
 
@@ -237,7 +235,7 @@ struct Print_BCGen
 
     StackAddr currSp()
     {
-        result ~= indent ~ "//currSp();//SP[" ~ to!string(sp.addr) ~ "]\n";
+        result ~= indent ~ "//currSp();//SP[" ~ itos(sp.addr) ~ "]\n";
         return sp;
     }
 
@@ -262,7 +260,7 @@ struct Print_BCGen
 //        assert(!insideFunction);
         insideFunction = true;
         auto fd = *(cast(FuncDeclaration*) &fnDecl);
-        result ~= indent ~ "beginFunction(" ~ to!string(f) ~ ");//" ~ (fd && fd.ident ? fd.toChars.fromStringz : "(nameless)") ~ "\n";
+        result ~= indent ~ "beginFunction(" ~ itos(f) ~ ");//" ~ (fd && fd.ident ? fd.toChars.fromStringz : "(nameless)") ~ "\n";
         incIndent();
     }
 
@@ -284,8 +282,8 @@ struct Print_BCGen
             result ~= "\n";
         }
         name =  name ? name : "p";
-        result ~= indent ~ "auto " ~ name ~ "_" ~ to!string(++parameterCount) ~ functionSuffix ~ " = genParameter(" ~ print(
-            bct) ~ ");//SP[" ~ to!string(sp) ~ "]\n";
+        result ~= indent ~ "auto " ~ name ~ "_" ~ itos(++parameterCount) ~ functionSuffix ~ " = genParameter(" ~ print(
+            bct) ~ ");//SP[" ~ itos(sp) ~ "]\n";
         //currentFunctionStateNumber--;
         sp += 4;
         auto p = BCValue(BCParameter(parameterCount, bct));
@@ -299,8 +297,8 @@ struct Print_BCGen
         auto tmpAddr = sp.addr;
         sp += isBasicBCType(bct) ? align4(basicTypeSize(bct.type)) : 4;
 
-        result ~= indent ~ "auto tmp" ~ to!string(++temporaryCount) ~ functionSuffix ~ " = genTemporary(" ~ print(
-            bct) ~ ");//SP[" ~ to!string(tmpAddr) ~ "]\n";
+        result ~= indent ~ "auto tmp" ~ itos(++temporaryCount) ~ functionSuffix ~ " = genTemporary(" ~ print(
+            bct) ~ ");//SP[" ~ itos(tmpAddr) ~ "]\n";
         return BCValue(StackAddr(tmpAddr), bct, temporaryCount);
     }
 
@@ -310,10 +308,10 @@ struct Print_BCGen
         auto localAddr = sp.addr;
         sp += isBasicBCType(bct) ? align4(basicTypeSize(bct.type)) : 4;
 
-        auto localName = name ? name ~ "_" ~ to!string(++localCount) : "local" ~ to!string(++localCount);
+        auto localName = name ? name ~ "_" ~ itos(++localCount) : "local" ~ itos(++localCount);
 
         result ~= indent ~ "auto " ~ localName ~ functionSuffix ~ " = genLocal(" ~ print(
-            bct) ~ ", \"" ~ (name ? name : "") ~ "\");//SP[" ~ to!string(localAddr) ~ "]\n";
+            bct) ~ ", \"" ~ (name ? name : "") ~ "\");//SP[" ~ itos(localAddr) ~ "]\n";
         return BCValue(StackAddr(localAddr), bct, localCount, name);
     }
 
@@ -321,14 +319,14 @@ struct Print_BCGen
     BCAddr beginJmp()
     {
         sameLabel = false;
-        result ~= indent ~ "auto jmp" ~ to!string(++jmpCount) ~ functionSuffix ~ " = beginJmp();\n";
+        result ~= indent ~ "auto jmp" ~ itos(++jmpCount) ~ functionSuffix ~ " = beginJmp();\n";
         return BCAddr(jmpCount);
     }
 
     void endJmp(BCAddr atIp, BCLabel target)
     {
         sameLabel = false;
-        result ~= indent ~ "endJmp(jmp" ~ to!string(atIp.addr) ~ functionSuffix ~ ", " ~ print(target) ~ functionSuffix ~ ");\n";
+        result ~= indent ~ "endJmp(jmp" ~ itos(atIp.addr) ~ functionSuffix ~ ", " ~ print(target) ~ functionSuffix ~ ");\n";
     }
 
     void genJump(BCLabel target)
@@ -340,7 +338,7 @@ struct Print_BCGen
     CndJmpBegin beginCndJmp(BCValue cond = BCValue.init, bool ifTrue = false)
     {
         sameLabel = false;
-        result ~= indent ~ "auto cndJmp" ~ to!string(++cndJumpCount) ~ functionSuffix ~ " = beginCndJmp(" ~ (
+        result ~= indent ~ "auto cndJmp" ~ itos(++cndJumpCount) ~ functionSuffix ~ " = beginCndJmp(" ~ (
             cond ? (print(cond) ~ (ifTrue ? ", true" : "")) : "") ~ ");\n";
         return CndJmpBegin(BCAddr(cndJumpCount), cond, ifTrue);
     }
@@ -348,7 +346,7 @@ struct Print_BCGen
     void endCndJmp(CndJmpBegin jmp, BCLabel target)
     {
         sameLabel = false;
-        result ~= indent ~ "endCndJmp(cndJmp" ~ to!string(jmp.at.addr) ~ ", " ~ print(target) ~ ");\n";
+        result ~= indent ~ "endCndJmp(cndJmp" ~ itos(jmp.at.addr) ~ ", " ~ print(target) ~ ");\n";
     }
 
     void emitFlg(BCValue lhs)
@@ -523,7 +521,7 @@ struct Print_BCGen
     void Cat(BCValue _result, BCValue lhs, BCValue rhs, const uint elmSize)
     {
         sameLabel = false;
-        result ~= indent ~ "Cat(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ", " ~ to!string(
+        result ~= indent ~ "Cat(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ", " ~ itos(
             elmSize) ~ ");\n";
     }
 
@@ -554,7 +552,7 @@ struct Print_BCGen
 
     void Line(uint line)
     {
-        result ~= indent ~ "Line(" ~ to!string(line) ~ ");\n";
+        result ~= indent ~ "Line(" ~ itos(line) ~ ");\n";
     }
 
     void IToF32(BCValue _result, BCValue value)
