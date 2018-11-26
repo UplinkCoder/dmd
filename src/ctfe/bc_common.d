@@ -66,7 +66,7 @@ string enumToString(E)(E v)
 }
 
 
-const(uint) fastLog10(const uint val) pure nothrow @nogc
+const(uint) fastLog10(const uint val) pure nothrow @nogc @safe
 {
     return (val < 10) ? 0 : (val < 100) ? 1 : (val < 1000) ? 2 : (val < 10000) ? 3
         : (val < 100000) ? 4 : (val < 1000000) ? 5 : (val < 10000000) ? 6
@@ -78,7 +78,7 @@ static immutable fastPow10tbl = [
     1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
 ];
 
-string itos(const uint val) pure
+string itos(const uint val) pure @trusted nothrow
 {
     immutable length = fastLog10(val) + 1;
     char[] result;
@@ -95,6 +95,18 @@ string itos(const uint val) pure
 
 static assert(mixin(uint.max.itos) == uint.max);
 
+
+string floatToString(float f)
+{
+   import std.conv : to;
+   return f.to!string;
+}
+
+string doubleToString(double d)
+{
+   import std.conv : to;
+   return d.to!string;
+}
 
 const(uint) basicTypeSize(const BCTypeEnum bct) @safe pure
 {
@@ -195,7 +207,6 @@ enum BCTypeEnum : ubyte
     c8,
     c16,
     c32,
-    Char = c32,
     /// signed by default
     i8,
     /// DITTO

@@ -721,9 +721,9 @@ pure:
 
         BCTypeEnum commonType = commonTypeEnum(lhs.type.type, rhs.type.type);
 
-        // FIXME remove the lhs.type == BCTypeEnum.Char as soon as we convert correctly.
+        // FIXME Implement utf8 <-> utf32 conversion
         assert(commonType == BCTypeEnum.i32 || commonType == BCTypeEnum.i64
-            || commonType == BCTypeEnum.f23 || commonType == BCTypeEnum.Char
+            || commonType == BCTypeEnum.f23 || commonType == BCTypeEnum.c32
             || commonType == BCTypeEnum.c8  || commonType == BCTypeEnum.f52,
             "only i32, i64, f23, f52, is supported for now not: " ~ to!string(commonType));
         //assert(lhs.type.type == rhs.type.type, lhs.type.type.to!string ~ " != " ~ rhs.type.type.to!string);
@@ -3083,7 +3083,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     bailoutValue.vType = BCValueType.Bailout;
     return bailoutValue;
 
-    debug (cttfe)
+    debug (ctfe)
     {
         assert(0, "I would be surprised if we got here -- withBC: " ~ byteCode.printInstructions);
     }
