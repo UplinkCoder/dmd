@@ -5,11 +5,13 @@ import ddmd.declaration : FuncDeclaration, VarDeclaration, Declaration,
     SymbolDeclaration, STCref, CtorDeclaration;
 import ddmd.dsymbol;
 import ddmd.dstruct;
+import ddmd.dscope;
 import ddmd.dclass;
 import ddmd.init;
 import ddmd.mtype;
 import ddmd.statement;
 import ddmd.sideeffect;
+import ddmd.tokens;
 import ddmd.visitor;
 import ddmd.arraytypes : Expressions, VarDeclarations;
 import ddmd.root.rmem;
@@ -17,7 +19,6 @@ import ddmd.root.rmem;
  * Written By Stefan Koch in 2016-18
  */
 
-import std.conv : to;
 import core.stdc.stdio : printf;
 
 enum perf = 1;
@@ -25,7 +26,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -351,7 +352,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
     static if (perf)
     {
         hiw.stop();
-        writeln("Initializing heap took " ~ hiw.peek.usecs.to!string ~ " usecs");
+        writeln("Initializing heap took " ~ (cast(int)hiw.peek.usecs).itos ~ " usecs");
         isw.start();
     }
     __gshared static bcv = new BCV!BCGenT;
@@ -1272,8 +1273,8 @@ struct SharedCtfeState(BCGenT)
 
         if (sizeRecursionCount > 3000)
         {
-            writeln("Calling Size for (", type.type.to!string, ", ",
-                type.typeIndex.to!string, ")");
+            writeln("Calling Size for (" ~ enumToString(type.type) ~ ", "
+                ~ itos(type.typeIndex) ~ ")");
             //writeln(getTypeString(bct));
             return 0;
         }
@@ -1352,9 +1353,9 @@ struct SharedCtfeState(BCGenT)
         string result;
 
         result ~= "Dumping Type-State \n";
-        foreach(i, t;sliceTypes[0 .. sliceCount])
+        foreach(uint i, t;sliceTypes[0 .. sliceCount])
         {
-            result ~= to!string(i) ~ " : " ~ t.to!string;
+            result ~= itos(i) ~ " : " ~ t.toString;
         }
 /*
         foreach(i, t;_sharedCtfeState.structTypes[0 .. structCount])
@@ -1970,10 +1971,20 @@ extern (C++) final class BCTypeVisitor : Visitor
 
         auto st = sharedCtfeState.beginStruct(sd);
         bool died;
+        string reason;
+        VarDeclaration currentField;
         __gshared static bcv = new BCV!BCGenT; // TODO don't do this.
 
         addFieldLoop : foreach (mi, sMember; sd.fields)
         {
+            bool calledSemantic = false;
+            // keep track field which could be processed without problems
+            // in order to print out the field where stuff went wrong
+
+            assert(sMember.type);
+
+            if (!died) currentField = sMember;
+ 
             if (sMember.type.ty == Tstruct && (cast(TypeStruct) sMember.type).sym == sd)
                 assert(0, "recursive struct definition this should never happen");
 
@@ -1984,17 +1995,18 @@ extern (C++) final class BCTypeVisitor : Visitor
                 if (sMember.offset == f.offset)
                 {
                     died = true;
+                    reason = "Overlapping fields";
                     break addFieldLoop;
                 }
             }
-
 
             auto bcType = toBCType(sMember.type);
             if (!bcType.type)
             {
                 // if the memberType is invalid we abort!
                 died = true;
-                break;
+                reason = "BCType could not be generated for -- " ~ sMember.toString;
+                break addFieldLoop;
             }
             else if (sMember._init)
             {
@@ -2006,12 +2018,34 @@ extern (C++) final class BCTypeVisitor : Visitor
 
                     if(auto initExp = sMember._init.toExpression)
                     {
-                        if (!initExp.type)
+/+
+                        if (initExp.op == TOK.TOKarrayliteral)
+                        {
+                            // array literals as initalizers have may not have a type on themselves
+                            // we need to copy the literal and stick the type of sMember in
+
+                            auto cpy = initExp.copy();
+                            initExp = cpy;
+                        }
++/
+                        if(!initExp.type && !calledSemantic)
+                        {
+                            initExp.semantic(sMember._scope);
+                            calledSemantic = true;
+                        }
+
+                        if (!initExp.type && calledSemantic)
                         {
                             //("initExp.type is null:  " ~ initExp.toString);
                             died = true;
-                            break;//BCValue.init;
+                            import ddmd.asttypename;
+		            reason = "type " ~ initExp.type.toString ~ "could not be generated initExp: -- " ~ initExp.toString
+				~ " -- " ~ astTypeName(initExp) ~ " initExp.tok: " ~ enumToString(initExp.op); 
+                            break addFieldLoop;
+
                         }
+
+
 
 
                         auto initBCValue = bcv.genExpr(initExp);
@@ -2038,9 +2072,8 @@ extern (C++) final class BCTypeVisitor : Visitor
             }
             else
                 st.addField(bcType, false, []);
-
         }
-
+        assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ " " ~ reason);
         _sharedCtfeState.endStruct(&st, died);
         scope(exit) bcv.clear();
     }
@@ -2167,8 +2200,6 @@ extern (C++) final class BCV(BCGenT) : Visitor
             return BCType.init;
         }
     }
-
-    import ddmd.tokens;
 
     BCBlock[void* ] labeledBlocks;
     bool ignoreVoid;
