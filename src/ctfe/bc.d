@@ -725,8 +725,8 @@ pure:
         assert(commonType == BCTypeEnum.i32 || commonType == BCTypeEnum.i64
             || commonType == BCTypeEnum.f23 || commonType == BCTypeEnum.c32
             || commonType == BCTypeEnum.c8  || commonType == BCTypeEnum.f52,
-            "only i32, i64, f23, f52, is supported for now not: " ~ to!string(commonType));
-        //assert(lhs.type.type == rhs.type.type, lhs.type.type.to!string ~ " != " ~ rhs.type.type.to!string);
+            "only i32, i64, f23, f52, is supported for now not: " ~ enumToString(commonType));
+        //assert(lhs.type.type == rhs.type.type, lhs.type.type.to!string ~ " != " ~ enumToString(rhs.type.type));
 
         if (lhs.vType == BCValueType.Immediate)
         {
@@ -753,7 +753,7 @@ pure:
                 rhs = pushOntoStack(rhs);
             }
             else
-                assert(0, "did not expect type " ~ to!string(rhs.type.type) ~ "to be used in a float expression");
+                assert(0, "did not expect type " ~ enumToString(rhs.type.type) ~ "to be used in a float expression");
 
             if (inst != LongInst.Set)
                 inst += (LongInst.FAdd32 - LongInst.Add);
@@ -794,14 +794,14 @@ pure:
         }
         else
         {
-            assert(0, "Cannot handle: " ~ to!string(rhs.vType));
+            assert(0, "Cannot handle: " ~ enumToString(rhs.vType));
         }
     }
 
     void Set(BCValue lhs, BCValue rhs)
     {
         assert(isStackValueOrParameter(lhs), "Set lhs is has to be a StackValue. Not: " ~ enumToString(lhs.vType));
-        assert(rhs.vType == BCValueType.Immediate || isStackValueOrParameter(rhs), "Set rhs is has to be a StackValue or Imm not: " ~ rhs.vType.to!string);
+        assert(rhs.vType == BCValueType.Immediate || isStackValueOrParameter(rhs), "Set rhs is has to be a StackValue or Imm not: " ~ rhs.vType.enumToString);
 
         if (rhs.vType == BCValueType.Immediate && (rhs.type.type == BCTypeEnum.i64 || rhs.type.type == BCTypeEnum.f52))
         {
@@ -882,7 +882,7 @@ pure:
     {
         assert(result.vType == BCValueType.Unknown
             || isStackValueOrParameter(result),
-            "The result for this must be Empty or a StackValue not " ~ to!string(result.vType) );
+            "The result for this must be Empty or a StackValue not " ~ enumToString(result.vType) );
         emitArithInstruction(LongInst.Eq, lhs, rhs);
 
         if (isStackValueOrParameter(result))
@@ -1179,7 +1179,7 @@ pure:
         }
         else
         {
-                assert(0, "I cannot deal with this type of return" ~ to!string(val.vType));
+                assert(0, "I cannot deal with this type of return" ~ enumToString(val.vType));
         }
     }
 
@@ -2921,7 +2921,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
                 BCValue[32] callArgs = void;
 
-                foreach(i,ref arg;call.args)
+                foreach(int i,ref arg;call.args)
                 {
                     if(isStackValueOrParameter(arg))
                     {
@@ -2940,7 +2940,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                         import core.stdc.string : strlen;
                         const string fnString = cast(string)(cast(FuncDeclaration)functions[cast(size_t)(fn - 1)].funcDecl).ident.toString;
 
-                        assert(0, "Argument " ~ to!string(i) ~" ValueType unhandeled: " ~ to!string(arg.vType) ~"\n Calling Function: " ~ fnString ~ " from: " ~ call.loc.toChars[0 .. strlen(call.loc.toChars)]);
+                        assert(0, "Argument " ~ itos(i) ~" ValueType unhandeled: " ~ enumToString(arg.vType) ~"\n Calling Function: " ~ fnString ~ " from: " ~ call.loc.toChars[0 .. strlen(call.loc.toChars)]);
                     }
                 }
                 if (callDepth++ == 2000)
