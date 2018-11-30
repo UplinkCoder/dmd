@@ -6628,26 +6628,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                         else bailout("Storing to ptr which is not i8 or i32 is unsupported for now");
                      }
                 }
-                else if (lhs.type.type == BCTypeEnum.Struct && lhs.type == rhs.type)
-                {
-                    auto size = _sharedCtfeState.size(lhs.type).align4;
-                    if (size)
-                    {
-                        auto sizeImm32 = imm32(size);
-
-                        if (ae.op == TOKconstruct)
-                        {
-                            auto CJLhsIsNull = beginCndJmp(lhs.i32, true);
-                            Alloc(lhs.i32, sizeImm32);
-                            endCndJmp(CJLhsIsNull, genLabel());
-                        }
-
-
-                        MemCpy(lhs.i32, rhs.i32, sizeImm32);
-                    }
-                    else
-                        bailout("0-sized allocation in: " ~ ae.toString);
-                }
                 else if (lhs.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.c8]) && rhs.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.c8]))
                 {
                     Set(lhs.i32, rhs.i32);
@@ -6748,7 +6728,15 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     }
 
                     const structSize = _sharedCtfeState.size(lhs.type);
-                    Alloc(lhs.i32, imm32(structSize), lhs.type);
+                    const allocSize = structSize.align4;
+
+                    if (ae.op == TOKconstruct)
+                    {
+                        auto CJLhsIsNull = beginCndJmp(lhs.i32, true);
+                        Alloc(lhs.i32, imm32(allocSize), lhs.type);
+                        endCndJmp(CJLhsIsNull, genLabel());
+                    }
+
                     MemCpy(lhs.i32, rhs.i32, imm32(structSize));
                 }
                 else if (lhs.type.type == BCTypeEnum.Class && rhs.type.type == BCTypeEnum.Class)
