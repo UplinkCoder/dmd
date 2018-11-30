@@ -2,7 +2,6 @@ module ddmd.ctfe.bc;
 import ddmd.ctfe.bc_common;
 import ddmd.ctfe.bc_limits;
 import core.stdc.stdio;
-import std.conv;
 
 /**
  * Written By Stefan Koch in 2016/17
@@ -626,7 +625,7 @@ pure:
         BCValue _msg;
         if (isStackValueOrParameter(err))
         {
-            assert(0, "err.vType is not Error but: " ~ err.vType.to!string);
+            assert(0, "err.vType is not Error but: " ~ enumToString(err.vType));
         }
 
         if (value)
@@ -1052,8 +1051,8 @@ pure:
         {
             _to = pushOntoStack(_to);
         }
-        assert(isStackValueOrParameter(_to), "to has the vType " ~ to!string(_to.vType));
-        assert(isStackValueOrParameter(from), "from has the vType " ~ to!string(from.vType));
+        assert(isStackValueOrParameter(_to), "to has the vType " ~ enumToString(_to.vType));
+        assert(isStackValueOrParameter(from), "from has the vType " ~ enumToString(from.vType));
 
         emitLongInst(LongInst.HeapLoad32, _to.stackAddr, from.stackAddr);
     }
@@ -1070,8 +1069,8 @@ pure:
             _to = pushOntoStack(_to);
         }
 
-        assert(isStackValueOrParameter(_to), "to has the vType " ~ to!string(_to.vType));
-        assert(isStackValueOrParameter(value), "value has the vType " ~ to!string(value.vType));
+        assert(isStackValueOrParameter(_to), "to has the vType " ~ enumToString(_to.vType));
+        assert(isStackValueOrParameter(value), "value has the vType " ~ enumToString(value.vType));
 
         emitLongInst(LongInst.HeapStore32, _to.stackAddr, value.stackAddr);
     }
@@ -1086,8 +1085,8 @@ pure:
         {
             _to = pushOntoStack(_to);
         }
-        assert(isStackValueOrParameter(_to), "to has the vType " ~ to!string(_to.vType));
-        assert(isStackValueOrParameter(from), "from has the vType " ~ to!string(from.vType));
+        assert(isStackValueOrParameter(_to), "to has the vType " ~ enumToString(_to.vType));
+        assert(isStackValueOrParameter(from), "from has the vType " ~ enumToString(from.vType));
 
         emitLongInst(LongInst.HeapLoad64, _to.stackAddr, from.stackAddr);
     }
@@ -1104,8 +1103,8 @@ pure:
             _to = pushOntoStack(_to);
         }
 
-        assert(isStackValueOrParameter(_to), "to has the vType " ~ to!string(_to.vType));
-        assert(isStackValueOrParameter(value), "value has the vType " ~ to!string(value.vType));
+        assert(isStackValueOrParameter(_to), "to has the vType " ~ enumToString(_to.vType));
+        assert(isStackValueOrParameter(value), "value has the vType " ~ enumToString(value.vType));
 
         emitLongInst(LongInst.HeapStore64, _to.stackAddr, value.stackAddr);
     }
@@ -1220,7 +1219,7 @@ pure:
     {
         assert(result.vType == BCValueType.Unknown
             || isStackValueOrParameter(result),
-            "The result for this must be Empty or a StackValue not: " ~ to!string(result.vType));
+            "The result for this must be Empty or a StackValue not: " ~ enumToString(result.vType));
         if (lhs.vType == BCValueType.Immediate)
         {
             lhs = pushOntoStack(lhs);
@@ -1230,9 +1229,9 @@ pure:
             rhs = pushOntoStack(rhs);
         }
         assert(isStackValueOrParameter(lhs),
-            "The lhs of StrEq3 is not a StackValue " ~ to!string(rhs.vType));
+            "The lhs of StrEq3 is not a StackValue " ~ enumToString(rhs.vType));
         assert(isStackValueOrParameter(rhs),
-            "The rhs of StrEq3 not a StackValue" ~ to!string(rhs.vType));
+            "The rhs of StrEq3 not a StackValue" ~ enumToString(rhs.vType));
 
         emitLongInst(LongInst.StrEq, lhs.stackAddr, rhs.stackAddr);
 
@@ -1289,7 +1288,7 @@ string localName(const string[ushort] stackMap, ushort addr) pure
     else
     {
     LnotFound:
-        return "SP[" ~ to!string(addr) ~ "]";
+        return "SP[" ~ itos(addr) ~ "]";
     }
 }
 
@@ -1900,9 +1899,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     debug (bc)
         if (!__ctfe)
         {
-            import std.stdio;
-
-            writeln("before pushing args");
+            printf("before pushing args");
         }
     long* stackP = &stack[0] + (stackOffset / 4);
 /+
@@ -1958,7 +1955,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     if (byteCode.length < 6 || byteCode.length <= ip)
         return typeof(return).init;
 
-    if (!__ctfe) debug writeln("Interpreter started");
+    if (!__ctfe) debug printf("Interpreter started");
     while (true && ip <= byteCode.length - 1)
     {
 /+
