@@ -6735,6 +6735,22 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
                     endCndJmp(JstructNotNull, genLabel());
                 }
+                else if (lhs.type.type == BCTypeEnum.Struct && rhs.type.type == BCTypeEnum.Struct)
+                {
+                    //FIXME this might be wrong ... if it is determined that it is not; remove this FIXME
+
+                    //Struct Assiignment involves allocation and copying ... sigh
+                    if (lhs.type.typeIndex != rhs.type.typeIndex)
+                    {
+                        bailout("We tried to assign a struct to a struct of a diffrent type -- "
+                            ~ ae.toString());
+                        return ;
+                    }
+
+                    const structSize = _sharedCtfeState.size(lhs.type);
+                    Alloc(lhs.i32, imm32(structSize), lhs.type);
+                    MemCpy(lhs.i32, rhs.i32, imm32(structSize));
+                }
                 else if (lhs.type.type == BCTypeEnum.Class && rhs.type.type == BCTypeEnum.Class)
                 {
                     Set(lhs.i32, rhs.i32);
