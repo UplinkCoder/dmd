@@ -71,8 +71,8 @@ struct C_BCGen
        code ~= "\tswitch(fnIdx) {\n";
        foreach(i;0 .. currentFunctionStateNumber)
        {
-           code ~= "\t\tcase " ~ to!string(i) ~ " :\n";
-           code ~= "\t\t\treturn fn" ~ to!string(i) ~ "(args, heapPtr);\n\n";
+           code ~= "\t\tcase " ~ itos(i) ~ " :\n";
+           code ~= "\t\t\treturn fn" ~ itos(i) ~ "(args, heapPtr);\n\n";
        }
        code ~= "\t\tdefault : assert(0, \"invalid fnIdx\");\n";
        code ~= "\t}\n";
@@ -81,7 +81,7 @@ struct C_BCGen
 
     @property string functionSuffix()
     {
-        return currentFunctionStateNumber > 0 ? "_fn_" ~ to!string(currentFunctionStateNumber) : "";
+        return currentFunctionStateNumber > 0 ? "_fn_" ~ itos(currentFunctionStateNumber) : "";
     }
 
     alias currentFunctionState this;
@@ -97,7 +97,7 @@ struct C_BCGen
         return (
             (
             (fname is null) ? "((BCValue[] args, BCHeap* heapPtr) @safe {\n"
-            : "BCValue " ~ fname ~ "(BCValue[] args) {\n") ~ "\n\tint stackOffset;\n\tBCValue retval;\n\nlong[" ~ to!string(
+            : "BCValue " ~ fname ~ "(BCValue[] args) {\n") ~ "\n\tint stackOffset;\n\tBCValue retval;\n\nlong[" ~ itos(
             align4(sp + 400)) ~ "] stack;\n\tint cond;\n\n" ~ q{
         foreach(i, arg;args)
         {
@@ -148,7 +148,7 @@ pure:
     {
         sameLabel = false;
         insideFunction = true;
-        code ~= "\nBCValue fn" ~  to!string(currentFunctionStateNumber) ~ "(BCValue[] args, BCHeap* heapPtr = null) {\n";
+        code ~= "\nBCValue fn" ~  itos(currentFunctionStateNumber) ~ "(BCValue[] args, BCHeap* heapPtr = null) {\n";
 
     }
 
@@ -197,31 +197,31 @@ pure:
         }
 
         assert(v.type.type == BCTypeEnum.i32,
-            "i32 expected not: " ~ to!string(v.type.type));
+            "i32 expected not: " ~ enumToString(v.type.type));
 
         if (v.vType == BCValueType.StackValue)
         {
-            valueString = "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
+            valueString = "stack[stackOffset+" ~ itos(v.stackAddr) ~ "]";
         }
         else if (v.vType == BCValueType.Parameter)
         {
-            valueString = "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
+            valueString = "stack[stackOffset+" ~ itos(v.stackAddr) ~ "]";
         }
         else if (v.vType == BCValueType.Local)
         {
-            valueString = "stack[stackOffset+" ~ to!string(v.stackAddr) ~ "]";
+            valueString = "stack[stackOffset+" ~ itos(v.stackAddr) ~ "]";
         }
         else if (v.vType == BCValueType.Immediate)
         {
-            valueString = to!string(v.imm32.imm32);
+            valueString = itos(v.imm32.imm32);
         }
         else if (v.vType == BCValueType.Error)
         {
-            valueString = to!string(v.imm32.imm32);
+            valueString = itos(v.imm32.imm32);
         }
         else
         {
-            assert(0, "unsupported " ~ to!string(v.vType));
+            assert(0, "unsupported " ~ enumToString(v.vType));
         }
 
         return valueString; 
@@ -373,7 +373,7 @@ pure:
             code ~= "cond = (" ~ toCode(lhs) ~ " >= " ~ toCode(rhs) ~ ");\n";
             break;
         default:
-            assert(0, "Inst unsupported " ~ to!string(inst));
+            assert(0, "Inst unsupported " ~ enumToString(inst));
 
         }
     }
@@ -736,7 +736,7 @@ pure:
 
     void Line(uint line)
     {
-        code ~= "/***** Line (" ~ to!string(line) ~ ") *****/\n";
+        code ~= "/***** Line (" ~ itos(line) ~ ") *****/\n";
     }
 
    /* void CallBuiltin(BCValue result, BCBuiltin fn, BCValue[] args)
@@ -750,7 +750,7 @@ pure:
 
             }
         default:
-            assert(0, "Unsupported builtin " ~ to!string(fn));
+            assert(0, "Unsupported builtin " ~ enumToString(fn));
         }
         //emitLongInst(LongInst64(LongInst.BuiltinCall, StackAddr(cast(short)fn), StackAddr(cast(short)args.length)));
     } */
