@@ -5972,10 +5972,12 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             if (ie.type.ty == Tint32 && (cast(int) ie.value) < 0)
             {
                 retval = BCValue(Imm64(cast(int)ie.value));
+                retval.type = bct;
             }
             else
             {
                 retval = imm32(cast(uint) ie.value);
+                retval.type = bct;
             }
         }
         //auto value = evaluateUlong(ie);
@@ -7776,9 +7778,13 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             else if (toType.type == BCTypeEnum.i32) {} // nop
             else if (toType.type == BCTypeEnum.i64) {} // nop
             else if (toType.type.anyOf([BCTypeEnum.c8, BCTypeEnum.i8]))
+            {
                 And3(retval.i32, retval.i32, imm32(0xff));
+            }
             else if (toType.type.anyOf([BCTypeEnum.c16, BCTypeEnum.i16]))
+            {
                 And3(retval.i32, retval.i32, imm32(0xffff));
+            }
             else
             {
                 bailout("Cast not implemented: " ~ ce.toString);
