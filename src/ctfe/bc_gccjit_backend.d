@@ -573,7 +573,7 @@ else
         assert(!functions[functionCount].funcDecl);
         functions[functionCount].funcDecl = fd;
 
-        functions[functionCount].fname = cast(char*) (name ? name : ("f" ~ to!string(fnId)).toStringz);
+        functions[functionCount].fname = cast(char*) (name ? name : ("f" ~ itos(fnId)).toStringz);
         functions[functionCount].func =  gcc_jit_context_new_function(ctx,
             null, GCC_JIT_FUNCTION_INTERNAL, i64type,
             cast(const) functions[functionCount].fname,
@@ -634,7 +634,7 @@ else
             bct = i32Type;
 
         if (bct != i32Type && bct != BCType(BCTypeEnum.i64))
-            assert(0, "can currently only create params of i32Type not: " ~ to!string(bct.type));
+            assert(0, "can currently only create params of i32Type not: " ~ enumToString(bct.type));
         //parameters[parameterCount] =
         auto r = BCValue(BCParameter(parameterCount++, bct, StackAddr(0)));
         return r;
@@ -643,7 +643,7 @@ else
 
     BCAddr beginJmp(int line = __LINE__)
     {
-        newBlock(("beginJmp_" ~ to!string(line) ~ "\0").ptr);
+        newBlock(("beginJmp_" ~ itos(line) ~ "\0").ptr);
         return BCAddr(blockCount - 2);
     }
 
@@ -654,14 +654,14 @@ else
 
     BCLabel genLabel(int line = __LINE__)
     {
-        newBlock(("genLabel_" ~ to!string(line) ~ "\0").ptr);
+        newBlock(("genLabel_" ~ itos(line) ~ "\0").ptr);
         gcc_jit_block_end_with_jump(blocks[blockCount - 2], currentLoc, block);
         return BCLabel(BCAddr(blockCount-1));
     }
 
     CndJmpBegin beginCndJmp(BCValue cond = BCValue.init, bool ifTrue = false, int line = __LINE__)
     {
-        newBlock(("cndJmp_fallthrough_" ~ to!string(line) ~ "\0").ptr);
+        newBlock(("cndJmp_fallthrough_" ~ itos(line) ~ "\0").ptr);
         auto cjb = CndJmpBegin(BCAddr(blockCount-2), cond, ifTrue);
 
         return cjb;
@@ -1029,7 +1029,7 @@ else
     {
         if (l != Loc.init)
         {
-            Comment("CallFrom:" ~ to!string(l.tupleof[0]));
+            Comment("CallFrom:" ~ itos(l.tupleof[0]));
         }
 
         jrvalue[5] fnArgs;
