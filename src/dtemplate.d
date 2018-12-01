@@ -41,6 +41,8 @@ import ddmd.root.rootobject;
 import ddmd.tokens;
 import ddmd.visitor;
 
+import ddmd.trace;
+
 //debug = FindExistingInstance; // print debug stats of findExistingInstance
 private enum LOG = false;
 
@@ -568,6 +570,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
 
     override void semantic(Scope* sc)
     {
+        mixin(traceString("this"));
         static if (LOG)
         {
             printf("TemplateDeclaration.semantic(this = %p, id = '%s')\n", this, ident.toChars());
@@ -786,6 +789,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
      */
     bool evaluateConstraint(TemplateInstance ti, Scope* sc, Scope* paramscope, Objects* dedargs, FuncDeclaration fd)
     {
+        mixin(traceString("ti"));
         /* Detect recursive attempts to instantiate this template declaration,
          * https://issues.dlang.org/show_bug.cgi?id=4072
          *  void foo(T)(T x) if (is(typeof(foo(x)))) { }
@@ -2322,6 +2326,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
      */
     TemplateInstance findExistingInstance(TemplateInstance tithis, Expressions* fargs)
     {
+        mixin(traceString("tithis"));
         //printf("findExistingInstance(%p)\n", tithis);
         tithis.fargs = fargs;
         auto tibox = TemplateInstanceBox(tithis);
@@ -6137,6 +6142,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
     void semantic(Scope* sc, Expressions* fargs)
     {
+        mixin(traceString("this"));
         //printf("[%s] TemplateInstance.semantic('%s', this=%p, gag = %d, sc = %p)\n", loc.toChars(), toChars(), this, global.gag, sc);
         version (none)
         {

@@ -48,6 +48,8 @@ import ddmd.target;
 import ddmd.tokens;
 import ddmd.visitor;
 
+import ddmd.trace;
+
 /// Inline Status
 enum ILS : int
 {
@@ -2043,6 +2045,7 @@ extern (C++) class FuncDeclaration : Declaration
      */
     final bool functionSemantic()
     {
+        mixin(traceString("this", "functionSemantic"));
         if (!_scope)
             return !errors;
 
@@ -2097,6 +2100,7 @@ extern (C++) class FuncDeclaration : Declaration
      */
     final bool functionSemantic3()
     {
+        mixin(traceString("this"));
         if (semanticRun < PASSsemantic3 && _scope)
         {
             /* Forward reference - we need to run semantic3 on this function.

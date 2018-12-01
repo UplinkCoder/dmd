@@ -36,6 +36,8 @@ import ddmd.tokens;
 import ddmd.utf;
 import ddmd.visitor;
 
+import ddmd.trace;
+
 enum CtfeGoal : int
 {
     ctfeNeedRvalue,     // Must return an Rvalue (== CTFE value)
@@ -674,6 +676,7 @@ public:
  */
 extern (C++) void ctfeCompile(FuncDeclaration fd)
 {
+    mixin(traceString("fd"));
     debug (LOGCOMPILE)
     {
         printf("\n%s FuncDeclaration::ctfeCompile %s\n", fd.loc.toChars(), fd.toChars());
@@ -710,6 +713,7 @@ extern (C++) void ctfeCompile(FuncDeclaration fd)
  */
 extern (C++) Expression ctfeInterpret(Expression e)
 {
+    mixin(traceString("e"));
     if (e.op == TOKerror)
         return e;
     assert(e.type); // https://issues.dlang.org/show_bug.cgi?id=14642
@@ -796,6 +800,7 @@ extern (C++) Expression ctfeInterpretForPragmaMsg(Expression e)
  */
 extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expressions* arguments, Expression thisarg)
 {
+    mixin(traceString("fd"));
     debug (LOG)
     {
         printf("\n********\n%s FuncDeclaration::interpret(istate = %p) %s\n", fd.loc.toChars(), istate, fd.toChars());

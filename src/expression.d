@@ -71,6 +71,8 @@ import ddmd.utf;
 import ddmd.utils;
 import ddmd.visitor;
 
+import ddmd.trace;
+
 enum LOGSEMANTIC = false;
 void emplaceExp(T : Expression, Args...)(void* p, Args args)
 {
@@ -7466,6 +7468,7 @@ extern (C++) final class IsExp : Expression
 
     override Expression semantic(Scope* sc)
     {
+        mixin(traceString("this"));
         /* is(targ id tok tspec)
          * is(targ id :  tok2)
          * is(targ id == tok2)

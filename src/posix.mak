@@ -163,7 +163,7 @@ CXXFLAGS += -g -g3 -DDEBUG=1 -DUNITTEST
 DFLAGS += -g -debug -unittest
 endif
 ifdef ENABLE_RELEASE
-CXXFLAGS += -O2
+CXXFLAGS += -O2 -g
 DFLAGS += -O -release -inline
 endif
 ifdef ENABLE_PROFILING
@@ -211,7 +211,7 @@ FRONT_SRCS=$(addsuffix .d,access aggregate aliasthis apply argtypes arrayop	\
 	sideeffect statement staticassert target tokens traits utf visitor	\
 	typinf utils statement_rewrite_walker statementsem safe blockexit asttypename \
 	ctfe/ctfe_bc ctfe/bc ctfe/bc_common ctfe/bc_limits ctfe/bc_test \
-	ctfe/bc_printer_backend ctfe/bc_c_backend)
+	ctfe/bc_printer_backend ctfe/bc_c_backend trace queryperf)
 
 ifeq ($(D_OBJC),1)
 	FRONT_SRCS += objc.d

@@ -59,6 +59,8 @@ import ddmd.utils;
 import core.stdc.config;
 extern(C) c_long strtol(inout(char)* nptr, inout(char)** endptr, int base);
 
+import ddmd.trace;
+
 /**
  * Print DMD's logo on stdout
  */
@@ -1574,6 +1576,95 @@ Language changes listed by -transition=id:
             Module m = modules[i];
             gendocfile(m);
         }
+    }
+
+    static if (SYMBOL_TRACE)
+    {
+        // this is debug code we simply hope that we will not need more
+        // then 32 Megabyte of log-buffer;
+        char* fileBuffer = cast(char*)malloc(ushort.max * 512 * 64);
+        char* bufferPos = fileBuffer;
+
+        char[255] fileNameBuffer;
+        import core.stdc.time : ctime, time;
+        auto now = time(null);
+
+        auto timeString = ctime(&now);
+        // replace the ' ' by _ and '\n' or '\r' by '\0'
+        {
+            int len = 0;
+            char c = void;
+            for(;;)
+            {
+                c = timeString[len++];
+                // break on null, just to be safe;
+                if (!c)
+                    break;
+
+                if (c == ' ')
+                    timeString[len - 1] = '_';
+
+                if (c == '\r' || c == '\n')
+                {
+                    timeString[len - 1] = '\0';
+                    break;
+                }
+            }
+        }
+
+        sprintf(&fileNameBuffer[0],
+             "symbol-%s.log".ptr, timeString);
+
+        auto f = File(&fileNameBuffer[0]);
+
+        bufferPos += sprintf(cast(char*) bufferPos, "//");
+        foreach(arg;arguments)
+        {
+            bufferPos += sprintf(bufferPos, "%s ", arg);
+        }
+        bufferPos += sprintf(cast(char*) bufferPos, "\n");
+
+        bufferPos += sprintf(cast(char*) bufferPos,
+            "%s|%s|%s|%s|%s|%s|%s|%s|%s|\n",
+            "inclusive ticks".ptr,
+            "name".ptr, "kind".ptr, "phase".ptr,
+            "location".ptr, "begin_ticks".ptr, "end_ticks".ptr,
+            "begin_mem".ptr, "end_mem".ptr
+        );
+
+        foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count])
+        {
+
+            Loc loc;
+            const (char)* name;
+
+            if (dp.sym !is null)
+            {
+                loc = dp.sym.loc;
+                name = dp.sym.toChars();
+            }
+            else if (dp.exp !is null)
+            {
+                loc = dp.exp.loc;
+                name = dp.exp.toChars();
+            }
+            else 
+                continue; // we probably should assert here, but whaverever.
+
+            // Identifier id = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
+
+            bufferPos += sprintf(cast(char*) bufferPos,
+                "%lld|%s|%s|%s|%s|%lld|%lld|%lld|%lld|\n",
+                dp.end_ticks - dp.begin_ticks,
+                name, &dp.kind[0], &dp.fn[0],
+                loc.toChars(), dp.begin_ticks, dp.end_ticks,
+                dp.begin_mem, dp.end_mem);
+        }
+
+        f.setbuffer(fileBuffer, bufferPos - fileBuffer);
+        f._ref = 1;
+        f.write();
+        free(fileBuffer);
     }
     if (!global.params.obj)
     {

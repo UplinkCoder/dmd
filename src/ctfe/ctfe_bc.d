@@ -20,6 +20,7 @@ import ddmd.root.rmem;
  */
 
 import core.stdc.stdio : printf;
+import ddmd.trace;
 
 enum perf = 1;
 enum bailoutMessages = 1;
@@ -183,6 +184,7 @@ struct BlackList
 
 Expression evaluateFunction(FuncDeclaration fd, Expressions* args)
 {
+    mixin(traceString("fd", "newCTFE_full"));
     return evaluateFunction(fd, args ? args.data[0 .. args.dim] : []);
 }
 
@@ -432,6 +434,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
 
     if (!bcv.IGaveUp)
     {
+        mixin(traceString("fd", "newCTFE_execution"));
+
         import std.algorithm;
         import std.range;
         import std.datetime : StopWatch;
@@ -2072,7 +2076,7 @@ extern (C++) final class BCTypeVisitor : Visitor
             else
                 st.addField(bcType, false, []);
         }
-        assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ " " ~ reason);
+        // assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ " " ~ reason);
         _sharedCtfeState.endStruct(&st, died);
         scope(exit) bcv.clear();
     }
@@ -6709,6 +6713,13 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     // HACK allocate space for struct if structPtr is zero
                     auto JstructNotNull = beginCndJmp(lhs.i32, true);
                     auto structSize = _sharedCtfeState.size(lhs.type);
+
+                    if (!structSize)
+                    {
+                        bailout("StructSize is zero for in -- " ~ ae.e1.toString());
+                        return ;
+                    }
+
                     Alloc(lhs.i32, imm32(structType.size), lhs.type);
 
                     initStruct(lhs, structType);
@@ -6729,9 +6740,15 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
                     const structSize = _sharedCtfeState.size(lhs.type);
                     const allocSize = structSize.align4;
+	
 
                     if (ae.op == TOKconstruct)
                     {
+                        if (!structSize)
+                        {
+                            bailout("StructSize is zero for in -- " ~ ae.e1.toString());
+                            return ;
+                        }
                         auto CJLhsIsNull = beginCndJmp(lhs.i32, true);
                         Alloc(lhs.i32, imm32(allocSize), lhs.type);
                         endCndJmp(CJLhsIsNull, genLabel());
