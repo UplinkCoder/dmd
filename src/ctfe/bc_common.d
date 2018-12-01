@@ -528,9 +528,7 @@ struct BCHeapRef
             break;
 
         default:
-            import std.conv : to;
-
-            assert(0, "vType unsupported: " ~ to!string(that.vType));
+            assert(0, "vType unsupported: " ~ enumToString(that.vType));
         }
         vType = that.vType;
     }
@@ -582,9 +580,7 @@ struct BCValue
             return this.imm32;
         default:
             {
-                import std.conv : to;
-
-                assert(0, "toUint not implemented for " ~ vType.to!string);
+                assert(0, "toUint not implemented for " ~ enumToString(vType));
             }
         }
 
@@ -613,9 +609,9 @@ struct BCValue
         case BCValueType.Local : goto case;
         case BCValueType.Parameter, BCValueType.Temporary,
                 BCValueType.StackValue:
-                return "stackAddr: " ~ to!string(stackAddr);
+                return "stackAddr: " ~ itos(stackAddr);
         case BCValueType.HeapValue:
-            return "heapAddr: " ~ to!string(heapAddr);
+            return "heapAddr: " ~ itos(heapAddr);
         case BCValueType.Immediate:
             return "imm: " ~ (type.type == BCTypeEnum.i64 || type.type == BCTypeEnum.f52
                     ? to!string(imm64) : itos(imm32));
@@ -771,9 +767,7 @@ struct BCValue
             break;
 
         default:
-            import std.conv : to;
-
-            assert(0, "vType unsupported: " ~ to!string(vType));
+            assert(0, "vType unsupported: " ~ enumToString(vType));
         }
     }
 }
