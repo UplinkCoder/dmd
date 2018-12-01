@@ -618,7 +618,7 @@ struct BCValue
             return "heapAddr: " ~ to!string(heapAddr);
         case BCValueType.Immediate:
             return "imm: " ~ (type.type == BCTypeEnum.i64 || type.type == BCTypeEnum.f52
-                    ? to!string(imm64) : to!string(imm32));
+                    ? to!string(imm64) : itos(imm32));
         default:
             return "unknown value format";
         }
@@ -680,7 +680,7 @@ struct BCValue
     {
         this.type.type = BCTypeEnum.i32;
         this.vType = BCValueType.Immediate;
-        this.imm32 = imm32;
+        this.imm32.imm32 = imm32.imm32;
     }
 
     this(const Imm64 imm64) pure
