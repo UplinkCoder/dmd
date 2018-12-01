@@ -1142,7 +1142,7 @@ pure:
                     emitLongInst(LongInst.F64ToI, lhs.stackAddr, rhs.stackAddr);
             break;
             default :
-                debug{assert(0, "me no have no cast for targetType " ~ to!string(targetType));}
+                debug{assert(0, "me no have no cast for targetType " ~ enumToString(targetType));}
             break;
         }
 
