@@ -414,6 +414,8 @@ struct Imm32
 BCValue imm32(uint value) pure @trusted
 {
     BCValue ret = void;
+    if (__ctfe)
+        ret = BCValue.init;
     ret.vType = BCValueType.Immediate;
     ret.type.type = BCTypeEnum.i32;
     ret.type.typeIndex = 0;
@@ -429,6 +431,10 @@ BCValue imm32(uint value) pure @trusted
 BCValue imm64(ulong value) pure @trusted
 {
     BCValue ret = void;
+
+    if (__ctfe)
+        ret = BCValue.init;
+
     ret.vType = BCValueType.Immediate;
     ret.type.type = BCTypeEnum.i64;
     ret.type.flags = BCTypeFlags.None;
