@@ -23,10 +23,10 @@ import core.stdc.stdio : printf;
 
 enum perf = 1;
 enum bailoutMessages = 1;
-enum printResult = 0;
+enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -2312,6 +2312,60 @@ extern (C++) final class BCV(BCGenT) : Visitor
         }
     }
 
+    void Store32AtOffset(BCValue addr, BCValue value, int offset)
+    {
+        if (addr.type.type != BCTypeEnum.i32)
+            addr = addr.i32;
+
+        if (value.type.type != BCTypeEnum.i32)
+            value = value.i32;
+
+        if (!offset)
+        {
+            Store32(addr, value);
+        }
+        else
+        {
+            auto ea = genTemporary(i32Type);
+            if (offset > 0)
+            {
+                Add3(ea, addr, imm32(offset));
+            }
+            else
+            {
+                Sub3(ea, addr, imm32(offset));
+            }
+            Store32(ea, value);
+        }
+    }
+
+    void Load32FromOffset(BCValue value, BCValue addr, int offset)
+    {
+        if (addr.type.type != BCTypeEnum.i32)
+            addr = addr.i32;
+
+        if (value.type.type != BCTypeEnum.i32)
+            value = value.i32;
+
+        if (!offset)
+        {
+            Load32(value, addr);
+        }
+        else
+        {
+            auto ea = genTemporary(i32Type);
+            if (offset > 0)
+            {
+                Add3(ea, addr, imm32(offset));
+            }
+            else
+            {
+                Sub3(ea, addr, imm32(offset));
+            }
+            Load32(value, ea);
+        }
+    }
+
     debug (nullPtrCheck)
     {
         import ddmd.lexer : Loc;
@@ -3114,16 +3168,7 @@ public:
                 endParameters();
                 beginFunction(fnIdx, cast(void*) null);
                     // printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
-                    if (ClassMetaData.VtblOffset)
-                    {
-                        auto vtblPtrPtr = genTemporary(i32Type);
-                        Add3(vtblPtrPtr, p1, imm32(ClassMetaData.VtblOffset));
-                        Store32(vtblPtrPtr, imm32(bcClass.vtblPtr));
-                    }
-                    else
-                    {
-                        Store32(p1, imm32(bcClass.vtblPtr));
-                    }
+                    Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
                     Ret(p1);
                 endFunction();
                 static if (is(BCGen))
@@ -3971,12 +4016,12 @@ static if (is(BCGen))
 				}
                 else
                 {
-					if (var.type.ty == Tclass || var.type.ty == Tstruct)
-					{
-                    	bailout("Cannot currently handle struct or class offsets");
-					}
-					else
-					{
+                    if (var.type.ty == Tclass || var.type.ty == Tstruct)
+                    {
+                        bailout("Cannot currently handle struct or class offsets");
+                    }
+                    else
+                    {
 						bailout("Cannot handle SymOffsetExp of type: " ~
 							enumToString(cast(ENUMTY)var.type.ty)
 						);
@@ -7274,17 +7319,9 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Comment("loadVtblPtr");
 
                 auto vtblPtr = genTemporary(i32Type);
-                if (ClassMetaData.VtblOffset)
-                {
-                    auto vtblPtrAddr = genTemporary(i32Type);
-                    Add3(vtblPtrAddr, thisPtr.i32, imm32(ClassMetaData.VtblOffset));
-                    Load32(vtblPtr, vtblPtrAddr);
-                }
-                else
-                {
-                    Load32(vtblPtr, thisPtr.i32);
-                }
-                int vtblIndex = fd.vtblIndex;
+                Load32FromOffset(vtblPtr, thisPtr.i32, ClassMetaData.VtblOffset);
+
+		const vtblIndex = fd.vtblIndex;
 
                 Comment("vtblIndex == " ~ itos(vtblIndex) ~ "  for " ~ fd.toString);
                 Comment("vtblLoad");

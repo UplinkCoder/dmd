@@ -232,7 +232,7 @@ FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argt
 	sideeffect statement staticassert target tokens traits utf visitor	\
 	typinf utils statement_rewrite_walker statementsem safe blockexit asttypename \
 	ctfe/ctfe_bc ctfe/bc ctfe/bc_common ctfe/bc_limits ctfe/bc_test \
-	ctfe/bc_printer_backend ctfe/bc_c_backend)
+	ctfe/bc_printer_backend ctfe/bc_c_backend))
 
 ifeq ($(D_OBJC),1)
 	FRONT_SRCS += $D/objc.d
@@ -350,7 +350,7 @@ auto-tester-build: dmd checkwhitespace $G/dmd_frontend
 $G/glue.a: $(G_GLUE_OBJS)
 	$(AR) rcs $@ $(G_GLUE_OBJS)
 
-$G/backend.a: $(G_OBJS)
+backend.a: $(G_OBJS)
 	$(AR) rcs $@ $(G_OBJS)
 
 $G/dmd_frontend: $(FRONT_SRCS) $D/gluelayer.d $(ROOT_SRCS) $G/newdelete.o $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)

@@ -2890,6 +2890,7 @@ final class Parser : Lexer
                                 goto Lelse;
                         }
                         else
+			{
                     Lelse:
                             at = parseType(&ai);
                         }
@@ -2932,6 +2933,7 @@ final class Parser : Lexer
 
         L1:
         }
+
         check(TOKrparen);
         *pvarargs = varargs;
         return parameters;
