@@ -2072,7 +2072,7 @@ extern (C++) final class BCTypeVisitor : Visitor
             else
                 st.addField(bcType, false, []);
         }
-        assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ " " ~ reason);
+        // assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ " " ~ reason);
         _sharedCtfeState.endStruct(&st, died);
         scope(exit) bcv.clear();
     }
