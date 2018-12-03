@@ -3729,7 +3729,10 @@ static if (is(BCGen))
             }
 
             //TODO we should handle sign extension before bin-ops of coercing types
-            if ((isFloat(lhs.type) && isFloat(rhs.type) && lhs.type.type == rhs.type.type) || (canHandleBinExpTypes(retval.type.type, lhs.type.type) && canHandleBinExpTypes(retval.type.type, rhs.type.type)) || (e.op == TOKmod && canHandleBinExpTypes(rhs.type.type, retval.type.type)) || ((e.op == TOKequal || e.op == TOKnotequal) && canHandleBinExpTypes(lhs.type.type, rhs.type.type)))
+            if ((isFloat(lhs.type) && isFloat(rhs.type) && lhs.type.type == rhs.type.type) ||
+                (canHandleBinExpTypes(retval.type.type, lhs.type.type) && canHandleBinExpTypes(retval.type.type, rhs.type.type)) ||
+                (e.op == TOKmod && canHandleBinExpTypes(rhs.type.type, retval.type.type)) ||
+                ((e.op == TOKequal || e.op == TOKnotequal) && canHandleBinExpTypes(lhs.type.type, rhs.type.type)))
             {
                 const oldDiscardValue = discardValue;
                 discardValue = false;
@@ -3836,7 +3839,7 @@ static if (is(BCGen))
 
             else
             {
-                bailout("Only binary operations on i32s are supported lhs: " ~ lhs.type.type.enumToString ~ " rhs: " ~ rhs.type.type.enumToString ~ " retval.type: " ~ enumToString(retval.type.type) ~  " -- " ~ e.toString);
+                bailout("Only binary operations on i32s are supported lhs.type: " ~ lhs.type.type.enumToString ~ " rhs.type: " ~ rhs.type.type.enumToString ~ " retval.type: " ~ enumToString(retval.type.type) ~  " -- " ~ e.toString);
                 return;
             }
 
@@ -3854,8 +3857,6 @@ static if (is(BCGen))
                                 return ;
                             }
 
-                            //auto afterLhs = genLabel();
-                            //doFixup(oldFixupTableCount, null, &afterLhs);
                             fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(lhs,
                                     true));
                             Comment("|| after lhs");
@@ -3901,8 +3902,6 @@ static if (is(BCGen))
                                 return ;
                             }
 
-                            //auto afterLhs = genLabel();
-                            //doFixup(oldFixupTableCount, &afterLhs, null);
                             fixupTable[fixupTableCount++] = BoolExprFixupEntry(beginCndJmp(lhs,
                                     false));
                             Comment("&& afterLhs");
@@ -3944,9 +3943,8 @@ static if (is(BCGen))
     override void visit(SymOffExp se)
     {
         lastLoc = se.loc;
-
         Line(se.loc.linnum);
-        //bailout();
+
         auto var = se.var;
         auto vd = se.var.isVarDeclaration();
         auto fd = se.var.isFuncDeclaration();
