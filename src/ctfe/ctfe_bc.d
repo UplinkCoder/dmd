@@ -1970,15 +1970,17 @@ extern (C++) final class BCTypeVisitor : Visitor
 
         auto st = sharedCtfeState.beginStruct(sd);
         bool died;
-        string reason;
+
+        // keep track field which could be processed without problems
+        // in order to print out the field where stuff went wrong
         VarDeclaration currentField;
+        string reason;
+
         __gshared static bcv = new BCV!BCGenT; // TODO don't do this.
 
         addFieldLoop : foreach (mi, sMember; sd.fields)
         {
             bool calledSemantic = false;
-            // keep track field which could be processed without problems
-            // in order to print out the field where stuff went wrong
 
             assert(sMember.type);
 
@@ -1988,7 +1990,7 @@ extern (C++) final class BCTypeVisitor : Visitor
                 assert(0, "recursive struct definition this should never happen");
 
             // look for previous field with the same offset
-            // since we do not handle those current
+            // since we do not handle those currently
             foreach(f;sd.fields[0 .. mi])
             {
                 if (sMember.offset == f.offset)
