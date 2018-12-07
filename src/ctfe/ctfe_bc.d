@@ -1959,8 +1959,6 @@ extern (C++) final class BCTypeVisitor : Visitor
             ct.size += _sharedCtfeState.classTypes[parentIdx - 1].size;
         }
         sharedCtfeState.endClass(&ct, died);
-
-
     }
 
 
@@ -2635,7 +2633,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
         else
         {
-            auto offset = genTemporary(BCType(BCTypeEnum.i32)); //SP[12]
+            auto offset = genTemporary(BCType(BCTypeEnum.i32));
 
             auto len1 = getLength(rhs);
             auto len2 = getLength(lhs);
@@ -2644,7 +2642,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             auto ptr1 = getBase(lhs);
             auto ptr2 = getBase(rhs);
             Set(offset, len1);
-            Comment("streq loop");
+
             auto e1 = genTemporary(i32Type);
             auto e2 = genTemporary(i32Type);
 
@@ -2655,7 +2653,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             Load32(e1, ptr1);
             Load32(e2, ptr2);
             Eq3(result, e1, e2);
-            endCndJmp(beginCndJmp(BCValue.init, true), LbeginLoop);
+            Jmp(LbeginLoop);
             auto LendLoop = genLabel();
             endCndJmp(cndJmp1, LendLoop);
         }
@@ -3313,7 +3311,7 @@ public:
                         Set(vtblPtrAddr, vtblPtr);
                     }
 
-                    endJmp(beginJmp(), LbeginLoop);
+                    Jmp(LbeginLoop);
                     auto LRetNull = genLabel();
                     {
                         Set(rv, imm32(0));
@@ -4266,9 +4264,9 @@ static if (is(BCGen))
 
     void fixupBreak(uint oldBreakFixupCount, BCLabel breakHere)
     {
-        foreach (Jmp; breakFixups[oldBreakFixupCount .. breakFixupCount])
+        foreach (jmp; breakFixups[oldBreakFixupCount .. breakFixupCount])
         {
-            endJmp(Jmp, breakHere);
+            endJmp(jmp, breakHere);
         }
         breakFixupCount = oldBreakFixupCount;
     }
@@ -4276,11 +4274,11 @@ static if (is(BCGen))
     void fixupContinue(uint oldContinueFixupCount, BCLabel continueHere)
     {
         //FIXME: I don't think we should have a global continueHere
-	// which does not properly stack
+        // which does not properly stack
         lastContinue = continueHere;
-        foreach (Jmp; continueFixups[oldContinueFixupCount .. continueFixupCount])
+        foreach (jmp; continueFixups[oldContinueFixupCount .. continueFixupCount])
         {
-            endJmp(Jmp, continueHere);
+            endJmp(jmp, continueHere);
         }
         continueFixupCount = oldContinueFixupCount;
     }
@@ -7757,7 +7755,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         else if (fromType.type == BCTypeEnum.i8 || fromType.type == BCTypeEnum.c8)
         {
             // A "bitcast" is enough. All implementations are assumed to use 32/64bit registers.
-            if (toType.type.anyOf([BCTypeEnum.i8, BCTypeEnum.c8, BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i64]))
+            if (toType.type.anyOf([BCTypeEnum.i8, BCTypeEnum.c8, BCTypeEnum.i32, BCTypeEnum.c32, BCTypeEnum.i16, BCTypeEnum.i64]))
                 retval.type = toType;
             else
             {

@@ -589,7 +589,7 @@ pure:
         byteCodeArray[atIp + 1] = lj.hi;
     }
 
-    void genJump(BCLabel target)
+    void Jmp(BCLabel target)
     {
         assert(target.addr);
         if (ip != target.addr)

@@ -207,6 +207,7 @@ enum BCTypeEnum : ubyte
     c8,
     c16,
     c32,
+
     /// signed by default
     i8,
     /// DITTO
