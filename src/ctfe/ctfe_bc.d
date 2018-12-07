@@ -31,6 +31,8 @@ enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
 
+enum output_bc = 1;
+
 private static void clearArray(T)(auto ref T array, uint count)
 {
         array[0 .. count] = typeof(array[0]).init;
@@ -3040,6 +3042,9 @@ public:
 
         void addUncompiledConstructor(CtorDeclaration ctor, BCType type, int *cIdxP)
         {
+            if (ctor)
+                ctor.functionSemantic3();
+
             if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
             {
                 bailout("UncompiledFunctions overflowed");
@@ -3178,7 +3183,7 @@ public:
             endFunction();
             static if (is(BCGen))
             {
-                _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) null,
+                _sharedCtfeState.functions[uc.fnIdx - 1] = BCFunction(cast(void*) null,
                     uc.fnIdx, BCFunctionTypeEnum.Bytecode,
                     cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
                     // get rid of dup!
@@ -3254,6 +3259,7 @@ public:
             if (forCtor)
             {
                 const bcClass = _sharedCtfeState.classTypes[forCtor.typeIndex - 1];
+                if (!_this) Comment("There's no this here");
                 Store32AtOffset(_this.i32, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
             }
 
@@ -4502,6 +4508,12 @@ static if (is(BCGen))
         Assert(imm32(0), addError(he.loc, "HaltExp"));
     }
 
+    override void visit(DotIdExp de)
+    {
+        printf("Encountering DotIdExp %s ... this means sema has not been run\n", de.toChars);
+        assert(0);
+    }
+
     override void visit(SliceExp se)
     {
         lastLoc = se.loc;
@@ -5273,9 +5285,6 @@ static if (is(BCGen))
                 // However we need to have some kind of ID for it so we don't
                 // Generate it over and over agian let's just cast the classType
                 // It should be unique :)
-
-                ctor = cast (FuncDeclaration)
-                        _sharedCtfeState.classDeclTypePointers[type.typeIndex - 1];
             }
             auto cIdx = _sharedCtfeState.getFunctionIndex(ctor);
             if (!cIdx)

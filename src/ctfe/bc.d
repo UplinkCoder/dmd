@@ -620,7 +620,7 @@ pure:
         emitLongInst(LongInst.Alloc, heapPtr.stackAddr, size.stackAddr);
     }
 
-    void Assert(BCValue value, BCValue err)
+    void Assert(BCValue value, BCValue err, uint l = __LINE__)
     {
         BCValue _msg;
         if (isStackValueOrParameter(err))
@@ -634,7 +634,7 @@ pure:
         }
         else
         {
-            assert(0, "BCValue.init is no longer a valid value for assert");
+            assert(0, "BCValue.init is no longer a valid value for assert -- fromLine: " ~ itos(l));
         }
 
     }
