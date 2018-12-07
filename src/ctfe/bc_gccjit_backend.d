@@ -695,7 +695,7 @@ else
             cond, true_block, false_block);
     }
 
-    void genJump(BCLabel target)
+    void Jmp(BCLabel target)
     {
         gcc_jit_block_end_with_jump(block, currentLoc, blocks[target.addr.addr]);
         newBlock();

@@ -246,7 +246,7 @@ pure:
         }
     }
 
-    void genJump(BCLabel target)
+    void Jmp(BCLabel target)
     {
         endJmp(beginJmp(), target);
     }

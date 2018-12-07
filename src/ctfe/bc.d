@@ -3100,7 +3100,7 @@ auto testRelJmp()
         Ret(result);
         endCndJmp(cndJmp, genLabel());
         Add3(result, result, BCValue(Imm32(1)));
-        genJump(evalCond);
+        Jmp(evalCond);
         Finalize();
         return gen;
     }

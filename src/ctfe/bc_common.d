@@ -841,8 +841,8 @@ template ensureIsBCGen(BCGenT)
             ~ " is missing CndJmpBegin beginCndJmp(BCValue cond = BCValue.init, bool ifTrue = false)");
     static assert(is(typeof(BCGenT.endCndJmp(CndJmpBegin.init, BCLabel.init)) == void),
             BCGenT.stringof ~ " is missing void endCndJmp(CndJmpBegin jmp, BCLabel target)");
-    static assert(is(typeof(BCGenT.genJump(BCLabel.init)) == void),
-            BCGenT.stringof ~ " is missing void genJump(BCLabel target)");
+    static assert(is(typeof(BCGenT.Jmp(BCLabel.init)) == void),
+            BCGenT.stringof ~ " is missing void Jmp(BCLabel target)");
     static assert(is(typeof(BCGenT.emitFlg(BCValue.init)) == void),
             BCGenT.stringof ~ " is missing void emitFlg(BCValue lhs)");
     static assert(is(typeof(BCGenT.Alloc(BCValue.init, BCValue.init)) == void),

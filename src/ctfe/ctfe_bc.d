@@ -74,14 +74,19 @@ struct UncompiledFunction
 {
     FuncDeclaration fd;
     uint fn;
-    union
-    {
-        BCType type;
-        bool mayFail; /** virtual functions may fail
+    bool mayFail; /** virtual functions may fail
                       to complile for ctfe this is
                       okay since we can not statically
                       proof if it is actually called */
-    }
+}
+
+struct UncompiledConstructor
+{
+    /// may be null. if so use type.typeIndex
+    /// to get the ClassDeclPtr
+    CtorDeclaration cd;
+    BCType type;
+    int fnIdx;
 }
 
 struct UncompiledDynamicCast
@@ -469,7 +474,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         bcv.compileUncompiledFunctions();
         bcv.buildVtbls();
         // we build the vtbls now let's build the constructors
-        bcv.compileUncompiledFunctions(true);
+        bcv.compileUncompiledConstructors();
         bcv.compileUncompiledDynamicCasts();
         static if (is(BCGen))
         {
@@ -2179,7 +2184,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     BCAddr[ubyte.max] continueFixups = void;
     BCScope[16] scopes = void;
     BoolExprFixupEntry[ubyte.max] fixupTable = void;
-    UncompiledFunction[ubyte.max] uncompiledConstructors = void;
+    UncompiledConstructor[ubyte.max] uncompiledConstructors = void;
     UncompiledDynamicCast[ubyte.max] uncompiledDynamicCasts = void;
     UncompiledFunction[ubyte.max * 8] uncompiledFunctions = void;
     SwitchState[16] switchStates = void;
@@ -3040,17 +3045,12 @@ public:
                 bailout("UncompiledFunctions overflowed");
                 return ;
             }
-//            printf("UncompiledConstructor: %s\n", ctor.toString().ptr);
-            if (!ctor)
-            {
-                ctor = cast(CtorDeclaration)
-                    _sharedCtfeState.classDeclTypePointers[type.typeIndex - 1];
-            }
-
+            printf("UncompiledConstructor: %s\n", ctor.toString().ptr);
+       
             const fnIdx = ++_sharedCtfeState.functionCount;
             _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) ctor);
             uncompiledConstructors[uncompiledConstructorCount] =
-                UncompiledFunction(ctor, fnIdx, type);
+                UncompiledConstructor(ctor, type, fnIdx);
             ++uncompiledConstructorCount;
             *cIdxP = fnIdx;
         }
@@ -3129,59 +3129,104 @@ public:
     }
 
 
-    void compileUncompiledFunctions(bool forCtor = false)
+    void compileUncompiledConstructors()
+    {
+        foreach(ref uc;uncompiledConstructors[0 .. uncompiledConstructorCount])
+        {
+            if (!uc.cd)
+                compileUncompiledDefaultConstructor(uc);
+            else
+            {
+                compileUncompiledFunction(uc.cd, uc.fnIdx, false, &uc.type);
+            }
+        }
+    }
+
+    void compileUncompiledDefaultConstructor(UncompiledConstructor uc)
+    {
+        import ddmd.identifier : Identifier;
+
+        __gshared static FuncDeclaration dummy_fd = new FuncDeclaration(Loc.init, Loc.init, Identifier.init, 0, Type.init);
+        assert(uc.cd is null, "This is _only_ for DefaultConstructors");
+        {
+            // if we are building a ctor it might happen that it is null
+            // when the class has no construcor defined
+            // however we need to safe a vtblPtr at the very least
+            // so let's do just that!
+            
+            assert(uc.type.type == BCTypeEnum.Class && uc.type.typeIndex);
+            const tIdx = uc.type.typeIndex - 1;
+            auto bcClass = &_sharedCtfeState.classTypes[tIdx];
+            auto cdtp = _sharedCtfeState.classDeclTypePointers[tIdx];
+            static if (is(BCGen))
+            {
+                auto osp = sp;
+            }
+            vars.destroy();
+            beginParameters();
+                auto p1 = genParameter(i32Type, "thisPtr");
+                // the following is a hack to fake us setting a me.ptr
+                // which we need for endParameters
+                auto oldme = me;
+                me = dummy_fd;
+            endParameters();
+                me = oldme;
+            beginFunction(uc.fnIdx, cast(void*) null);
+            // printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
+                Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
+                Ret(p1);
+            endFunction();
+            static if (is(BCGen))
+            {
+                _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) null,
+                    uc.fnIdx, BCFunctionTypeEnum.Bytecode,
+                    cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
+                    // get rid of dup!
+                    byteCodeArray[0 .. ip].idup);
+            }
+        }
+    }
+
+    void compileUncompiledFunctions()
     {
         uint lastUncompiledFunction;
-
+        
     LuncompiledFunctions :
-        foreach (uf; forCtor ? uncompiledConstructors[0 .. uncompiledConstructorCount] :
-                               uncompiledFunctions[lastUncompiledFunction .. uncompiledFunctionCount])
+        foreach (uf;uncompiledFunctions[lastUncompiledFunction .. uncompiledFunctionCount])
         {
-            if (_blacklist.isInBlacklist(uf.fd.ident))
+            if (uf.fd)
+                compileUncompiledFunction(uf.fd, uf.fn, uf.mayFail, null);
+
+            lastUncompiledFunction++;
+        }
+
+        if (uncompiledFunctionCount > lastUncompiledFunction)
+            goto LuncompiledFunctions;
+        
+        clearArray(uncompiledFunctions, uncompiledFunctionCount);
+        // not sure if the above clearArray does anything
+        uncompiledFunctionCount = 0;
+    }
+
+    void compileUncompiledFunction(FuncDeclaration fd, int fnIdx,
+        bool mayFail, BCType* forCtor)
+    {
+        assert(fd);
+        {
+            if (_blacklist.isInBlacklist(fd.ident))
             {
-                bailout("Bail out on blacklisted: " ~ uf.fd.ident.toString());
+                bailout("Bail out on blacklisted: " ~ fd.ident.toString());
                 return;
             }
 
-            //assert(!me, "We are not clean!");
-            me = uf.fd;
-            auto fnIdx = uf.fn;
-
             if (forCtor)
             {
-                // if we are building a ctor it might happen that it is null
-                // when the class has no construcor defined
-                // however we need to safe a vtblPtr at the very least
-                // so let's do just that!
-
-                assert(uf.type.type == BCTypeEnum.Class && uf.type.typeIndex);
-                const tIdx = uf.type.typeIndex - 1;
-                auto bcClass = &_sharedCtfeState.classTypes[tIdx];
-                auto cdtp = _sharedCtfeState.classDeclTypePointers[tIdx];
-                static if (is(BCGen))
-                {
-                    auto osp = sp;
-                }
-                vars.destroy();
-                beginParameters();
-                    auto p1 = genParameter(i32Type, "thisPtr");
-                endParameters();
-                beginFunction(fnIdx, cast(void*) null);
-                    // printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
-                    Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
-                    Ret(p1);
-                endFunction();
-                static if (is(BCGen))
-                {
-                    _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) uf.fd,
-                        fnIdx, BCFunctionTypeEnum.Bytecode,
-                        cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
-                        // get rid of dup!
-                        byteCodeArray[0 .. ip].idup);
-                }
-
-                continue ;
+                assert(forCtor.type == BCTypeEnum.Class && forCtor.typeIndex);
             }
+
+            //assert(!me, "We are not clean!");
+            me = fd;
+         
             vars.destroy();
             beginParameters();
             auto parameters = me.parameters;
@@ -3206,6 +3251,12 @@ public:
             if (me.closureVars.dim)
                 allocateAndLinkClosure(me);
 
+            if (forCtor)
+            {
+                const bcClass = _sharedCtfeState.classTypes[forCtor.typeIndex - 1];
+                Store32AtOffset(_this.i32, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
+            }
+
             me.fbody.accept(this);
 
             static if (is(BCGen))
@@ -3213,34 +3264,35 @@ public:
                 auto osp = sp;
             }
 
-            if (uf.fd.type.nextOf.ty == Tvoid)
+            if (forCtor)
             {
-
+                Ret(_this.i32);
+            }
+            else if (fd.type.nextOf.ty == Tvoid)
+            {
                 // insert a dummy return after void functions because they can omit a returnStatement
                 Ret(bcNull);
             }
             Line(me.endloc.linnum);
             endFunction();
 
-            lastUncompiledFunction++;
-
             if (IGaveUp)
             {
-                if (!forCtor && uf.mayFail)
+                if (!forCtor && mayFail)
                 {
-                    Assert(imm32(0), addError(uf.fd.loc, "CTFE ABORT IN : " ~ uf.fd.toString ~ ":" ~ itos(lastLine)));
+                    Assert(imm32(0), addError(fd.loc, "CTFE ABORT IN : " ~ fd.toString ~ ":" ~ itos(lastLine)));
                     IGaveUp = false;
                 }
                 else
                 {
-                    bailout("A called function bailed out: " ~ uf.fd.toString);
+                    bailout("A called function bailed out: " ~ fd.toString);
                     return ;
                 }
             }
 
             static if (is(BCGen))
             {
-                _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) uf.fd,
+                _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd,
                     fnIdx, BCFunctionTypeEnum.Bytecode,
                     cast(ushort) (parameters ? parameters.dim : 0), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
                     // get rid of dup!
@@ -3248,23 +3300,9 @@ public:
             }
             else
             {
-                _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) uf.fd);
+                _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd);
             }
             clear();
-
-        }
-
-        if (uncompiledFunctionCount > lastUncompiledFunction)
-            goto LuncompiledFunctions;
-
-        clearArray(uncompiledFunctions, uncompiledFunctionCount);
-        // not sure if the above clearArray does anything
-        uncompiledFunctionCount = 0;
-        if (forCtor)
-        {
-            clearArray(uncompiledConstructors, uncompiledConstructorCount);
-            // not sure if the above clearArray does anything
-            uncompiledConstructorCount = 0;
         }
     }
 
@@ -4364,7 +4402,7 @@ static if (is(BCGen))
                 fs.increment.accept(this);
                 fixupContinue(oldContinueFixupCount, _body.end);
             }
-            genJump(condEval);
+            Jmp(condEval);
             auto afterLoop = genLabel();
             fixupBreak(oldBreakFixupCount, afterLoop);
             endCndJmp(condJmp, afterLoop);
@@ -4383,7 +4421,7 @@ static if (is(BCGen))
             {
                 fs.increment.accept(this);
             }
-            genJump(condEval);
+            Jmp(condEval);
             endCndJmp(condJmp, genLabel());
         }
         else
@@ -7099,7 +7137,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
         if (auto labeledBlock = ident in labeledBlocks)
         {
-            genJump(labeledBlock.begin);
+            Jmp(labeledBlock.begin);
         }
         else
         {
@@ -7171,7 +7209,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         {
             if (auto target = cast(void*) cs.ident in labeledBlocks)
             {
-                genJump(target.begin);
+                Jmp(target.begin);
             }
             else
             {
@@ -7197,7 +7235,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         {
             if (auto target = cast(void*) bs.ident in labeledBlocks)
             {
-                genJump(target.end);
+                Jmp(target.end);
             }
             else
             {
@@ -7872,7 +7910,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             fixupContinue(oldContinueFixupCount, block.end);
             increment.accept(this);
         }
-        genJump(block.begin);
+        Jmp(block.begin);
         auto after_jmp = genLabel();
         fixupBreak(oldBreakFixupCount, after_jmp);
 

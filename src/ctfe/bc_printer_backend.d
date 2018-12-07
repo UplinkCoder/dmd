@@ -329,10 +329,10 @@ struct Print_BCGen
         result ~= indent ~ "endJmp(jmp" ~ itos(atIp.addr) ~ functionSuffix ~ ", " ~ print(target) ~ functionSuffix ~ ");\n";
     }
 
-    void genJump(BCLabel target)
+    void Jmp(BCLabel target)
     {
         sameLabel = false;
-        result ~= indent ~ "genJump(" ~ print(target) ~ ");\n";
+        result ~= indent ~ "Jmp(" ~ print(target) ~ ");\n";
     }
 
     CndJmpBegin beginCndJmp(BCValue cond = BCValue.init, bool ifTrue = false)
