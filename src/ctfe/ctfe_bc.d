@@ -994,6 +994,28 @@ struct SharedCtfeState(BCGenT)
             return BCType.init;
     }
 
+    const(BCType) fieldType(const BCType type, const int fieldIndex) pure const
+    {
+        BCType result;
+
+        if (type.type == BCTypeEnum.Struct)
+        {
+            if (type.typeIndex && type.typeIndex <= structCount)
+            {
+                result = _sharedCtfeState.structTypes[type.typeIndex - 1].memberTypes[fieldIndex];
+            }
+        }
+        else if (type.type == BCTypeEnum.Class)
+        {
+            if (type.typeIndex && type.typeIndex <= structCount)
+            {
+                result = _sharedCtfeState.structTypes[type.typeIndex - 1].memberTypes[fieldIndex];
+            }
+        }
+
+       return result;
+    }
+
     uint[] initializer(const BCType type) const
     {
         assert(type.type == BCTypeEnum.Struct, "only structs can have initializers... Type passed: " ~ type.type.enumToString);
@@ -4525,8 +4547,6 @@ static if (is(BCGen))
 
             writefln("SliceExp %s", se.toString);
             writefln("se.e1 %s", se.e1.toString);
-
-            //assert(0, "Cannot handleExpression");
         }
 
         if (!se.lwr && !se.upr)
@@ -6451,11 +6471,14 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             auto fIndex =  (isStruct ? findFieldIndexByName(structDeclPtr, vd)
                                      : findFieldIndexByName(classDeclPtr, vd));
-            assert(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
-            assert(isStruct, "the code at line " ~__LINE__.itos ~ "Still has to be adjusted to get class members!"); 
-            auto bcStructType = _sharedCtfeState.structTypes[aggregateTypeIndex - 1];
 
-            auto fieldType = bcStructType.memberTypes[fIndex];
+            assert(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
+             
+            
+
+            auto fieldType = _sharedCtfeState.fieldType((isStruct ? _sharedCtfeState.structTypes[aggregateTypeIndex] 
+                                                                  : _sharedCtfeState.classTypes[aggregateTypeIndex]), fIndex);
+            
             // import std.stdio; writeln("got fieldType: ", fieldType); //DEBUGLINE
 
             string enumArrayToString(T)(T arr)
