@@ -1002,14 +1002,14 @@ struct SharedCtfeState(BCGenT)
         {
             if (type.typeIndex && type.typeIndex <= structCount)
             {
-                result = _sharedCtfeState.structTypes[type.typeIndex - 1].memberTypes[fieldIndex];
+                result = structTypes[type.typeIndex - 1].memberTypes[fieldIndex];
             }
         }
         else if (type.type == BCTypeEnum.Class)
         {
-            if (type.typeIndex && type.typeIndex <= structCount)
+            if (type.typeIndex && type.typeIndex <= classCount)
             {
-                result = _sharedCtfeState.structTypes[type.typeIndex - 1].memberTypes[fieldIndex];
+                result = classTypes[type.typeIndex - 1].memberTypes[fieldIndex];
             }
         }
 
@@ -3407,6 +3407,45 @@ public:
         uncompiledDynamicCastCount = 0;
     }
 
+    int getFieldIndex(BCType t, VarDeclaration vd)
+    {
+        int fIndex = -1;
+
+        if (t.type == BCTypeEnum.Class)
+        {
+            const ti = t.typeIndex;
+            if (!ti || ti < _sharedCtfeState.classCount)
+            {
+                bailout("can't get class-type invalid");
+                return -1;
+            }
+
+            int offset = -1;
+
+            auto cd = _sharedCtfeState.classDeclTypePointers[ti - 1]; 
+            BCClass* c = &_sharedCtfeState.classTypes[ti - 1];
+            
+            FindField: while(cd)
+            {
+                foreach(int i,f;cd.fields)
+                {
+                    if (vd == f)
+                    {
+                        fIndex = i;
+                        break FindField;
+                    }
+                }
+                cd = cd.baseClass;
+                c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
+            }
+        }
+
+        return fIndex;
+        // TODO consider getting the offset here as well
+        // and return an Index|Offsset-Pair
+
+    }
+
     override void visit(FuncDeclaration fd)
     {
         lastLoc = fd.loc;
@@ -4736,30 +4775,10 @@ static if (is(BCGen))
         }
         else if (dve.e1.type.ty == Tclass && (cast(TypeClass) dve.e1.type).sym)
         {
-            auto cd = (cast(TypeClass) dve.e1.type).sym;
-            auto ti = _sharedCtfeState.getClassIndex(cd);
-            bailout(!ti, "Don't know the class for: " ~ cd.toString);
-
-            int fIndex = -1;
-            int offset = -1;
-            BCClass* c = &_sharedCtfeState.classTypes[ti - 1];
-        
-            FindField: while(cd)
-            {
-                foreach(int i,f;cd.fields)
-                {
-                    if (dve.var == f)
-                    {
-                        fIndex = i;
-                        break FindField;
-                    }
-                }
-                cd = cd.baseClass;
-                c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
-            }
-
-            if (fIndex != -1)
-                offset = c.offset(fIndex);
+            const bcType = toBCType(dve.e1.type);
+            const c = _sharedCtfeState.classTypes[bcType.typeIndex - 1];
+            const fIndex = getFieldIndex(bcType, cast(VarDeclaration)dve.var);
+            const offset = c.offset(fIndex);
 
 
             BCType varType = c.memberTypes[fIndex];
@@ -6458,6 +6477,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 (isStruct ? _sharedCtfeState.getStructIndex(structDeclPtr)
                           : _sharedCtfeState.getClassIndex(classDeclPtr));
 
+            auto aggBCType = toBCType(aggregate.type);
+
             if (!aggregateTypeIndex)
             {
                 bailout("could not get Type of struct or class");
@@ -6469,16 +6490,19 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             import ddmd.ctfeexpr : findFieldIndexByName;
 
-            auto fIndex =  (isStruct ? findFieldIndexByName(structDeclPtr, vd)
-                                     : findFieldIndexByName(classDeclPtr, vd));
+            auto fIndex = (isStruct ? findFieldIndexByName(structDeclPtr, vd)
+                                   : getFieldIndex(aggBCType, vd));
 
             assert(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
-             
-            
 
-            auto fieldType = _sharedCtfeState.fieldType((isStruct ? _sharedCtfeState.structTypes[aggregateTypeIndex] 
-                                                                  : _sharedCtfeState.classTypes[aggregateTypeIndex]), fIndex);
-            
+            auto fieldType = _sharedCtfeState.fieldType(aggBCType, fIndex);
+
+            if (fieldType == BCType.init)
+            {
+                bailout("could not get field-type for -- " ~ ae.toString ~ " fIndex:" ~ itos(fIndex) ~ "aggBCType: " ~ _sharedCtfeState.typeToString(aggBCType));
+                return ;
+            }
+
             // import std.stdio; writeln("got fieldType: ", fieldType); //DEBUGLINE
 
             string enumArrayToString(T)(T arr)
@@ -6524,7 +6548,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 //Not sure if this is really correct :)
                 rhs = bcNull;
             }
-
+/+
             {
                 if (bcStructType.voidInit[fIndex])
                 {
@@ -6532,7 +6556,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     setMemberVoidInit(lhs, fIndex, true);
                 }
             }
-
++/
             if (!rhs.type.type.anyOf(supportedStructTypes))
             {
                 bailout("only " ~ enumArrayToString(supportedStructTypes) ~ " are supported for now. Not:" ~ rhs.type.type.enumToString);
@@ -6542,7 +6566,10 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             auto ptr = genTemporary(BCType(BCTypeEnum.i32));
 
-            Add3(ptr, lhs.i32, imm32(bcStructType.offset(fIndex)));
+            auto offset =  (isStruct ? _sharedCtfeState.structTypes[aggregateTypeIndex - 1].offset(fIndex)
+                                     : _sharedCtfeState.classTypes[aggregateTypeIndex - 1].offset(fIndex));
+
+            Add3(ptr, lhs.i32, imm32(offset));
             immutable size = _sharedCtfeState.size(rhs.type);
             if (size && size <= 4)
                 Store32(ptr, rhs);
