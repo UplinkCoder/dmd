@@ -840,6 +840,29 @@ struct BCClass
 
     BCType[bc_max_members] memberTypes;
 
+    void computeSize()
+    {
+        uint size;
+
+        if (parentIdx)
+        {
+            auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
+            if (!pct.size) pct.computeSize();
+            assert(pct.size <= align4(ClassMetaData.Size));
+            this.size = pct.size;
+        }
+        else
+        {
+            this.size = align4(ClassMetaData.Size);
+        }
+
+
+        foreach (t; memberTypes[0 .. memberCount])
+        {
+            size += align4(sharedCtfeState.size(t, true));
+        }
+    }
+
     const int offset(const int idx)
     {
         int _offset;
@@ -851,6 +874,13 @@ struct BCClass
             else if (idx > memberCount)
                 return -1;
 
+
+        if (parentIdx)
+        {
+            auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
+            if (!pct.size) pct.computeSize();
+            _offset += pct.size;
+        }
 
         _offset += (
             parentIdx ?
@@ -6491,7 +6521,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             import ddmd.ctfeexpr : findFieldIndexByName;
 
             auto fIndex = (isStruct ? findFieldIndexByName(structDeclPtr, vd)
-                                   : getFieldIndex(aggBCType, vd));
+                                    : getFieldIndex(aggBCType, vd));
 
             assert(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
 
