@@ -2903,7 +2903,7 @@ public:
         }
         auto oldRetval = retval;
         import ddmd.asttypename;
-        // import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
+        import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
 
         if (processingArguments)
         {
@@ -5277,15 +5277,7 @@ static if (is(BCGen))
         else if (type.type == BCTypeEnum.Class)
         {
             FuncDeclaration ctor = ne.member;
-            bool noCtor;
-            if (!ctor)
-            {
-                noCtor = true;
-                // ne.member is null when there is no constructor in the class
-                // However we need to have some kind of ID for it so we don't
-                // Generate it over and over agian let's just cast the classType
-                // It should be unique :)
-            }
+
             auto cIdx = _sharedCtfeState.getFunctionIndex(ctor);
             if (!cIdx)
             {
@@ -5293,13 +5285,14 @@ static if (is(BCGen))
             }
 
             BCValue[] cTorArgs;
-            cTorArgs.length = ne.arguments.dim;
+            cTorArgs.length = ne.arguments.dim + 1;
             foreach(idx; 0 .. ne.arguments.dim)
             {
                 cTorArgs[idx] = genExpr((*ne.arguments)[idx]);
             }
-            if (noCtor)
-                cTorArgs ~= ptr.i32;
+            // ptr  = this; which should already point
+            // to freshly allocated memory.
+            cTorArgs[ne.arguments.dim] = ptr.i32;
 
             Comment("ConstructorCall");
             Call(ptr, imm32(cIdx), cTorArgs);
@@ -6456,9 +6449,12 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             import ddmd.ctfeexpr : findFieldIndexByName;
 
-            auto fIndex = findFieldIndexByName(structDeclPtr, vd);
+            auto fIndex =  (isStruct ? findFieldIndexByName(structDeclPtr, vd)
+                                     : findFieldIndexByName(classDeclPtr, vd));
             assert(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
+            assert(isStruct, "the code at line " ~__LINE__.itos ~ "Still has to be adjusted to get class members!"); 
             auto bcStructType = _sharedCtfeState.structTypes[aggregateTypeIndex - 1];
+
             auto fieldType = bcStructType.memberTypes[fIndex];
             // import std.stdio; writeln("got fieldType: ", fieldType); //DEBUGLINE
 
@@ -6488,7 +6484,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             if (!fieldType.type.anyOf(supportedStructTypes))
             {
-                bailout("only " ~ enumArrayToString(supportedStructTypes) ~ " are supported for structs (for now)... not : " ~ enumToString(bcStructType.memberTypes[fIndex].type));
+                bailout("only " ~ enumArrayToString(supportedStructTypes) ~ " are supported for structs (for now)... not : " ~ enumToString(fieldType.type));
                 return;
             }
 
@@ -7721,7 +7717,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             () {
                 with (BCTypeEnum)
                 {
-                    enum a = [c8, i8, c16, i16, c32, i32, i64, f23, f52, Slice, Array, Struct, string8, Function];
+                    enum a = [c8, i8, c16, i16, c32, i32, i64, f23, f52, Slice, Array, Struct, string8, Function, Class];
                     return cast(typeof(a[0])[a.length]) a;
                 }
             } ();
