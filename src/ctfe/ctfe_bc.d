@@ -26,7 +26,7 @@ enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -2297,6 +2297,18 @@ extern (C++) final class BCV(BCGenT) : Visitor
         return 0;
     }
 
+    int getConstructor(CtorDeclaration cd, BCType type)
+    {
+        assert(type.type == BCTypeEnum.Class);
+        foreach (ctor; uncompiledConstructors[0 .. uncompiledConstructorCount])
+        {
+            if (ctor.cd == cd && ctor.type == type)
+            {
+                return ctor.fnIdx;
+            }
+        }
+        return 0;
+    }
 
     extern(D) BCValue addError(Loc loc, string msg, BCValue v1 = BCValue.init, BCValue v2 = BCValue.init, BCValue v3 = BCValue.init, BCValue v4 = BCValue.init)
     {
@@ -5341,12 +5353,12 @@ static if (is(BCGen))
         }
         else if (type.type == BCTypeEnum.Class)
         {
-            FuncDeclaration ctor = ne.member;
+            auto ctor = ne.member;
 
-            auto cIdx = _sharedCtfeState.getFunctionIndex(ctor);
+            auto cIdx = getConstructor(ctor, type);
             if (!cIdx)
             {
-                addUncompiledConstructor(ne.member, type, &cIdx);
+                addUncompiledConstructor(ctor, type, &cIdx);
             }
 
             BCValue[] cTorArgs;
@@ -7440,7 +7452,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 auto vtblPtr = genTemporary(i32Type);
                 Load32FromOffset(vtblPtr, thisPtr.i32, ClassMetaData.VtblOffset);
 
-		const vtblIndex = fd.vtblIndex;
+                const vtblIndex = fd.vtblIndex;
 
                 Comment("vtblIndex == " ~ itos(vtblIndex) ~ "  for " ~ fd.toString);
                 Comment("vtblLoad");
