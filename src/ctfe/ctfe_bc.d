@@ -26,7 +26,7 @@ enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -2718,7 +2718,8 @@ extern (C++) final class BCV(BCGenT) : Visitor
             auto e2 = genTemporary(i32Type);
 
             auto LbeginLoop = genLabel();
-            auto cndJmp1 = beginCndJmp(offset);
+            auto is_false = beginCndJmp(result);
+            auto is_at_end = beginCndJmp(offset);
             Sub3(offset, offset, imm32(1));
 
             Load32(e1, ptr1);
@@ -2726,7 +2727,8 @@ extern (C++) final class BCV(BCGenT) : Visitor
             Eq3(result, e1, e2);
             Jmp(LbeginLoop);
             auto LendLoop = genLabel();
-            endCndJmp(cndJmp1, LendLoop);
+            endCndJmp(is_false, LendLoop);
+            endCndJmp(is_at_end, LendLoop);
         }
     }
 
