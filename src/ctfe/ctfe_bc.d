@@ -330,6 +330,7 @@ ulong evaluateUlong(Expression e)
 }
 
 pragma(msg, "sizeof(SharedExecutionState) = ", int(SharedExecutionState.sizeof/1024), "k");
+pragma(msg, "sizeof(SharedCtfeState) = ", int(_sharedCtfeState.sizeof/1024/1024), "M");
 
 uint max (uint a, uint b)
 {
@@ -849,11 +850,11 @@ struct BCClass
             auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
             if (!pct.size) pct.computeSize();
             assert(pct.size <= align4(ClassMetaData.Size));
-            this.size = pct.size;
+            size = pct.size;
         }
         else
         {
-            this.size = align4(ClassMetaData.Size);
+            size = align4(ClassMetaData.Size);
         }
 
 
@@ -861,6 +862,8 @@ struct BCClass
         {
             size += align4(sharedCtfeState.size(t, true));
         }
+
+        this.size = size;
     }
 
     const int offset(const int idx)
@@ -871,7 +874,7 @@ struct BCClass
 
         debug (ctfe)
             assert(idx <= memberCount);
-            else if (idx > memberCount)
+        else if (idx > memberCount)
                 return -1;
 
 
@@ -880,6 +883,10 @@ struct BCClass
             auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
             if (!pct.size) pct.computeSize();
             _offset += pct.size;
+        }
+        else
+        {
+            
         }
 
         _offset += (
@@ -951,7 +958,7 @@ struct SharedCtfeState(BCGenT)
     BCPointer[bc_max_pointers] pointerTypes;
 
     BCTypeVisitor btv = new BCTypeVisitor();
-
+    pragma(msg, "sizeof typeVisitor instance = ", int(__traits(classInstanceSize, BCTypeVisitor)), "bytes");
 
     uint structCount;
     uint classCount;
@@ -961,7 +968,7 @@ struct SharedCtfeState(BCGenT)
     // find a way to live without 102_000
     RetainedError[bc_max_errors] errors;
     uint errorCount;
-
+    pragma(msg, "sizeof errors = ", int(errors.sizeof/1024), "k");
     string typeToString(const BCType type) const
     {
         string result;
@@ -1127,7 +1134,7 @@ struct SharedCtfeState(BCGenT)
     static if (is(BCFunction))
     {
         static assert(is(typeof(BCFunction.funcDecl) == void*));
-        BCFunction[ubyte.max * 64] functions;
+        BCFunction[bc_max_functions] functions;
         int functionCount = 0;
     }
     else
@@ -5335,7 +5342,11 @@ static if (is(BCGen))
         if (type.type == BCTypeEnum.Class)
         {
             ptr = genTemporary(type);
-            typeSize = _sharedCtfeState.size(type) + ClassMetaData.Size;
+            BCClass* c = &_sharedCtfeState.classTypes[type.typeIndex - 1];
+            if (c.size)
+                c.computeSize();
+            printf("Allocating class with size %d\n", c.size);
+            typeSize = c.size;
         }
         else
         {
