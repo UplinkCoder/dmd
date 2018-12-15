@@ -31,8 +31,6 @@ enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
 
-enum output_bc = 1;
-
 private static void clearArray(T)(auto ref T array, uint count)
 {
         array[0 .. count] = typeof(array[0]).init;
@@ -273,7 +271,7 @@ struct UnionMetaData
 /// before the first member
 struct ClassMetaData
 {
-    enum VtblOffset = 0;
+    enum VtblPtrOffset = 0;
     enum TypeIdIdxOffset = 4;
     enum Size = 8;
 }
@@ -707,7 +705,6 @@ struct BeginClassResult
     void addField(const BCType bct, bool isVoid)
     {
         memberTypes[memberCount++] = bct;
-        size += _sharedCtfeState.size(bct, true);
     }
 }
 
@@ -833,7 +830,7 @@ struct BCUnion
 struct BCClass
 {
     uint parentIdx; /// 0 is object
-    uint size;
+    uint size = 0;
     uint memberCount;
     uint vtblPtr;
 
@@ -843,13 +840,15 @@ struct BCClass
 
     void computeSize()
     {
+        assert(!this.size);
+
         uint size;
 
         if (parentIdx)
         {
             auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
             if (!pct.size) pct.computeSize();
-            assert(pct.size <= align4(ClassMetaData.Size));
+            assert(pct.size >= align4(ClassMetaData.Size));
             size = pct.size;
         }
         else
@@ -888,12 +887,6 @@ struct BCClass
         {
             
         }
-
-        _offset += (
-            parentIdx ?
-            _sharedCtfeState.classTypes[parentIdx - 1].size :
-            ClassMetaData.Size
-        );
 
         foreach (t; memberTypes[0 .. idx])
         {
@@ -1373,7 +1366,7 @@ struct SharedCtfeState(BCGenT)
                 {
                     // the if above should really be an assert
                     // I have no idea why this even happens
-                    return 0;
+                    assert(0);
                 }
 
                 const BCClass _class = classTypes[type.typeIndex - 1];
@@ -2020,10 +2013,6 @@ extern (C++) final class BCTypeVisitor : Visitor
             ct.addField(toBCType(f.type), f._init ? !!f._init.isVoidInitializer : false);
         }
 
-        if (parentIdx)
-        {
-            ct.size += _sharedCtfeState.classTypes[parentIdx - 1].size;
-        }
         sharedCtfeState.endClass(&ct, died);
     }
 
@@ -2976,7 +2965,7 @@ public:
         }
         auto oldRetval = retval;
         import ddmd.asttypename;
-        import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
+        // import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
 
         if (processingArguments)
         {
@@ -2984,7 +2973,7 @@ public:
             {
                 import std.stdio;
 
-                //    writeln("Arguments ", arguments);
+                // writeln("Arguments ", arguments);
             }
             if (processedArgs != arguments.length)
             {
@@ -3251,7 +3240,7 @@ public:
                 me = oldme;
             beginFunction(uc.fnIdx, cast(void*) null);
             // printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
-                Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
+                Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblPtrOffset);
                 Ret(p1);
             endFunction();
             static if (is(BCGen))
@@ -3333,7 +3322,7 @@ public:
             {
                 const bcClass = _sharedCtfeState.classTypes[forCtor.typeIndex - 1];
                 if (!_this) Comment("There's no this here");
-                Store32AtOffset(_this.i32, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
+                Store32AtOffset(_this.i32, imm32(bcClass.vtblPtr), ClassMetaData.VtblPtrOffset);
             }
 
             me.fbody.accept(this);
@@ -3404,9 +3393,9 @@ public:
 
                 Set(rv, p1.i32);
 
-                if (ClassMetaData.VtblOffset)
+                if (ClassMetaData.VtblPtrOffset)
                 {
-                    Add3(vtblPtrAddr, p1.i32, imm32(ClassMetaData.VtblOffset));
+                    Add3(vtblPtrAddr, p1.i32, imm32(ClassMetaData.VtblPtrOffset));
                 }
                 else
                 {
@@ -3490,7 +3479,6 @@ public:
         return fIndex;
         // TODO consider getting the offset here as well
         // and return an Index|Offsset-Pair
-
     }
 
     override void visit(FuncDeclaration fd)
@@ -5343,9 +5331,8 @@ static if (is(BCGen))
         {
             ptr = genTemporary(type);
             BCClass* c = &_sharedCtfeState.classTypes[type.typeIndex - 1];
-            if (c.size)
+            if (!c.size)
                 c.computeSize();
-            printf("Allocating class with size %d\n", c.size);
             typeSize = c.size;
         }
         else
@@ -7463,7 +7450,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Comment("loadVtblPtr");
 
                 auto vtblPtr = genTemporary(i32Type);
-                Load32FromOffset(vtblPtr, thisPtr.i32, ClassMetaData.VtblOffset);
+                Load32FromOffset(vtblPtr, thisPtr.i32, ClassMetaData.VtblPtrOffset);
 
                 const vtblIndex = fd.vtblIndex;
 
@@ -7959,7 +7946,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 && _sharedCtfeState.arrayTypes[fromType.typeIndex - 1].elementType
                 == _sharedCtfeState.sliceTypes[toType.typeIndex - 1].elementType)
         {
-            // e.g. cast(uint[])uint[10]
+            // e.g. cast(uint[])uint[10] reinterpret
             retval.type = toType;
         }
         else if (fromType.type == BCTypeEnum.string8
@@ -7967,9 +7954,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 && _sharedCtfeState.sliceTypes[toType.typeIndex - 1].elementType.type
                 == BCTypeEnum.i8)
         {
-            // for the cast(ubyte[])string case
-            // for now make an i8 slice
-            _sharedCtfeState.sliceTypes[_sharedCtfeState.sliceCount++] = BCSlice(BCType(BCTypeEnum.i8));
+            // for the cast(ubyte[])string case reinterpret
             retval.type = toType;
         }
         else if (toType.type == BCTypeEnum.string8
@@ -7977,11 +7962,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 && _sharedCtfeState.sliceTypes[fromType.typeIndex - 1].elementType.type
                 == BCTypeEnum.i8)
         {
-            // for the cast(ubyte[])string case
-            // for now make an i8 slice
-            _sharedCtfeState.sliceTypes[_sharedCtfeState.sliceCount++] = BCSlice(BCType(BCTypeEnum.i8));
-            retval.type = BCType(BCTypeEnum.Slice, _sharedCtfeState.sliceCount);
-            //retval.type = toType;
+            // for the cast(string)ubyte[] case reinterpret
+            retval.type = toType;
         }
         else if (toType.type == BCTypeEnum.Class && fromType.type == BCTypeEnum.Class)
         {

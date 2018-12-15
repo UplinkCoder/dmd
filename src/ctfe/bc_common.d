@@ -924,7 +924,9 @@ BCTypeEnum commonTypeEnum(BCTypeEnum lhs, BCTypeEnum rhs) pure @safe
         commonType = BCTypeEnum.i64;
     }
     else if (lhs.anyOf(smallIntegerTypes) || rhs.anyOf(smallIntegerTypes))
+    {
         commonType = BCTypeEnum.i32;
+    }
 
     return commonType;
 }
