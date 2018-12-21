@@ -5995,7 +5995,7 @@ static if (is(BCGen))
         }
         else if (!canHandleBinExpTypes(lhs.type.type, rhs.type.type))
         {
-            bailout("Cannot use binExpTypes: " ~ enumToString(lhs.type.type) ~ " et: " ~ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(lhs.type))  ~ " -- " ~ " ~ enumToString(rhs.type.type)" ~ " et : " ~ 
+            bailout("Cannot use binExpTypes: " ~ enumToString(lhs.type.type) ~ " et: " ~ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(lhs.type))  ~ " -- " ~ enumToString(rhs.type.type)" ~ " et : " ~ 
 _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~ e.toString);
             return;
         }
