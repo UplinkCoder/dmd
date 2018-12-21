@@ -17,9 +17,9 @@ class E : D
   int _i;
   this(int _i)
   {
-    this._i = 1;
+    this._i = 3;
   }
-  override int i() {return 3;}
+  override int i() {return _i;}
   override float f() { return 2.0f; }
 }
 
