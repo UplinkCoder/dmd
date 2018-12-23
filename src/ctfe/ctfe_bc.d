@@ -31,8 +31,6 @@ enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
 
-enum output_bc = 1;
-
 private static void clearArray(T)(auto ref T array, uint count)
 {
         array[0 .. count] = typeof(array[0]).init;
@@ -5345,7 +5343,7 @@ static if (is(BCGen))
             printf("Allocating class with size %d\n", c.size);
             typeSize = c.size;
         }
-        else if (type.type == BCTypeEnum.Slice)
+        else if (type.type == BCTypeEnum.Slice || type.type == BCTypeEnum.string8)
         {
             assert(ne.arguments.dim  == 1 || ne.arguments.dim == 0, 
                 "new Slice is only expected to have one or zero arguments");
