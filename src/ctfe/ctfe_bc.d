@@ -4191,12 +4191,11 @@ static if (is(BCGen))
                 // FIXME Design!
                 // Things that are already heapValues
                 // don't need to be stored ((or do they ??) ... do we need to copy) ?
-
-                retval.type = _sharedCtfeState.pointerOf(v.type);
-/*
+                
+                /*
                 if (v.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.Slice]))
                 {
-					//bailout("HeapValues are currently unsupported for SymOffExps -- " ~ se.toString);
+                    //bailout("HeapValues are currently unsupported for SymOffExps -- " ~ se.toString);
                     return ;
                 }
 */
@@ -4204,11 +4203,12 @@ static if (is(BCGen))
                 Alloc(addr, imm32(align4(_sharedCtfeState.size(v.type))));
                 v.heapRef = BCHeapRef(addr);
                 StoreToHeapRef(v);
-
+                
                 setVariable(vd, v);
                 // register as pointer and set the variable to pointer as well;
                 // since it has to be promoted to heap value now.
                 retval = addr;
+                retval.type = _sharedCtfeState.pointerOf(v.type);
 
 
             }
