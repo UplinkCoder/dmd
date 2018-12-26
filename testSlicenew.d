@@ -32,3 +32,13 @@ char[] f3()
 static assert(f3() == ['A', 'B', 'C', 'D']);
 
 
+char[] f4()
+{
+    char[4] l;
+    l = 'V';
+    char[] r = new char[] (4);
+    r[] = l[];
+    return r;
+}
+
+static assert(f4() == "VVVV");
