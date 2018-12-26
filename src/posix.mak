@@ -231,8 +231,8 @@ FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argt
 	json lexer lib link mars mtype nogc nspace opover optimize parse sapply	\
 	sideeffect statement staticassert target tokens traits utf visitor	\
 	typinf utils statement_rewrite_walker statementsem safe blockexit asttypename \
-	ctfe/ctfe_bc ctfe/bc ctfe/bc_common ctfe/bc_limits ctfe/bc_test \
-	ctfe/bc_printer_backend ctfe/bc_c_backend))
+	ctfe/ctfe_bc ctfe/bc_common ctfe/bc_limits ctfe/fpconv_ctfe ctfe/bc_test \
+	ctfe/bc ctfe/bc_printer_backend ctfe/bc_c_backend))
 
 ifeq ($(D_OBJC),1)
 	FRONT_SRCS += $D/objc.d
