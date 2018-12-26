@@ -1,5 +1,7 @@
 module ddmd.ctfe.bc_common;
 
+import ddmd.ctfe.fpconv_ctfe;
+
 /// functions with index skipFn will be skipped
 /// calling them is equivlent to an expensive nop
 /// this is true for direct and indirect calls
@@ -98,14 +100,12 @@ static assert(mixin(uint.max.itos) == uint.max);
 
 string floatToString(float f)
 {
-   import std.conv : to;
-   return f.to!string;
+    return fpconv_dtoa(f) ~ "f";
 }
 
 string doubleToString(double d)
 {
-   import std.conv : to;
-   return d.to!string;
+    return fpconv_dtoa(d);
 }
 
 const(uint) basicTypeSize(const BCTypeEnum bct) @safe pure
