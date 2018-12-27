@@ -1774,7 +1774,7 @@ Expression toExpression(const BCValue value, Type expressionType,
             result = new RealExp(lastLoc, *cast(double*)&value.imm64, expressionType);
         }
         break;
-    case Tint32, Tuns32, Tint16, Tuns16, Tint8, Tuns8:
+    case Tint32, Tuns32, Tint16, Tuns16, Tint8, Tuns8, Tchar:
         {
             result = new IntegerExp(lastLoc, value.imm32, expressionType);
         }
@@ -6974,6 +6974,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                      || (lhs.type.type == BCTypeEnum.string8 && rhs.type.type == BCTypeEnum.c8))
                 {
                     // this is a broadcast assignment to a slice
+                    Comment("Broadcast Assignment");
                     const elemType = _sharedCtfeState.elementType(lhs.type);
                     auto length = getLength(lhs);
                     BCValue idx = genTemporary(i32Type);

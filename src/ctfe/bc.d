@@ -16,6 +16,7 @@ enum InstKind
 
     StackInst,
 }
+
 /+ We don't need this right now ... maybe later
 auto instKind(LongInst i)
 {
@@ -1919,7 +1920,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     {
         switch (arg.type.type)
         {
-        case BCTypeEnum.i32, BCTypeEnum.f23:
+        case BCTypeEnum.i32, BCTypeEnum.f23, BCTypeEnum.c8, BCTypeEnum.i16, BCTypeEnum.i8, BCTypeEnum.c16, BCTypeEnum.c32:
             {
                 *(&stackP[argOffset / 4]) = arg.imm32;
                 argOffset += uint.sizeof;
@@ -1943,7 +1944,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             break;
         default:
             //return -1;
-            //       assert(0, "unsupported Type " ~ to!string(arg.type));
+                   assert(0, "unsupported Type " ~ to!string(arg.type));
         }
     }
     uint ip = 4;
@@ -1955,7 +1956,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     if (byteCode.length < 6 || byteCode.length <= ip)
         return typeof(return).init;
 
-    if (!__ctfe) debug printf("Interpreter started");
+    if (!__ctfe) debug printf("Interpreter started\n");
     while (true && ip <= byteCode.length - 1)
     {
 /+
@@ -2554,6 +2555,8 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             {
                 debug
                 {
+	            writeln(byteCode.printInstructions(stackMap));
+
                     writeln("ip:", ip, "Assert(&", opRefOffset, " *",  *opRef, ")");
                 }
                 if (*opRef == 0)
@@ -2984,7 +2987,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     if (!__ctfe)
                     {
-                        writefln("Alloc(#%d) = &%d", allocSize, *lhsRef);
+                        printf("Alloc(#%d) = &%d\n", allocSize, *lhsRef);
                     }
                 }
 
