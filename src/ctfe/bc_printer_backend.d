@@ -124,7 +124,11 @@ struct Print_BCGen
         {
         case BCValueType.Immediate:
             {
-                if (val.type.type == BCTypeEnum.i32)
+                if (val.type.type == BCTypeEnum.c8)
+                {
+                    result ~= "Imm32('" ~ [cast(char)(val.imm32 & 0xFF)] ~ "')";
+                }
+                else if (val.type.type == BCTypeEnum.i32)
                 {
                     result ~= "Imm32(" ~ itos(val.imm32.imm32) ~ ")";
                 }

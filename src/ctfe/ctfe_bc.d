@@ -3699,12 +3699,6 @@ static if (is(BCGen))
                     return;
                 }
 
-                if (expr.type.type != BCTypeEnum.i64)
-                {
-                     expr = expr.i32;
-                     retval = retval.i32;
-                }
-
                 assert(expr.vType != BCValueType.Immediate,
                     "++ does not make sense on an Immediate Value");
 
@@ -3718,6 +3712,11 @@ static if (is(BCGen))
                 else if (expr.type.type == BCTypeEnum.f52)
                 {
                     Add3(expr, expr, BCValue(Imm52f(1.0)));
+                }
+                else if (expr.type.type.anyOf(smallIntegers))
+                {
+                    expr = expr.i32;
+                    Add3(expr, expr, imm32(1));
                 }
                 else
                 {
@@ -6364,7 +6363,9 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
     static bool canWorkWithType(const BCType bct) pure
     {
-        return (bct.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64, BCTypeEnum.f23, BCTypeEnum.f52]));
+        return (bct.type.anyOf([BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32,
+                                BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64, 
+                                BCTypeEnum.f23, BCTypeEnum.f52]));
     }
 /+
     override void visit(ConstructExp ce)

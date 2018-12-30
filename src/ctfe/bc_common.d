@@ -67,6 +67,18 @@ string enumToString(E)(E v)
     return result;
 }
 
+uint adjustmentMask(BCTypeEnum t)
+{
+    uint mask = 0;
+    const typeSize = basicTypeSize(t);
+    if (typeSize == 1)
+        mask = 0xFF;
+    else if (typeSize == 2)
+        mask = 0xFFFF;
+
+    return mask;
+}
+
 
 const(uint) fastLog10(const uint val) pure nothrow @nogc @safe
 {
@@ -105,7 +117,7 @@ string floatToString(float f)
 
 string doubleToString(double d)
 {
-    return fpconv_dtoa(d);
+   return fpconv_dtoa(d);
 }
 
 const(uint) basicTypeSize(const BCTypeEnum bct) @safe pure
@@ -903,8 +915,7 @@ template ensureIsBCGen(BCGenT)
 }
 
 /// commonType enum used for implicit conversion
-static immutable smallIntegerTypes = [BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8
-                                      BCTypeEnum.c32, BCTypeEnum.c16, BCTypeEnum.c8];
+static immutable smallIntegerTypes = [BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8];
 
 BCTypeEnum commonTypeEnum(BCTypeEnum lhs, BCTypeEnum rhs) pure @safe
 {
