@@ -324,12 +324,14 @@ struct Print_BCGen
     {
         sameLabel = false;
         result ~= indent ~ "auto jmp" ~ itos(++jmpCount) ~ functionSuffix ~ " = beginJmp();\n";
+        incIndent();
         return BCAddr(jmpCount);
     }
 
     void endJmp(BCAddr atIp, BCLabel target)
     {
         sameLabel = false;
+        decIndent();
         result ~= indent ~ "endJmp(jmp" ~ itos(atIp.addr) ~ functionSuffix ~ ", " ~ print(target) ~ functionSuffix ~ ");\n";
     }
 
@@ -344,12 +346,16 @@ struct Print_BCGen
         sameLabel = false;
         result ~= indent ~ "auto cndJmp" ~ itos(++cndJumpCount) ~ functionSuffix ~ " = beginCndJmp(" ~ (
             cond ? (print(cond) ~ (ifTrue ? ", true" : "")) : "") ~ ");\n";
+        incIndent();
+        result ~= "\n";
         return CndJmpBegin(BCAddr(cndJumpCount), cond, ifTrue);
     }
 
     void endCndJmp(CndJmpBegin jmp, BCLabel target)
     {
         sameLabel = false;
+        decIndent();
+        result ~= "\n";
         result ~= indent ~ "endCndJmp(cndJmp" ~ itos(jmp.at.addr) ~ ", " ~ print(target) ~ ");\n";
     }
 
@@ -468,6 +474,7 @@ struct Print_BCGen
         sameLabel = false;
         result ~= indent ~ "Byte3(" ~ print(_result) ~ ", " ~ print(word) ~ ", " ~ print(idx) ~ ");\n";
     }
+
     import ddmd.globals : Loc;
     void Call(BCValue _result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
