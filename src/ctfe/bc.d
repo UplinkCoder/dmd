@@ -651,7 +651,7 @@ pure:
 
     void Line(uint line)
     {
-       //  emitLongInst(LongInst.Line, StackAddr(0), Imm32(line));
+         emitLongInst(LongInst.Line, StackAddr(0), Imm32(line));
     }
 
     void Comment(string comment)
@@ -2957,7 +2957,14 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     return cRetval;
                 }
-                *lhsRef = cRetval.imm32;
+                if (cRetval.type.type == BCTypeEnum.i64 || cRetval.type.type == BCTypeEnum.f52)
+                {
+                    *lhsRef = cRetval.imm64;
+                }
+                else
+                {
+                    *lhsRef = cRetval.imm32;
+                }
                 callDepth--;
             }
             break;
