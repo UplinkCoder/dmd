@@ -2928,7 +2928,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                         if(stackP[arg.stackAddr.addr / 4] <= uint.max)
                             callArgs[i] = imm32(stackP[arg.stackAddr.addr / 4] & uint.max);
                         else
-                            callArgs[i] = BCValue(Imm64(stackP[arg.stackAddr.addr]));
+                            callArgs[i] = BCValue(Imm64(stackP[arg.stackAddr.addr / 4]));
                     }
                     else if (arg.vType == BCValueType.Immediate)
                     {
