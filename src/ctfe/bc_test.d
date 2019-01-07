@@ -329,6 +329,35 @@ bool test(BCGenT)()
     static assert(() {
         BCHeap heap; return testStore64([], &heap);
     }().imm64.imm64 == 0x13371337DEADBEEF);
+/+
+    static immutable testPassthrough64 = BCGenFunction!(BCGenT, () {
+        BCGenT gen;
+        with (gen)
+        {
+            Initialize();
 
+            beginFunction(0);//__lambda3
+                auto tmp1 = genTemporary(BCType(BCTypeEnum.i64));//SP[4]
+                Call(tmp1, BCValue(Imm32(2)), [BCValue(Imm64(4294967295 | (4294967295 << 32)))]);
+                auto tmp2 = genTemporary(BCType(BCTypeEnum.i64));//SP[12]
+                Call(tmp2, BCValue(Imm32(2)), [tmp1]);
+                Ret(tmp1);
+            endFunction();
+
+            auto l_1_fn_1 = genParameter(BCType(BCTypeEnum.i64));//SP[4]
+            beginFunction(1);//echo
+                Ret(l_1_fn_1);
+            endFunction();
+
+            Finalize();
+        }
+        return gen;
+
+    });
+
+    pragma(msg, () {
+        BCHeap heap; return testPassthrough64([], &heap);
+    }()/*.imm64.imm64 == ulong.max*/);
++/
     return true;
 }
