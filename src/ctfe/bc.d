@@ -2751,9 +2751,11 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
         case LongInst.HeapStore64:
             {
-                assert(*lhsRef, "trying to deref null pointer SP[" ~ to!string((lhsRef - &stackP[0])*4) ~ "] at : &" ~ to!string (ip - 2));
-                (*(heapPtr._heap.ptr + *lhsRef)) = (*rhs) & 0xFF_FF_FF_FF;
-                (*(heapPtr._heap.ptr + 4 + *lhsRef)) = ((*rhs & 0xFF_FF_FF_FF_00_00_00_00) >> 32);
+                assert(*lhsRef, "trying to deref null pointer SP[" ~ to!string((lhsRef - &stackP[0])*4) ~ "] at : &" ~ itos (ip - 2));
+                const heapOffset = *lhsRef;
+                assert(heapOffset < heapPtr.heapSize, "Store out of range at ip: &" ~ itos(ip - 2));
+                (*(heapPtr._heap.ptr + heapOffset)) = (*rhs) & 0xFF_FF_FF_FF;
+                (*(heapPtr._heap.ptr + 4 + heapOffset)) = ((*rhs & 0xFF_FF_FF_FF_00_00_00_00) >> 32);
             }
             break;
 
