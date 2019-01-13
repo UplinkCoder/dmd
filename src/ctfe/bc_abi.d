@@ -1,9 +1,8 @@
 /// This module contains ABI definitions in form of structs and helper functions
 
-
 module ddmd.ctfe.bc_abi;
 
-import bc_limits;
+import ddmd.ctfe.bc_limits;
 
 /// appended to a struct
 /// behind the last member

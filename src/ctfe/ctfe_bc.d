@@ -192,6 +192,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expressions* args)
 }
 
 import ddmd.ctfe.bc_common;
+import ddmd.ctfe.bc_abi;
 
 struct ClosureVariableDescriptor
 {
@@ -236,45 +237,6 @@ ClosureVariableDescriptor* searchInParent(FuncDeclaration fd, VarDeclaration vd)
 }
 
 enum heapStartAddr = 100;
-
-struct SliceDescriptor
-{
-    enum BaseOffset = 0;
-    enum LengthOffset = 4;
-    enum CapcityOffset = 8;
-    enum ExtraFlagsOffset = 12;
-    enum Size = 16;
-}
-
-struct DelegateDescriptor
-{
-    enum FuncPtrOffset = 0;
-    enum ContextPtrOffset = 4;
-    enum Size = 8;
-}
-
-/// appended to a struct
-/// so it's behind the last member
-struct StructMetaData
-{
-    enum VoidInitBitfieldOffset = 0;
-    enum Size = 4;
-}
-/// appended to union
-/// behind the biggest Member
-struct UnionMetaData
-{
-    enum VoidInitBitfieldOffset = 0;
-    enum Size = bc_max_members/8;
-}
-/// prepended to a class
-/// before the first member
-struct ClassMetaData
-{
-    enum VtblOffset = 0;
-    enum TypeIdIdxOffset = 4;
-    enum Size = 8;
-}
 
 __gshared LocType!() lastLoc;
 
@@ -6317,12 +6279,16 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             bailout("Currently we don't support < or > for pointers.");
             return ;
         }
-        if (canWorkWithType(lhs.type) && canWorkWithType(rhs.type) && (!oldAssignTo || canWorkWithType(oldAssignTo.type)) || true)
+
+        if (canWorkWithType(lhs.type) && canWorkWithType(rhs.type) && (!oldAssignTo || canWorkWithType(oldAssignTo.type)))
         {
             switch (ce.op)
             {
             case TOK.TOKlt:
                 {
+                    import std.stdio : writeln; writeln(ce.toString);
+                    writeln(canWorkWithType(lhs.type) && canWorkWithType(rhs.type) && (!oldAssignTo || canWorkWithType(oldAssignTo.type)));
+                    writeln(lhs.type, rhs.type, !oldAssignTo, oldAssignTo.type);
                     Lt3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
@@ -6953,6 +6919,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
                     const structSize = _sharedCtfeState.size(lhs.type);
                     const allocSize = structSize.align4;
+                    if (!allocSize)
+                    {
+                        bailout("We would do a null allocation in " ~ ae.toString);
+                        return ;
+                    }
 
                     if (ae.op == TOKconstruct)
                     {

@@ -2,7 +2,7 @@ module ddmd.ctfe.bc;
 import ddmd.ctfe.bc_common;
 import ddmd.ctfe.bc_limits;
 import core.stdc.stdio;
-
+debug = bc;
 /**
  * Written By Stefan Koch in 2016/17
  */
@@ -53,9 +53,18 @@ auto instKind(LongInst i)
     }
 } +/
 
-struct RetainedCall
+
+static if (is(typeof({import ddmd.globals : Loc; })))
 {
     import ddmd.globals : Loc;
+}
+else
+{
+    struct Loc {}
+}
+
+struct RetainedCall
+{
     BCValue fn;
     BCValue[] args;
 
@@ -380,8 +389,7 @@ struct BCGen
 
     void beginFunction(uint fnId = 0, void* fd = null)
     {
-        import ddmd.declaration : FuncDeclaration;
-        import std.string;
+//        import ddmd.declaration : FuncDeclaration;
         ip = BCAddr(4);
         //() @trusted { assert(!insideFunction, fd ? (cast(FuncDeclaration)fd).toChars.fromStringz : "fd:null"); } ();
         //TODO figure out why the above assert cannot always be true ... see issue 7667
@@ -1035,7 +1043,6 @@ pure:
         emitArithInstruction(LongInst.Mod, result, rhs, &result.type.type);
     }
 
-    import ddmd.globals : Loc;
     void Call(BCValue result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
         calls[callCount++] = RetainedCall(fn, args, functionId, ip, sp, l);
@@ -1833,15 +1840,16 @@ string printInstructions(const int* startInstructions, uint length, const string
     return result ~ "\nEndInstructionDump\n";
 }
 
-static if (is(typeof(() { import ddmd.ctfe.ctfe_bc : RetainedError;  })))
+static if (is(typeof({ import ddmd.ctfe.ctfe_bc; })))
 {
-    import ddmd.ctfe.ctfe_bc : RetainedError;
+    import ddmd.ctfe.ctfe_bc;
 
     alias RE = RetainedError;
 }
 else
 {
     alias RE = void;
+    pragma(msg, "not chosing retained error branch");
 }
 
 __gshared int[ushort.max * 2] byteCodeCache;
@@ -2839,7 +2847,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 }
                 else
                 {
-                    import ddmd.ctfe.ctfe_bc : SliceDescriptor;
+                    import ddmd.ctfe.bc_abi : SliceDescriptor;
 
                     const elemSize = (lw >> 8) & 255;
                     const uint _lhs =  *lhsRef & uint.max;
@@ -2938,11 +2946,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     }
                     else
                     {
-                        import ddmd.declaration : FuncDeclaration;
-                        import core.stdc.string : strlen;
-                        const string fnString = cast(string)(cast(FuncDeclaration)functions[cast(size_t)(fn - 1)].funcDecl).ident.toString;
-
-                        assert(0, "Argument " ~ itos(i) ~" ValueType unhandeled: " ~ enumToString(arg.vType) ~"\n Calling Function: " ~ fnString ~ " from: " ~ call.loc.toChars[0 .. strlen(call.loc.toChars)]);
+                        assert(0, "Argument " ~ itos(i) ~" ValueType unhandeled: " ~ enumToString(arg.vType));
                     }
                 }
                 if (callDepth++ == 2000)
@@ -3043,7 +3047,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 }
                 else
                 {
-                    import ddmd.ctfe.ctfe_bc : SliceDescriptor;
+                    import ddmd.ctfe.bc_abi : SliceDescriptor;
                     immutable lhsLength = heapPtr._heap[_lhs + SliceDescriptor.LengthOffset];
                     immutable rhsLength = heapPtr._heap[_rhs + SliceDescriptor.LengthOffset];
                     if (lhsLength == rhsLength)

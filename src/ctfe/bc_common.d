@@ -915,7 +915,8 @@ template ensureIsBCGen(BCGenT)
 }
 
 /// commonType enum used for implicit conversion
-static immutable smallIntegerTypes = [BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8];
+static immutable smallIntegerTypes = [BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8,
+                                      BCTypeEnum.c32, BCTypeEnum.c16, BCTypeEnum.c8];
 
 BCTypeEnum commonTypeEnum(BCTypeEnum lhs, BCTypeEnum rhs) pure @safe
 {
