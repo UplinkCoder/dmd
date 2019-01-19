@@ -330,7 +330,7 @@ struct BCFunction
     ushort nArgs;
     ushort maxStackUsed;
 
-    immutable(int)[] byteCode;
+    int[] byteCode; // should be const but currently we need to assign ot this;
 
     //    this(void* fd, BCFunctionTypeEnum type, int nr, const int[] byteCode, uint nArgs) pure
     //    {
@@ -1879,6 +1879,26 @@ struct DebugCommand
     uint v1;
 }
 
+const (int[]) getCodeForId (const int fnId, const BCFunction* functions) pure
+{
+    return functions[fnId].byteCode;
+}
+
+const(BCValue) interpret_(int fnId, const BCValue[] args,
+    BCHeap* heapPtr = null, const BCFunction* functions = null,
+    const RetainedCall* calls = null,
+    BCValue* ev1 = null, BCValue* ev2 = null, BCValue* ev3 = null,
+    BCValue* ev4 = null, const RE* errors = null,
+    long[] stackPtr = null, const string[ushort] stackMap = null,
+    /+    DebugCommand function() reciveCommand = {return DebugCommand(DebugCmdEnum.Nothing);},
+    BCValue* debugOutput = null,+/ uint stackOffset = 0)  @trusted
+{
+    const code = getCodeForId(fnId, functions);
+    return interpret_(code, args, heapPtr, functions, calls,
+        ev1, ev2, ev3, ev4, errors, 
+        stackPtr, stackMap, stackOffset);
+}
+
 const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     BCHeap* heapPtr = null, const BCFunction* functions = null,
     const RetainedCall* calls = null,
@@ -1943,7 +1963,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
             }
             break;
-        case BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Ptr:
+        case BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Null:
             {
                 // This might need to be removed again?
                 *(&stackP[argOffset / 4]) = arg.heapAddr.addr;

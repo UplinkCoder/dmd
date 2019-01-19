@@ -479,7 +479,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
                 printInstructions(bcv.gen.byteCodeArray[0 .. bcv.ip], bcv.stackMap).writeln();
             }
 
-            auto retval = interpret_(bcv.byteCodeArray[0 .. bcv.ip], bc_args,
+            auto retval = interpret_(0, bc_args,
                 &_sharedExecutionState.heap, &_sharedCtfeState.functions[0], &bcv.calls[0],
                 &errorValues[0], &errorValues[1], &errorValues[2], &errorValues[3],
                 &_sharedCtfeState.errors[0], _sharedExecutionState.stack[], bcv.stackMap());
@@ -3220,9 +3220,10 @@ public:
             {
                 _sharedCtfeState.functions[uc.fnIdx - 1] = BCFunction(cast(void*) null,
                     uc.fnIdx, BCFunctionTypeEnum.Bytecode,
-                    cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
-                    // get rid of dup!
-                    byteCodeArray[0 .. ip].idup);
+                    cast(ushort) (1), osp.addr);
+                _sharedCtfeState.functions[uc.fnIdx - 1].byteCode[0 .. ip]
+                    = byteCodeArray[0 .. ip];
+
             }
         }
     }
@@ -3331,9 +3332,10 @@ public:
             {
                 _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd,
                     fnIdx, BCFunctionTypeEnum.Bytecode,
-                    cast(ushort) (parameters ? parameters.dim : 0), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
-                    // get rid of dup!
-                    byteCodeArray[0 .. ip].idup);
+                    cast(ushort) (parameters ? parameters.dim : 0), osp.addr);
+                _sharedCtfeState.functions[fnIdx - 1].byteCode.length = ip;
+                _sharedCtfeState.functions[fnIdx - 1].byteCode[0 .. ip] 
+                    = byteCodeArray[0 .. ip];
             }
             else
             {
@@ -3405,9 +3407,10 @@ public:
             {
                 _sharedCtfeState.functions[udc.fnIdx - 1] = BCFunction(cast(void*) null,
                     udc.fnIdx, BCFunctionTypeEnum.Bytecode,
-                    cast(ushort) (1), osp.addr, //FIXME IMPORTANT PERFORMANCE!!!
-                    // get rid of dup!
-                    byteCodeArray[0 .. ip].idup);
+                    cast(ushort) (1), osp.addr);
+
+                    _sharedCtfeState.functions[udc.fnIdx - 1].byteCode[0 .. ip] 
+                        = byteCodeArray[0 .. ip];
                     sp = osp;
             }
 
@@ -3572,12 +3575,9 @@ public:
                 auto myArgs = arguments.dup;
 static if (is(BCGen))
 {
-                auto myCode = byteCodeArray[0 .. ip].idup;
+                auto myCode = byteCodeArray[0 .. ip];
                 auto myIp = ip;
 }
-                //FIXME IMPORTANT PERFORMANCE!!!
-                // get rid of dup!
-
                 debug (ctfe)
                 {
                     writeln("FnCnt: ", _sharedCtfeState.functionCount);
@@ -3588,8 +3588,10 @@ static if (is(BCGen))
                     {
                         _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd,
                             fnIdx, BCFunctionTypeEnum.Bytecode,
-                            cast(ushort) parameterTypes.length, osp2,
-                            myCode);
+                            cast(ushort) parameterTypes.length, osp2);
+                        _sharedCtfeState.functions[fnIdx - 1].byteCode.length = myIp;
+                        _sharedCtfeState.functions[fnIdx - 1].byteCode[0 .. myIp] =
+                            byteCodeArray[0 .. myIp];
                         clear();
                     }
                     else
