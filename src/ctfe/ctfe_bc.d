@@ -21,9 +21,9 @@ import ddmd.root.rmem;
 
 import core.stdc.stdio : printf;
 
-enum perf = 1;
-enum bailoutMessages = 1;
-enum printResult = 1;
+enum perf = 0;
+enum bailoutMessages = 0;
+enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -3087,7 +3087,7 @@ public:
                 bailout("UncompiledFunctions overflowed");
                 return ;
             }
-            printf("UncompiledConstructor: %s\n", ctor.toString().ptr);
+            //printf("UncompiledConstructor: %s\n", ctor.toString().ptr); /debugline
        
             const fnIdx = ++_sharedCtfeState.functionCount;
             _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) ctor);
@@ -3223,6 +3223,7 @@ public:
                 _sharedCtfeState.functions[uc.fnIdx - 1] = BCFunction(cast(void*) null,
                     uc.fnIdx, BCFunctionTypeEnum.Bytecode,
                     cast(ushort) (1), osp.addr);
+                _sharedCtfeState.functions[uc.fnIdx - 1].byteCode.length = ip;
                 _sharedCtfeState.functions[uc.fnIdx - 1].byteCode[0 .. ip]
                     = byteCodeArray[0 .. ip];
 
@@ -4159,7 +4160,6 @@ static if (is(BCGen))
                 if (index == -1)
                     bailout("could not compute index");
 
-				printf("found offset %d index:%d \n", se.offset, index);
 				
                 // Everything in here is highly suspicious!
                 // FIXME Design!
@@ -4546,7 +4546,7 @@ static if (is(BCGen))
 
         BCValue context;
         auto contextType = toBCType(de.e1.type);
-        printf("ContextType: %s\n", de.e1.type.toPrettyChars(true)); //DEBUGLINE
+        //printf("ContextType: %s\n", de.e1.type.toPrettyChars(true)); //DEBUGLINE
         if (contextType.type == BCTypeEnum.Function)
         {
             context = closureChain;
@@ -4796,6 +4796,11 @@ static if (is(BCGen))
             const fIndex = getFieldIndex(bcType, cast(VarDeclaration)dve.var);
             const offset = c.offset(fIndex);
 
+            if (fIndex == -1 || fIndex >= c.memberCount)
+            {
+                bailout("Either we failed to get the field, or we have more than 96 fields.");
+                return ;
+            }
 
             BCType varType = c.memberTypes[fIndex];
             if (!varType.type)
@@ -5316,7 +5321,7 @@ static if (is(BCGen))
             BCClass* c = &_sharedCtfeState.classTypes[type.typeIndex - 1];
             if (!c.size)
                 c.computeSize();
-            printf("Allocating class with size %d\n", c.size);
+            //printf("Allocating class with size %d\n", c.size); //debugline
             typeSize = c.size;
         }
         else if (type.type == BCTypeEnum.Slice || type.type == BCTypeEnum.string8)
@@ -6290,9 +6295,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             {
             case TOK.TOKlt:
                 {
-                    import std.stdio : writeln; writeln(ce.toString);
-                    writeln(canWorkWithType(lhs.type) && canWorkWithType(rhs.type) && (!oldAssignTo || canWorkWithType(oldAssignTo.type)));
-                    writeln(lhs.type, rhs.type, !oldAssignTo, oldAssignTo.type);
                     Lt3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
@@ -6543,7 +6545,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             auto fIndex = (isStruct ? findFieldIndexByName(structDeclPtr, vd)
                                     : getFieldIndex(aggBCType, vd));
 
-            assert(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
+            // this can happen on forward-references
+            bailout(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
 
             auto fieldType = _sharedCtfeState.fieldType(aggBCType, fIndex);
 
@@ -7647,7 +7650,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 auto vd = cast(VarDeclaration) cv;
                 gen.Add3(closureptr_offset, closureChain, imm32(offset));
                 BCValue var = getVariable(vd);
-                printf("Generating Store-Back for %s\n", vd.toChars());
+                //printf("Generating Store-Back for %s\n", vd.toChars()); //debugline
                 var.heapRef = BCHeapRef(closureptr_offset);
                 StoreToHeapRef(var);
             }

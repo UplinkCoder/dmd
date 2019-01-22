@@ -4,7 +4,7 @@ import ddmd.ctfe.bc_limits;
 import core.stdc.stdio;
 
 /**
- * Written By Stefan Koch in 2016/17
+ * Written By Stefan Koch in 2016/2017/2019
  */
 enum InstKind
 {
@@ -1963,7 +1963,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
             }
             break;
-        case BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Null:
+        case BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Null:
             {
                 // This might need to be removed again?
                 *(&stackP[argOffset / 4]) = arg.heapAddr.addr;
