@@ -2,7 +2,7 @@ module ddmd.ctfe.bc;
 import ddmd.ctfe.bc_common;
 import ddmd.ctfe.bc_limits;
 import core.stdc.stdio;
-debug = bc;
+
 /**
  * Written By Stefan Koch in 2016/17
  */
