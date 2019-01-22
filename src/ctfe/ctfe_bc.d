@@ -3306,7 +3306,7 @@ public:
                 auto osp = sp;
             }
 
-            else if (fd.type.nextOf.ty == Tvoid)
+            if (fd.type.nextOf.ty == Tvoid)
             {
                 // insert a dummy return after void functions because they can omit a returnStatement
                 Ret(bcNull);
