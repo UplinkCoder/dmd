@@ -1080,16 +1080,18 @@ struct SharedCtfeState(BCGenT)
         static if (is(BCFunction))
             clearArray(functions, functionCount);
 
-        _sharedCtfeState.errorCount = 0;
-        _sharedCtfeState.arrayCount = 0;
-        _sharedCtfeState.structCount = 0;
-        _sharedCtfeState.classCount = 0;
-        _sharedCtfeState.sliceCount = 0;
-        _sharedCtfeState.pointerCount = 0;
-        _sharedCtfeState.errorCount = 0;
+        errorCount = 0;
+        arrayCount = 0;
+        structCount = 0;
+        classCount = 0;
+        sliceCount = 0;
+        pointerCount = 0;
+        errorCount = 0;
 
         static if (is(BCFunction))
             _sharedCtfeState.functionCount = 0;
+
+        btv = btv.init;
     }
 
 
