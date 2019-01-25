@@ -1091,7 +1091,7 @@ struct SharedCtfeState(BCGenT)
         static if (is(BCFunction))
             _sharedCtfeState.functionCount = 0;
 
-        btv = btv.init;
+        btv = new BCTypeVisitor();
     }
 
 
@@ -7014,8 +7014,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         lastLoc = ne.loc;
 
         Line(ne.loc.linnum);
+        auto e1 = genExpr(ne.e1);
         retval = assignTo ? assignTo : genTemporary(toBCType(ne.type));
-        Sub3(retval, imm32(0), genExpr(ne.e1));
+        auto zero = imm32(0);
+        zero.type = e1.type;
+        Sub3(retval, zero, e1);
     }
 
     override void visit(NotExp ne)
