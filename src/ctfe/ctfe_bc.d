@@ -3411,10 +3411,10 @@ public:
                 _sharedCtfeState.functions[udc.fnIdx - 1] = BCFunction(cast(void*) null,
                     udc.fnIdx, BCFunctionTypeEnum.Bytecode,
                     cast(ushort) (1), osp.addr);
-
-                    _sharedCtfeState.functions[udc.fnIdx - 1].byteCode[0 .. ip] 
-                        = byteCodeArray[0 .. ip];
-                    sp = osp;
+                _sharedCtfeState.functions[udc.fnIdx - 1].byteCode.length = ip;
+                _sharedCtfeState.functions[udc.fnIdx - 1].byteCode[0 .. ip]
+                    = byteCodeArray[0 .. ip];
+                sp = osp;
             }
 
         }
