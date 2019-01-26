@@ -503,6 +503,7 @@ pure:
     {
         //assert(insideFunction);
         //I have no idea how this can fail ...
+        localCount = 0;
 
         insideFunction = false;
         BCFunction result;
@@ -826,7 +827,7 @@ pure:
 
     void SetHigh(BCValue lhs, BCValue rhs)
     {
-        assert(isStackValueOrParameter(lhs), "SeHigt lhs is has to be a StackValue");
+        assert(isStackValueOrParameter(lhs), "SetHigh lhs is has to be a StackValue");
         assert(rhs.vType == BCValueType.Immediate || isStackValueOrParameter(rhs), "SetHigh rhs is has to be a StackValue or Imm");
 
         //two cases :
@@ -1071,8 +1072,8 @@ pure:
         {
             value = pushOntoStack(value);
         }
-        if (!isStackValueOrParameter(_to))
 
+        if (!isStackValueOrParameter(_to))
         {
             _to = pushOntoStack(_to);
         }
@@ -1161,7 +1162,6 @@ pure:
     {
         if (!isStackValueOrParameter(val))
         {
-
             auto stackref = BCValue(currSp(), val.type);
             Set(stackref.i32, val);
 

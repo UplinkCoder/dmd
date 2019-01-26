@@ -4542,11 +4542,13 @@ static if (is(BCGen))
             imm32(DelegateDescriptor.FuncPtrOffset / 4),
             4
         );
+
         Comment("Store ContextPtr");
 
         BCValue context;
         auto contextType = toBCType(de.e1.type);
-        //printf("ContextType: %s\n", de.e1.type.toPrettyChars(true)); //DEBUGLINE
+        printf("ContextType: %s\n", de.e1.type.toPrettyChars(true)); //DEBUGLINE
+
         if (contextType.type == BCTypeEnum.Function)
         {
             context = closureChain;
@@ -4556,11 +4558,17 @@ static if (is(BCGen))
             context = _this;
         }
 
-        IndexedScaledStore32(dg.i32,
-            context.i32,
-            imm32(DelegateDescriptor.ContextPtrOffset / 4),
-            4
-        );
+        // at this point we may not have a context for the delegate,
+        // seems to be happing in something having to do with the type-info
+
+        if (context)
+        {
+            IndexedScaledStore32(dg.i32,
+                context.i32,
+                imm32(DelegateDescriptor.ContextPtrOffset / 4),
+                4
+            );
+        }
         retval = dg;
     }
 
