@@ -3186,6 +3186,7 @@ public:
                 compileUncompiledFunction(uc.cd, uc.fnIdx, false, &uc.type);
             }
         }
+        uncompiledConstructorCount = 0;
     }
 
     void compileUncompiledDefaultConstructor(UncompiledConstructor uc)
@@ -4813,7 +4814,7 @@ static if (is(BCGen))
 
             if (fIndex == -1 || fIndex >= c.memberCount)
             {
-                bailout("Either we failed to get the field, or we have more than 96 fields.");
+                bailout("Either we failed to get the field, or we have more than 96 fields -- findex: " ~ itos(fIndex) ~ "memberCount: " ~ itos(c.memberCount));
                 return ;
             }
 
