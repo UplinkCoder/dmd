@@ -22,8 +22,8 @@ import ddmd.root.rmem;
 import core.stdc.stdio : printf;
 
 enum perf = 0;
-enum bailoutMessages = 0;
-enum printResult = 0;
+enum bailoutMessages = 1;
+enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -990,7 +990,7 @@ struct SharedCtfeState(BCGenT)
             return BCType.init;
     }
 
-    const(BCType) fieldType(const BCType type, const int fieldIndex) pure const
+    const(BCType) fieldType(const BCType type, const int fieldIndex) const
     {
         BCType result;
 
@@ -1003,9 +1003,13 @@ struct SharedCtfeState(BCGenT)
         }
         else if (type.type == BCTypeEnum.Class)
         {
-            if (type.typeIndex && type.typeIndex <= classCount)
+            if (type.typeIndex > 0 && type.typeIndex <= classCount)
             {
-                result = classTypes[type.typeIndex - 1].memberTypes[fieldIndex];
+                const ct = classTypes[type.typeIndex - 1];
+                if (fieldIndex != -1 && ct.memberCount > fieldIndex)
+                {
+                    result = ct.memberTypes[fieldIndex];
+                }
             }
         }
 
@@ -2353,7 +2357,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         }
     }
 
-    void Store32AtOffset(BCValue addr, BCValue value, int offset)
+    void Store32AtOffset(BCValue addr, BCValue value, int offset, int line = __LINE__)
     {
         if (addr.type.type != BCTypeEnum.i32)
             addr = addr.i32;
@@ -2363,7 +2367,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
         if (!offset)
         {
-            Store32(addr, value);
+            Store32(addr, value, line);
         }
         else
         {
@@ -2376,11 +2380,11 @@ extern (C++) final class BCV(BCGenT) : Visitor
             {
                 Sub3(ea, addr, imm32(-offset));
             }
-            Store32(ea, value);
+            Store32(ea, value, line);
         }
     }
 
-    void Load32FromOffset(BCValue value, BCValue addr, int offset)
+    void Load32FromOffset(BCValue value, BCValue addr, int offset, int line = __LINE__)
     {
         if (addr.type.type != BCTypeEnum.i32)
             addr = addr.i32;
@@ -2390,7 +2394,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
         if (!offset)
         {
-            Load32(value, addr);
+            Load32(value, addr, line);
         }
         else
         {
@@ -2403,7 +2407,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             {
                 Sub3(ea, addr, imm32(-offset));
             }
-            Load32(value, ea);
+            Load32(value, ea, line);
         }
     }
 
@@ -3321,7 +3325,10 @@ public:
             {
                 if (!forCtor && mayFail)
                 {
-                    Assert(imm32(0), addError(fd.loc, "CTFE ABORT IN : " ~ fd.toString ~ ":" ~ itos(lastLine)));
+                    if (insideFunction)
+                    {
+                        Assert(imm32(0), addError(fd.loc, "CTFE ABORT IN : " ~ fd.toString ~ ":" ~ itos(lastLine)));
+                    }
                     IGaveUp = false;
                 }
                 else
@@ -6554,7 +6561,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                                     : getFieldIndex(aggBCType, vd));
 
             // this can happen on forward-references
-            bailout(fIndex != -1, "field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
+            if(fIndex == -1)
+            {
+                bailout("field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
+                return ;
+            }
 
             auto fieldType = _sharedCtfeState.fieldType(aggBCType, fIndex);
 
@@ -7523,6 +7534,10 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Comment("loadVtblPtr");
 
                 auto vtblPtr = genTemporary(i32Type);
+                // because of forward_referancing issues we need to assert
+                // that we do indeed have a this pointer
+                // what a pain
+                Assert(thisPtr.i32, addError(lastLoc, "Calling virtual function on null class ... maybe forward-reference?"));
                 Load32FromOffset(vtblPtr, thisPtr.i32, ClassMetaData.VtblOffset);
 
                 const vtblIndex = fd.vtblIndex;
