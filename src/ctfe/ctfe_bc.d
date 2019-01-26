@@ -5335,9 +5335,8 @@ static if (is(BCGen))
         {
             ptr = genTemporary(type);
             BCClass* c = &_sharedCtfeState.classTypes[type.typeIndex - 1];
-            if (!c.size)
-                c.computeSize();
-            //printf("Allocating class with size %d\n", c.size); //debugline
+            //FIXME we should not have to always remcompute the classSize!
+            c.computeSize();
             typeSize = c.size;
         }
         else if (type.type == BCTypeEnum.Slice || type.type == BCTypeEnum.string8)

@@ -14,6 +14,7 @@ class D : C
 
 class E : D
 {
+//  int x,y,z,w;
   int _i;
   this(int _i)
   {
