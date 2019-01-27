@@ -26,7 +26,7 @@ enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -2105,7 +2105,7 @@ extern (C++) final class BCTypeVisitor : Visitor
             else
                 st.addField(bcType, false, []);
         }
-        // assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ " " ~ reason);
+        assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ " " ~ reason);
         _sharedCtfeState.endStruct(&st, died);
         scope(exit) bcv.clear();
     }
@@ -2818,7 +2818,7 @@ public:
             if (bctype.type == BCTypeEnum.Struct)
             {
                 Comment("Allocate memory for struct_type");
-                Alloc(var, imm32(_sharedCtfeState.size(bctype)));
+                Alloc(var, imm32(_sharedCtfeState.size(bctype)), bctype);
             }
 
             var.heapRef = BCHeapRef(cvp);
@@ -5627,15 +5627,21 @@ static if (is(BCGen))
     void StoreToHeapRef(BCValue hrv, uint line = __LINE__)
     {
         Comment("Store to Heapref from:" ~ itos(line));
+        auto heapRef = BCValue(hrv.heapRef);
+        //auto heapRef = genTemporary(_sharedCtfeState.pointerOf(hrv.type));
+        //Set(heapRef.i32, BCValue(hrv.heapRef).i32);
+
         if(hrv.type.type.anyOf([BCTypeEnum.i64, BCTypeEnum.f52]))
-            Store64(BCValue(hrv.heapRef), hrv);
+            Store64(heapRef.i32, hrv);
         else if (hrv.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.f23]))
-            Store32(BCValue(hrv.heapRef), hrv);
+            Store32(heapRef.i32, hrv);
         // since the stuff below are heapValues we may not want to do this??
         else if (hrv.type.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.string8]))
-            MemCpy(BCValue(hrv.heapRef).i32, hrv.i32, imm32(_sharedCtfeState.size(hrv.type)));
+            MemCpy(heapRef.i32, hrv.i32, imm32(_sharedCtfeState.size(hrv.type)));
         else
             bailout(enumToString(hrv.type.type) ~ " is not supported in StoreToHeapRef");
+
+
     }
 
     void linkRefsCallee(VarDeclarations* parameters)
@@ -6723,6 +6729,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             if (elemSize > 4 && elemSize != 8)
             {
                 bailout("only 32/64 bit array loads are supported right now");
+                return ;
             }
 
             auto rhs = genExpr(ae.e2);
@@ -6732,7 +6739,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 return ;
             }
 /*
-
             auto elemType = toBCType(ie1.e1.type.nextOf);
             auto elemSize = _sharedCtfeState.size(elemType);
 
@@ -6751,8 +6757,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 bailout("lhs for Assign-IndexExp needs to have a heapRef: " ~ ae.toString);
                 return ;
             }
+
             auto effectiveAddr = BCValue(lhs.heapRef);
 */
+            Assert(effectiveAddr.i32, addError(lastLoc, "No effetive addr in -- " ~ ae.toString));
+
             if (rhs.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.Slice]))
             {
                 MemCpy(effectiveAddr.i32, rhs.i32, imm32(sharedCtfeState.size(rhs.type)));
@@ -7667,17 +7676,19 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         {
             bc_args[lastArgIdx + !!thisPtr] = closureChain;
             // now we need to store back into the closure
-            auto closureptr_offset = genLocal(i32Type, "closureptr_offset");
+            int i;
             foreach(cv, offset; closureVarOffsets)
             {
+                auto closureptr_offset = gen.genLocal(i32Type, "closureptr_offset_" ~ itos(ce.loc.linnum) ~ itos(i++));
                 // here the "gen." is needed although it should be found via
                 // alias this
                 //TODO investiage bug!
                 auto vd = cast(VarDeclaration) cv;
                 gen.Add3(closureptr_offset, closureChain, imm32(offset));
                 BCValue var = getVariable(vd);
-                //printf("Generating Store-Back for %s\n", vd.toChars()); //debugline
+                printf("Generating Store-Back for %s\n", vd.toChars()); //debugline
                 var.heapRef = BCHeapRef(closureptr_offset);
+                gen.Comment("Store local variable in closure_chain --  "~ vd.toString());
                 StoreToHeapRef(var);
             }
         }
