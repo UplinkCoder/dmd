@@ -514,6 +514,8 @@ struct BCHeapRef
         Imm32 imm32;
     }
 
+    string name;
+
 @safe pure:
     bool opCast(T : bool)() const pure
     {
@@ -536,6 +538,7 @@ struct BCHeapRef
         case BCValueType.Local:
             stackAddr = that.stackAddr;
             localIndex = that.localIndex;
+            this.name = that.name;
             break;
 
         case BCValueType.HeapValue:
@@ -770,6 +773,7 @@ struct BCValue
         case BCValueType.Local:
             stackAddr = heapRef.stackAddr;
             tmpIndex = heapRef.localIndex;
+            name = heapRef.name;
             break;
 
         case BCValueType.Temporary:
