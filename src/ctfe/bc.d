@@ -2815,7 +2815,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     {
                         import std.stdio;
 
-                        writeln("Ret SP[", lhsOffset, "] (", *opRef, ")\n");
+                        writeln("Ret32 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
                 return imm32(*opRef & uint.max);
             }
@@ -2826,7 +2826,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     {
                         import std.stdio;
 
-                        writeln("Ret SP[", lhsOffset, "] (", *opRef, ")\n");
+                        writeln("Ret64 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
                 return BCValue(Imm64(*opRef));
             }
@@ -2947,6 +2947,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     debug writeln("fn = ", fn);
                     debug writeln((functions + fn - 1).byteCode.printInstructions);
                     debug writeln("stackOffsetCall: ", stackOffsetCall);
+                    debug writeln("call.args = ", call.args);
                 }
 
                 BCValue[32] callArgs = void;
@@ -2955,7 +2956,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     if(isStackValueOrParameter(arg))
                     {
-                        if(stackP[arg.stackAddr.addr / 4] <= uint.max)
+                        if(cast(ulong)(stackP[arg.stackAddr.addr / 4]) <= uint.max)
                             callArgs[i] = imm32(stackP[arg.stackAddr.addr / 4] & uint.max);
                         else
                             callArgs[i] = BCValue(Imm64(stackP[arg.stackAddr.addr / 4]));
