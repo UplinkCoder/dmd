@@ -174,9 +174,12 @@ struct Print_BCGen
                 result ~= "StackAddr(" ~ itos(val.stackAddr.addr) ~ "), " ~ print(val.type);
             }
             break;
+
         case BCValueType.Local :
+        {
             auto name = val.name ? val.name ~ "_" ~ itos(val.localIndex) : "local" ~ itos(val.localIndex);
             return name ~ functionSuffix;
+        }
 
         case BCValueType.Temporary:
             {
@@ -188,7 +191,7 @@ struct Print_BCGen
             }
         case BCValueType.Error:
             {
-                string _result = "Imm32(" ~ itos(val.imm32) ~ ") /*";
+                char[] _result = cast(char[])"Imm32(" ~ itos(val.imm32) ~ ") /*";
                 if (val.imm32)
                 {
                     auto eInfo = errorInfos[val.imm32 - 1];
@@ -197,9 +200,9 @@ struct Print_BCGen
                     foreach(i;0 .. eInfo.valueCount)
                         _result ~= print(eInfo.values[i]) ~ ", ";
 
-                    _result = _result[0 .. $-2] ~ "*/;";
+                    _result[$-2 .. $] = "*/";
                 }
-                return _result;
+                return cast(string)_result;
             }
         case BCValueType.Unknown:
             {
@@ -226,7 +229,7 @@ struct Print_BCGen
         {
             result ~= indent ~ "//";
         }
-        result ~= "auto label" ~ itos(labelCount) ~ " = genLabel();\n";
+        result ~= "auto label" ~ itos(labelCount) ~ functionSuffix ~ " = genLabel();\n";
         return BCLabel(BCAddr(labelCount));
     }
 
