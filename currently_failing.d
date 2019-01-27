@@ -1,21 +1,29 @@
 struct S
 {
-    size_t[4] a = 1;
-    size_t[4] b = 4;
+    int beginning = 63;
+    int[8] a = 1;
+    int[8] b = 4;
+    int end = 256;
 }
+
+pragma(msg, "S.sizeof: ", S.sizeof); 
 
 S makeS()
 {
     S s;
-    size_t i;
+    int i;
 
 
     bool buildNext()
     {
         if (i < S.a.length + S.b.length)
         {
+            assert(s.beginning == 63);
+            assert(s.end == 256);
+
             if (i < S.a.length)
             {
+//                int* arr_ptr = &s.a[0];
                 s.a[i] = i;
             }
             else
