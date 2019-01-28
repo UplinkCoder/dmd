@@ -1,8 +1,8 @@
 struct S
 {
     int beginning = 63;
-    int[8] a = 1;
-    int[8] b = 4;
+    int[4] a = 1;
+    int[4] b = 4;
     int end = 256;
 }
 
@@ -16,6 +16,7 @@ S makeS()
 
     bool buildNext()
     {
+
         if (i < S.a.length + S.b.length)
         {
             assert(s.beginning == 63);
@@ -23,7 +24,6 @@ S makeS()
 
             if (i < S.a.length)
             {
-//                int* arr_ptr = &s.a[0];
                 s.a[i] = i;
             }
             else

@@ -3148,4 +3148,3 @@ static assert(testRelJmp().interpret([]) == imm32(12));
 import ddmd.ctfe.bc_test;
 
 static assert(test!BCGen());
-

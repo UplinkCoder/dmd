@@ -5104,6 +5104,7 @@ static if (is(BCGen))
         auto rv_stackValue = structVal.i32;
         rv_stackValue.vType = BCValueType.StackValue;
         MemCpyConst(rv_stackValue, _sharedCtfeState.initializer(BCType(BCTypeEnum.Struct, idx)));
+        initStruct(structVal);
 
         uint offset = 0;
         BCValue fieldAddr = genTemporary(i32Type);
@@ -5700,9 +5701,15 @@ static if (is(BCGen))
     }
 
     /// Params: structPtr = assumed to point to already allocated memory
-    ///         type = a pointer to the BCStruct
-    void initStruct(BCValue structPtr, const (BCStruct)* type)
+    ///         type = a pointer to the BCStruct, if none the type in the structPtr is used.
+    void initStruct(BCValue structPtr, const (BCStruct)* type = null)
     {
+        if (!type)
+        {
+            assert(structPtr.type.type == BCTypeEnum.Struct, "when no explicit type os passed we need the type in the bcvalue");
+            type = &_sharedCtfeState.structTypes[structPtr.type.typeIndex - 1];
+        }
+
         /// TODO FIXME this has to copy the struct intializer if there is one
         uint memberCount = type.memberCount;
         foreach(int i, mt; type.memberTypes[0 .. memberCount])
@@ -5713,7 +5720,7 @@ static if (is(BCGen))
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
                 setArraySliceDesc(offset, _sharedCtfeState.arrayTypes[mt.typeIndex - 1]);
             }
-            if (mt.type == BCTypeEnum.Struct)
+            else if (mt.type == BCTypeEnum.Struct)
             {
                 auto offset = genTemporary(mt);
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
@@ -6932,10 +6939,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     auto JstructNotNull = beginCndJmp(lhs.i32, true);
                     auto structSize = _sharedCtfeState.size(lhs.type);
                     Alloc(lhs.i32, imm32(structType.size), lhs.type);
-
-                    initStruct(lhs, structType);
-
                     endCndJmp(JstructNotNull, genLabel());
+                    initStruct(lhs, structType);
                 }
                 else if (lhs.type.type == BCTypeEnum.Struct && rhs.type.type == BCTypeEnum.Struct)
                 {
