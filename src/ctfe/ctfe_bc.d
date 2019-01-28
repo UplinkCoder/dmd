@@ -2022,14 +2022,11 @@ extern (C++) final class BCTypeVisitor : Visitor
 
             // look for previous field with the same offset
             // since we do not handle those currently
-            foreach(f;sd.fields[0 .. mi])
+            if (mi < 0 && sd.fields[mi - 1].offset == sMember.offset)
             {
-                if (sMember.offset == f.offset)
-                {
-                    died = true;
-                    reason = "Overlapping fields";
-                    break addFieldLoop;
-                }
+                died = true;
+                reason = "Overlapping fields";
+                break addFieldLoop;
             }
 
             auto bcType = toBCType(sMember.type);
