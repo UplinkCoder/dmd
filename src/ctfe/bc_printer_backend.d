@@ -1,5 +1,5 @@
 module ddmd.ctfe.bc_printer_backend;
-
+//version = std_stuff;
 import ddmd.ctfe.bc_common;
 
 enum BCFunctionTypeEnum : byte
@@ -107,7 +107,7 @@ struct Print_BCGen
 
     string print(BCLabel label)
     {
-        return ("label" ~ itos(label.addr.addr));
+        return ("label" ~ itos(label.addr.addr) ~ functionSuffix);
     }
 
     string print(BCType type)
@@ -138,7 +138,7 @@ struct Print_BCGen
                         ((cast(ulong)val.imm64.imm64 <= uint.max) 
                             ? itos(val.imm64.imm64 & uint.max) 
                             : itos(val.imm64.imm64 & uint.max) ~ " | (" ~
-                                itos(val.imm64.imm64 >> 32) ~" << 32)" 
+                                itos(val.imm64.imm64 >> 32) ~"UL << 32)" 
                         )
                     ~ ")";
                 }
@@ -191,7 +191,7 @@ struct Print_BCGen
             }
         case BCValueType.Error:
             {
-                char[] _result = cast(char[])"Imm32(" ~ itos(val.imm32) ~ ") /*";
+                char[] _result = cast(char[])"imm32(" ~ itos(val.imm32) ~ ") /*";
                 if (val.imm32)
                 {
                     auto eInfo = errorInfos[val.imm32 - 1];
@@ -263,11 +263,23 @@ struct Print_BCGen
     {
         sameLabel = false;
         import ddmd.declaration : FuncDeclaration;
-        import std.string;
 //        assert(!insideFunction);
         insideFunction = true;
         auto fd = *(cast(FuncDeclaration*) &fnDecl);
-        result ~= indent ~ "beginFunction(" ~ itos(f) ~ ");//" ~ (fd && fd.ident ? fd.toChars.fromStringz : "(nameless)") ~ "\n";
+
+        version (std_stuff)
+        {
+            import std.string : fromStringz;
+        }
+        else
+        {
+            static immutable fromStringz = (inout(char)* cString) @nogc @system pure nothrow {
+                import core.stdc.string : strlen;
+                return cString ? cString[0 .. strlen(cString)] : null;
+            };
+        }
+
+        result ~= indent ~ "beginFunction(" ~ itos(f) ~ ");//" ~ (fd && fd.ident ? fromStringz(fd.toChars) : "(nameless)") ~ "\n";
         incIndent();
     }
 
@@ -335,7 +347,7 @@ struct Print_BCGen
     {
         sameLabel = false;
         decIndent();
-        result ~= indent ~ "endJmp(jmp" ~ itos(atIp.addr) ~ functionSuffix ~ ", " ~ print(target) ~ functionSuffix ~ ");\n";
+        result ~= indent ~ "endJmp(jmp" ~ itos(atIp.addr) ~ functionSuffix ~ ", " ~ print(target) ~ ");\n";
     }
 
     void Jmp(BCLabel target)
@@ -359,7 +371,7 @@ struct Print_BCGen
         sameLabel = false;
         decIndent();
         result ~= "\n";
-        result ~= indent ~ "endCndJmp(cndJmp" ~ itos(jmp.at.addr) ~ ", " ~ print(target) ~ ");\n";
+        result ~= indent ~ "endCndJmp(cndJmp" ~ itos(jmp.at.addr) ~ functionSuffix ~ ", " ~ print(target) ~ ");\n";
     }
 
     void emitFlg(BCValue lhs)
@@ -481,13 +493,25 @@ struct Print_BCGen
     import ddmd.globals : Loc;
     void Call(BCValue _result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
-        import std.algorithm : map;
-        import std.range : join;
+        version(std_algo)
+        {
+            import std.algorithm : map;
+            import std.range : join;
 
-        sameLabel = false;
+            sameLabel = false;
 
-        result ~= indent ~ "Call(" ~ print(_result) ~ ", " ~ print(fn) ~ ", [" ~ args.map!(
-            a => print(a)).join(", ") ~ "]);\n";
+            result ~= indent ~ "Call(" ~ print(_result) ~ ", " ~ print(fn) ~ ", [" ~ args.map!(
+                a => print(a)).join(", ") ~ "]);\n";
+        }
+        else
+        {
+            result ~= indent ~ "Call(" ~ print(_result) ~ ", " ~ print(fn) ~ ", [";
+            foreach(arg;args)
+            {
+                result ~= print(arg) ~ ", ";
+            }
+            result = result[0 .. $-2] ~ "]);\n";
+        }
     }
 
     void Load32(BCValue to, BCValue from)
