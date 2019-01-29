@@ -3467,7 +3467,7 @@ public:
         if (t.type == BCTypeEnum.Class)
         {
             const ti = t.typeIndex;
-            if (!ti || ti < _sharedCtfeState.classCount)
+            if (!ti || ti >= _sharedCtfeState.classCount)
             {
                 bailout("can't get class-type invalid");
                 return -1;
