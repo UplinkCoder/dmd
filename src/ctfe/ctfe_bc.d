@@ -22,11 +22,11 @@ import ddmd.root.rmem;
 import core.stdc.stdio : printf;
 
 enum perf = 0;
-enum bailoutMessages = 0;
+enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -619,7 +619,7 @@ string toString(T)(T value) if (is(T : Statement) || is(T : Declaration)
         if (value)
         {
             const(char)* lPtr = value.loc.toChars();
-            result = cPtr.fromStringz.idup ~ "\t" ~ lPtr.fromStringz.idup;
+            result = cPtr.fromStringz.idup ~ "    " ~ lPtr.fromStringz.idup;
         }
         else
         {
@@ -1003,9 +1003,26 @@ struct SharedCtfeState(BCGenT)
         }
         else if (type.type == BCTypeEnum.Class)
         {
+            // we need to start lookup at the first parent ... sigh
+
             if (type.typeIndex > 0 && type.typeIndex <= classCount)
             {
-                const ct = classTypes[type.typeIndex - 1];
+                int[64] classIndicies = -1;
+                int classIndiciesCount = 0;
+
+                auto ct = &classTypes[type.typeIndex - 1];
+                auto parentClassIdx = ct.parentIdx - 1;
+                // first we need to keep track of the class hierachy
+                // by walking it down all the way to object
+
+                while(parentClassIdx)
+                {
+                    classIndicies[classIndiciesCount++] = parentClassIdx;
+                    ct = &classTypes[parentClassIdx]; 
+                }
+
+                // now we need to walk the hierachy up agian
+
                 if (fieldIndex != -1 && ct.memberCount > fieldIndex)
                 {
                     result = ct.memberTypes[fieldIndex];
@@ -3461,24 +3478,34 @@ public:
             auto cd = _sharedCtfeState.classDeclTypePointers[ti - 1];
             BCClass* c = &_sharedCtfeState.classTypes[ti - 1];
 
-            FindField: while(cd)
+            while(cd && fIndex == -1)
             {
                 foreach(int i,f;cd.fields)
                 {
                     if (vd == f)
                     {
                         fIndex = i;
-                        break FindField;
+                        break;
                     }
                 }
                 cd = cd.baseClass;
                 c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
             }
+
+            if (fIndex != -1)
+            {
+                // we found the field, now we have to add the number of fields in the parents
+                while(cd)
+                {
+                    fIndex += cast(int) cd.fields.dim;
+                    cd = cd.baseClass;
+                }
+            }
         }
 
         return fIndex;
         // TODO consider getting the offset here as well
-        // and return an Index|Offsset-Pair
+        // and return an Index|Offset-Pair
 
     }
 
@@ -4673,8 +4700,6 @@ static if (is(BCGen))
             auto newSlice = genTemporary(origSlice.type);
             Alloc(newSlice.i32, imm32(SliceDescriptor.Size), origSlice.type);
 
-            // TODO assert lwr <= upr
-
             auto origLength = getLength(origSlice);
             if (!origLength)
             {
@@ -4696,12 +4721,13 @@ static if (is(BCGen))
                 return ;
             }
 
+            // this asserts that lwr <= upr
             {
-                Gt3(BCValue.init, lwr.i32, upr.i32);
+                Ge3(BCValue.init, lwr.i32, upr.i32);
                 auto CJoob = beginCndJmp();
-
-                Assert(imm32(0), addError(se.loc, "slice [%llu .. %llu] is out of bounds", lwr, upr));
-
+                {
+                    Assert(imm32(0), addError(se.loc, "slice [%llu .. %llu] is out of bounds", lwr, upr));
+                }
                 endCndJmp(CJoob, genLabel());
             }
             Sub3(newLength, upr.i32, lwr.i32);
@@ -5761,10 +5787,10 @@ static if (is(BCGen))
             }
 			else if (mt.type == BCTypeEnum.i64)
 			{
-				BCValue initValue = imm64(type.initializers[i].length ? type.initializers[i][0] | type.initializers[i][4] << 32UL : 0);
+				BCValue initValue = imm64(type.initializers[i].length ? type.initializers[i][0] | ulong(type.initializers[i][4]) << 32UL : 0);
 				auto offset = genTemporary(pointerToMemberType);
 				Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
-				Store32(offset.i32, initValue);
+				Store64(offset.i32, initValue);
 			}
         }
     }
