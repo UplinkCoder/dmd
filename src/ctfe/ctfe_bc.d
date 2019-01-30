@@ -16,7 +16,7 @@ import ddmd.visitor;
 import ddmd.arraytypes : Expressions, VarDeclarations;
 import ddmd.root.rmem;
 /**
- * Written By Stefan Koch in 2016-18
+ * Written By Stefan Koch in 2016-19
  */
 
 import core.stdc.stdio : printf;
@@ -119,6 +119,13 @@ struct BoolExprFixupEntry
     {
         this.conditional = conditional;
     }
+}
+
+struct FieldInfo
+{
+    int offset = -1;
+    int index = -1;
+    BCType type = BCType.init;
 }
 
 struct UnrolledLoopState
@@ -795,6 +802,9 @@ struct BCClass
     uint size;
     uint memberCount;
     uint vtblPtr;
+    //TODO make the default ctor stuff work.
+    FuncDeclaration defaultCtor;
+    int defaultCtorIdx;
 
     int[] usedVtblIdxs;
 
@@ -807,7 +817,7 @@ struct BCClass
         if (parentIdx)
         {
             auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
-            if (!pct.size) pct.computeSize();
+            pct.computeSize();
             assert(pct.size >= align4(ClassMetaData.Size));
             size = pct.size;
         }
@@ -827,7 +837,7 @@ struct BCClass
 
     const int offset(const int idx)
     {
-        int _offset;
+        int _offset = 0;
         if (idx == -1)
             return -1;
 
@@ -835,24 +845,6 @@ struct BCClass
             assert(idx <= memberCount);
         else if (idx > memberCount)
                 return -1;
-
-
-        if (parentIdx)
-        {
-            auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
-            if (!pct.size) pct.computeSize();
-            _offset += pct.size;
-        }
-        else
-        {
-
-        }
-
-        _offset += (
-            parentIdx ?
-            _sharedCtfeState.classTypes[parentIdx - 1].size :
-            ClassMetaData.Size
-        );
 
         foreach (t; memberTypes[0 .. idx])
         {
@@ -901,8 +893,8 @@ struct SharedCtfeState(BCGenT)
 {
     uint _threadLock;
 
-    BCClass[bc_max_classes] classTypes;
     ClassDeclaration[bc_max_classes] classDeclTypePointers;
+    BCClass[bc_max_classes] classTypes;
 
     StructDeclaration[bc_max_structs] structDeclpointerTypes;
     BCStruct[bc_max_structs] structTypes;
@@ -916,7 +908,7 @@ struct SharedCtfeState(BCGenT)
     TypePointer[bc_max_types] pointerTypePointers;
     BCPointer[bc_max_pointers] pointerTypes;
 
-    BCTypeVisitor btv = new BCTypeVisitor();
+        BCTypeVisitor btv = new BCTypeVisitor();
     pragma(msg, "sizeof typeVisitor instance = ", int(__traits(classInstanceSize, BCTypeVisitor)), "bytes");
 
     uint structCount;
@@ -988,49 +980,6 @@ struct SharedCtfeState(BCGenT)
             return BCType(BCTypeEnum.c8);
         else
             return BCType.init;
-    }
-
-    const(BCType) fieldType(const BCType type, const int fieldIndex) const
-    {
-        BCType result;
-
-        if (type.type == BCTypeEnum.Struct)
-        {
-            if (type.typeIndex && type.typeIndex <= structCount)
-            {
-                result = structTypes[type.typeIndex - 1].memberTypes[fieldIndex];
-            }
-        }
-        else if (type.type == BCTypeEnum.Class)
-        {
-            // we need to start lookup at the first parent ... sigh
-
-            if (type.typeIndex > 0 && type.typeIndex <= classCount)
-            {
-                int[64] classIndicies = -1;
-                int classIndiciesCount = 0;
-
-                auto ct = &classTypes[type.typeIndex - 1];
-                auto parentClassIdx = ct.parentIdx - 1;
-                // first we need to keep track of the class hierachy
-                // by walking it down all the way to object
-
-                while(parentClassIdx)
-                {
-                    classIndicies[classIndiciesCount++] = parentClassIdx;
-                    ct = &classTypes[parentClassIdx]; 
-                }
-
-                // now we need to walk the hierachy up agian
-
-                if (fieldIndex != -1 && ct.memberCount > fieldIndex)
-                {
-                    result = ct.memberTypes[fieldIndex];
-                }
-            }
-        }
-
-       return result;
     }
 
     uint[] initializer(const BCType type) const
@@ -1111,8 +1060,6 @@ struct SharedCtfeState(BCGenT)
 
         static if (is(BCFunction))
             _sharedCtfeState.functionCount = 0;
-
-        btv = new BCTypeVisitor();
     }
 
 
@@ -1332,6 +1279,7 @@ struct SharedCtfeState(BCGenT)
 
         if (isBasicBCType(type))
         {
+            assert(basicTypeSize(type.type) != 0);
             return basicTypeSize(type.type);
         }
 
@@ -1354,16 +1302,19 @@ struct SharedCtfeState(BCGenT)
             }
         case BCTypeEnum.Class :
             {
-                if (type.typeIndex && type.typeIndex < classCount)
+                if (type.typeIndex && type.typeIndex > classCount)
                 {
                     // the if above should really be an assert
                     // I have no idea why this even happens
                     return 0;
                 }
+                enum PtrSize = 4;
+                if (isMember)
+                    return PtrSize;
 
-                const BCClass _class = classTypes[type.typeIndex - 1];
-
-                return _class.size;
+                auto c = _sharedCtfeState.classTypes[type.typeIndex - 1];
+                c.computeSize();
+                return c.size;
             }
         case BCTypeEnum.Array:
             {
@@ -3250,9 +3201,25 @@ public:
                 me = oldme;
             beginFunction(uc.fnIdx - 1, cast(void*) null);
             // printf("BuildingCtor for: %s\n", cdtp.toString().ptr);
+                // the first thing we need to do is to call, the parent default ctor.
+                if (bcClass.parentIdx)
+                {
+                    auto pClass = _sharedCtfeState.classTypes[bcClass.parentIdx - 1];
+                    auto fnIdx = pClass.defaultCtorIdx;
+                    if (fnIdx)
+                    {
+                        Call(p1, imm32(fnIdx), [p1]);
+                    }
+                    else
+                    {
+                        bailout("default parent ctor unknown");
+                    }
+                }
                 Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
                 Ret(p1);
             endFunction();
+            bcClass.defaultCtorIdx = uc.fnIdx;
+
             static if (is(BCGen))
             {
                 _sharedCtfeState.functions[uc.fnIdx - 1] = BCFunction(cast(void*) null,
@@ -3460,53 +3427,60 @@ public:
         uncompiledDynamicCastCount = 0;
     }
 
-    int getFieldIndex(BCType t, VarDeclaration vd)
+    FieldInfo getFieldInfo(BCType t, VarDeclaration vd)
     {
-        int fIndex = -1;
+        FieldInfo fInfo;
 
         if (t.type == BCTypeEnum.Class)
         {
             const ti = t.typeIndex;
-            if (!ti || ti >= _sharedCtfeState.classCount)
+            if (!ti || ti > _sharedCtfeState.classCount)
             {
-                bailout("can't get class-type invalid");
-                return -1;
+                bailout("can't get class-type ti: " ~ itos(ti) ~ " classCount: " ~ itos(_sharedCtfeState.classCount));
+                return fInfo;
             }
-
-            int offset = -1;
 
             auto cd = _sharedCtfeState.classDeclTypePointers[ti - 1];
             BCClass* c = &_sharedCtfeState.classTypes[ti - 1];
+            int offset = -1;
 
-            while(cd && fIndex == -1)
+            FindField: while(cd)
             {
                 foreach(int i,f;cd.fields)
                 {
                     if (vd == f)
                     {
-                        fIndex = i;
-                        break;
+                        fInfo.index = i;
+                        offset = c.offset(i); 
+                        fInfo.type = c.memberTypes[i];
+                        break FindField; 
                     }
                 }
                 cd = cd.baseClass;
                 c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
             }
 
-            if (fIndex != -1)
+            // we either found a field and have to add the size of the parent
+            // (if there is one) or we could not find it, in which case cd will
+            // be null wich will cause to return the invalid Value {BCType.init, -1}
+
+            if (cd && cd.baseClass)
             {
-                // we found the field, now we have to add the number of fields in the parents
-                while(cd)
+                cd = cd.baseClass;
+                c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
+
+                c.computeSize();
+                offset += c.size;
+                if (!__ctfe)
                 {
-                    fIndex += cast(int) cd.fields.dim;
-                    cd = cd.baseClass;
+                    import core.stdc.stdio;
+                    printf("offset for: %s = %d  c.size = %d\n", vd.toChars, offset, c.size);
                 }
             }
+
+            fInfo.offset = offset;
         }
-
-        return fIndex;
-        // TODO consider getting the offset here as well
-        // and return an Index|Offset-Pair
-
+        return fInfo;
     }
 
     override void visit(FuncDeclaration fd)
@@ -4848,19 +4822,19 @@ static if (is(BCGen))
         {
             const bcType = toBCType(dve.e1.type);
             const c = _sharedCtfeState.classTypes[bcType.typeIndex - 1];
-            const fIndex = getFieldIndex(bcType, cast(VarDeclaration)dve.var);
-            const offset = c.offset(fIndex);
+            const fInfo = getFieldInfo(bcType, cast(VarDeclaration)dve.var);
+            const offset = fInfo.offset;
 
-            if (fIndex == -1 || fIndex >= c.memberCount)
+            if (offset == -1)
             {
-                bailout("Either we failed to get the field, or we have more than 96 fields -- findex: " ~ itos(fIndex) ~ "memberCount: " ~ itos(c.memberCount));
+                bailout("we failed to get the field -- " ~ dve.toString);
                 return ;
             }
 
-            BCType varType = c.memberTypes[fIndex];
+            BCType varType = fInfo.type;
             if (!varType.type)
             {
-                bailout("class " ~ itos(fIndex) ~ " has an empty type... This must not happen! -- " ~ dve.toString);
+                bailout("class field has an empty type... This must not happen! -- " ~ dve.toString);
                 return ;
             }
 
@@ -5371,15 +5345,7 @@ static if (is(BCGen))
         uint typeSize;
         BCValue ptr;
 
-        if (type.type == BCTypeEnum.Class)
-        {
-            ptr = genTemporary(type);
-            BCClass* c = &_sharedCtfeState.classTypes[type.typeIndex - 1];
-            //FIXME we should not have to always remcompute the classSize!
-            c.computeSize();
-            typeSize = c.size;
-        }
-        else if (type.type == BCTypeEnum.Slice || type.type == BCTypeEnum.string8)
+        if (type.type == BCTypeEnum.Slice || type.type == BCTypeEnum.string8)
         {
             assert(ne.arguments.dim  == 1 || ne.arguments.dim == 0,
                 "new Slice is only expected to have one or zero arguments");
@@ -5418,8 +5384,9 @@ static if (is(BCGen))
         }
         else
         {
-            ptr = genTemporary(i32Type);
+            ptr = genTemporary(type);
             typeSize = _sharedCtfeState.size(type);
+            ptr = ptr.i32;
         }
 
         if (!typeSize)
@@ -6616,7 +6583,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             if (aggTy != Tstruct && aggTy != Tclass)
             {
-                bailout("only structs are supported for now");
+                bailout("only structs and classes are supported for now");
                 return ;
             }
 
@@ -6642,21 +6609,18 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             import ddmd.ctfeexpr : findFieldIndexByName;
 
-            auto fIndex = (isStruct ? findFieldIndexByName(structDeclPtr, vd)
-                                    : getFieldIndex(aggBCType, vd));
+            auto fInfo = getFieldInfo(aggBCType, vd);
 
             // this can happen on forward-references
-            if(fIndex == -1)
+            if(fInfo.offset == -1)
             {
                 bailout("field " ~ vd.toString ~ " could not be found in " ~ dve.e1.toString);
                 return ;
             }
 
-            auto fieldType = _sharedCtfeState.fieldType(aggBCType, fIndex);
-
-            if (fieldType == BCType.init)
+            if (fInfo.type == BCType.init)
             {
-                bailout("could not get field-type for -- " ~ ae.toString ~ " fIndex:" ~ itos(fIndex) ~ "aggBCType: " ~ _sharedCtfeState.typeToString(aggBCType));
+                bailout("could not get field-type for -- " ~ dve.e1.toString);
                 return ;
             }
 
@@ -6681,16 +6645,16 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             () {
                 with(BCTypeEnum)
                 {
-                    return [i8, i32, i64, f23, f52, Function, Delegate];
+                    return [i8, i32, i64, f23, f52, Function, Delegate, Class];
                 }
             } ();
 
-
-            if (!fieldType.type.anyOf(supportedStructTypes))
+            const typeEnum = fInfo.type.type; 
+            if (!typeEnum.anyOf(supportedStructTypes))
             {
-                bailout("only " ~ enumArrayToString(supportedStructTypes) ~ " are supported for structs (for now)... not : " ~ enumToString(fieldType.type));
+                bailout("only " ~ enumArrayToString(supportedStructTypes) ~ " are supported for structs (for now)... not : " ~ enumToString(typeEnum));
                 return ;
-            }
+             }
 
             auto lhs = genExpr(aggregate);
             if (!lhs)
@@ -6723,8 +6687,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             auto ptr = genTemporary(BCType(BCTypeEnum.i32));
 
-            auto offset =  (isStruct ? _sharedCtfeState.structTypes[aggregateTypeIndex - 1].offset(fIndex)
-                                     : _sharedCtfeState.classTypes[aggregateTypeIndex - 1].offset(fIndex));
+            auto offset = fInfo.offset;
 
             Add3(ptr, lhs.i32, imm32(offset));
             immutable size = _sharedCtfeState.size(rhs.type);
@@ -6733,7 +6696,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             else if (size == 8)
                 Store64(ptr, rhs);
             else
-                bailout("only sizes [1 .. 4], and 8 are supported. MemberSize: " ~ itos(size));
+                MemCpy(ptr, rhs.i32, imm32(_sharedCtfeState.size(rhs.type)));
+                //bailout("only sizes [1 .. 4], and 8 are supported. MemberSize: " ~ itos(size));
 
 
             retval = rhs;

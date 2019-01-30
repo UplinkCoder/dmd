@@ -1,5 +1,8 @@
 class B {}
 
+
+pragma(msg, __traits(allMembers, B));
+
 class C : B
 {
   int _i = 2;
@@ -15,7 +18,7 @@ class D : C
 class E : D
 {
 //  int x,y,z,w;
-  int _i;
+//  int _i;
   this(int _i)
   {
     this._i = 3;
@@ -27,7 +30,8 @@ class E : D
 
 int testClassStuff ()
 {
-  B b1;
+  B b1, b2;
+  b2 = new B();
   C c1, c2, c3;
   D c4;
   c1 = new C();

@@ -1,6 +1,17 @@
 module ddmd.ctfe.bc_printer_backend;
-//version = std_stuff;
+//version = std_algo;
 import ddmd.ctfe.bc_common;
+
+string fromStringz(const(char)* cstring)
+{
+    int length = 0;
+    auto ptr = cstring;
+    if (ptr)
+    {
+        while(*(ptr++)) length++;
+    }
+    return cast(string) cstring[0 .. length];
+}
 
 enum BCFunctionTypeEnum : byte
 {
@@ -267,16 +278,7 @@ struct Print_BCGen
         insideFunction = true;
         auto fd = *(cast(FuncDeclaration*) &fnDecl);
 
-        version (std_stuff)
         {
-            import std.string : fromStringz;
-        }
-        else
-        {
-            static immutable fromStringz = (inout(char)* cString) @nogc @system pure nothrow {
-                import core.stdc.string : strlen;
-                return cString ? cString[0 .. strlen(cString)] : null;
-            };
         }
 
         result ~= indent ~ "beginFunction(" ~ itos(f) ~ ");//" ~ (fd && fd.ident ? fromStringz(fd.toChars) : "(nameless)") ~ "\n";
