@@ -3212,7 +3212,7 @@ public:
                     }
                     else
                     {
-                        bailout("default parent ctor unknown");
+//                        bailout("default parent ctor unknown");
                     }
                 }
                 Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
@@ -3431,7 +3431,26 @@ public:
     {
         FieldInfo fInfo;
 
-        if (t.type == BCTypeEnum.Class)
+        if (t.type == BCTypeEnum.Struct)
+        {
+            const ti = t.typeIndex;
+            if (!ti || ti > _sharedCtfeState.structCount)
+            {
+                bailout("can't get struct-type ti: " ~ itos(ti) ~ " structCount: " ~ itos(_sharedCtfeState.structCount));
+                return fInfo;
+            }
+            auto sd = _sharedCtfeState.structDeclpointerTypes[ti - 1];
+            import ddmd.ctfeexpr : findFieldIndexByName;
+            auto idx = findFieldIndexByName(sd, vd);
+            if (idx != -1)
+            {
+                auto _struct = &_sharedCtfeState.structTypes[ti - 1];
+                fInfo.index = idx;
+                fInfo.offset = _struct.offset(idx);
+                fInfo.type = _struct.memberTypes[idx];
+            }
+        }
+        else if (t.type == BCTypeEnum.Class)
         {
             const ti = t.typeIndex;
             if (!ti || ti > _sharedCtfeState.classCount)

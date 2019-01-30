@@ -28,5 +28,7 @@ auto testLayout()
 
     return c.toArray;
 }
-
-static assert (() { return testLayout() == expectedData; } ());
+static immutable returnValue = testLayout();
+pragma(msg, testLayout());
+pragma(msg, expectedData);
+static assert ( returnValue == expectedData );

@@ -19,10 +19,10 @@ class E : D
 {
 //  int x,y,z,w;
 //  int _i;
-  this(int _i)
-  {
-    this._i = 3;
-  }
+//  this(int _i)
+//  {
+//    this._i = 3;
+//  }
   override int i() {return _i;}
   override float f() { return 2.0f; }
 }
@@ -36,10 +36,10 @@ int testClassStuff ()
   D c4;
   c1 = new C();
   c2 = new D();
-  c3 = new E(3);
+  c3 = new E();
   b1 = new D();
 
-  D e = new E(3);
+  D e = new E();
   assert(cast(int)e.f() == 2);
   assert(c2 is c2, "Identity is broken ?");
   assert((cast(D)c3), "Dynamic cast not working");
