@@ -109,6 +109,20 @@ string itos(const uint val) pure @trusted nothrow
 
 static assert(mixin(uint.max.itos) == uint.max);
 
+string itos64(const ulong val) pure @trusted nothrow
+{
+    if (val <= uint.max)
+        return itos(val & uint.max);
+
+    uint lw = val & uint.max;
+    uint hi = val >> 32;
+
+    auto lwString = itos(lw);
+    auto hiString = itos(hi);
+
+    return cast(string) "((" ~ hiString ~ "<< 32)" ~ "|" ~ lwString ~ ")";
+}
+
 
 string floatToString(float f)
 {
@@ -270,8 +284,6 @@ struct BCType
 
     string toString() const pure @safe
     {
-        import std.conv;
-
         string result;
 
         result ~= "BCType(type: " ~ enumToString(type) ~ ", " ~ "typeIndex: " ~ itos(
@@ -624,8 +636,6 @@ struct BCValue
 
     string valueToString() const pure @safe
     {
-        import std.conv;
-
         switch (vType)
         {
         case BCValueType.Local : goto case;
@@ -636,7 +646,7 @@ struct BCValue
             return "heapAddr: " ~ itos(heapAddr);
         case BCValueType.Immediate:
             return "imm: " ~ (type.type == BCTypeEnum.i64 || type.type == BCTypeEnum.f52
-                    ? to!string(imm64) : itos(imm32));
+                    ? itos64(imm64) : itos(imm32));
         default:
             return "unknown value format";
         }

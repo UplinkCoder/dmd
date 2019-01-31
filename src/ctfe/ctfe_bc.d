@@ -3399,6 +3399,7 @@ public:
             auto cd = _sharedCtfeState.classDeclTypePointers[ti - 1];
             BCClass* c = &_sharedCtfeState.classTypes[ti - 1];
             int offset = -1;
+            int index = -1;
 
             FindField: while(cd)
             {
@@ -3406,7 +3407,7 @@ public:
                 {
                     if (vd == f)
                     {
-                        fInfo.index = i;
+                        index = i;
                         offset = c.offset(i); 
                         fInfo.type = c.memberTypes[i];
                         break FindField; 
@@ -3427,14 +3428,15 @@ public:
 
                 c.computeSize();
                 offset += c.size;
-                if (!__ctfe)
+                while(cd)
                 {
-                    import core.stdc.stdio;
-                    printf("offset for: %s = %d  c.size = %d\n", vd.toChars, offset, c.size);
+                    index += cd.fields.dim;
+                    cd = cd.baseClass;
                 }
             }
 
             fInfo.offset = offset;
+            fInfo.index = index;
         }
         return fInfo;
     }
