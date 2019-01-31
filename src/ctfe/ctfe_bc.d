@@ -2504,7 +2504,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             auto offset = 50;
             auto begin = pfn[offset .. $].indexOf('(') + offset + 1;
             auto end = pfn[begin .. $].indexOf(' ') + begin;
-            pfn = pfn[begin .. end];
+            pfn = pfn[begin .. end] ~ "\0";
         }
 
         if (fnIdx)
@@ -2518,9 +2518,9 @@ extern (C++) final class BCV(BCGenT) : Visitor
         }
         else
         {
-            import std.stdio;
+            import core.stdc.stdio;
             static if (bailoutMessages)
-                writefln("bail out on %s (%d): %s", pfn, line, message);
+                printf("bail out on %s (%d): %s", pfn.ptr, line, message.ptr);
         }
     }
 

@@ -735,7 +735,7 @@ pure:
             || commonType == BCTypeEnum.f23 || commonType == BCTypeEnum.c32
             || commonType == BCTypeEnum.c8  || commonType == BCTypeEnum.f52,
             "only i32, i64, f23, f52, is supported for now not: " ~ enumToString(commonType));
-        //assert(lhs.type.type == rhs.type.type, lhs.type.type.to!string ~ " != " ~ enumToString(rhs.type.type));
+        //assert(lhs.type.type == rhs.type.type, enumToString(lhs.type.type) ~ " != " ~ enumToString(rhs.type.type));
 
         if (lhs.vType == BCValueType.Immediate)
         {
@@ -1305,7 +1305,6 @@ string printInstructions(const int* startInstructions, uint length, const string
 
     string result = "StartInstructionDump: \n";
     uint pos = 0;
-    import std.conv;
 
     bool has4ByteOffset;
     if (length > 4 && startInstructions[0 .. 4] == [0, 0, 0, 0])
@@ -1316,13 +1315,13 @@ string printInstructions(const int* startInstructions, uint length, const string
         //pos += 4;
     }
 
-    result ~= "Length : " ~ to!string(length) ~ "\n";
+    result ~= "Length : " ~ itos(cast(int)length) ~ "\n";
     auto arr = startInstructions[0 .. length];
 
     while (length--)
     {
         uint lw = arr[pos];
-        result ~= pos.to!string ~ ":\t";
+        result ~= itos(pos) ~ ":\t";
         ++pos;
         if (lw == 0)
         {
@@ -1339,108 +1338,108 @@ string printInstructions(const int* startInstructions, uint length, const string
         {
         case LongInst.SetHighImm:
             {
-                result ~= "SetHigh " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "SetHigh " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmSet:
             {
-                result ~= "Set " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Set " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmAdd:
             {
-                result ~= "Add " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Add " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmSub:
             {
-                result ~= "Sub " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Sub " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmMul:
             {
-                result ~= "Mul " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Mul " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmDiv:
             {
-                result ~= "Div " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Div " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmAnd:
             {
-                result ~= "And " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "And " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmAnd32:
             {
-                result ~= "And32 " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "And32 " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmOr:
             {
-                result ~= "Or " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Or " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmXor:
             {
-                result ~= "Xor " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Xor " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmXor32:
             {
-                result ~= "Xor32 " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Xor32 " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmLsh:
             {
-                result ~= "Lsh " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Lsh " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmRsh:
             {
-                result ~= "Rsh " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Rsh " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmMod:
             {
-                result ~= "Mod " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Mod " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmEq:
             {
-                result ~= "Eq " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Eq " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmNeq:
             {
-                result ~= "Neq " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Neq " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
 
         case LongInst.ImmLt:
             {
-                result ~= "Lt " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Lt " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmGt:
             {
-                result ~= "Gt " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Gt " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmLe:
             {
-                result ~= "Le " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Le " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
         case LongInst.ImmGe:
             {
-                result ~= "Ge " ~ localName(stackMap, lw >> 16) ~ ", #" ~ to!string(hi) ~ "\n";
+                result ~= "Ge " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
             }
             break;
 
@@ -1649,7 +1648,7 @@ string printInstructions(const int* startInstructions, uint length, const string
 
         case LongInst.Assert:
             {
-                result ~= "Assert " ~ localName(stackMap, lw >> 16) ~ ", ErrNo #" ~  to!string(hi) ~ "\n";
+                result ~= "Assert " ~ localName(stackMap, lw >> 16) ~ ", ErrNo #" ~  itos(hi) ~ "\n";
             }
             break;
         case LongInst.StrEq:
@@ -1697,31 +1696,31 @@ string printInstructions(const int* startInstructions, uint length, const string
 
         case LongInst.Jmp:
             {
-                result ~= "Jmp &" ~ to!string(hi) ~ "\n";
+                result ~= "Jmp &" ~ itos(hi) ~ "\n";
             }
             break;
 
         case LongInst.JmpFalse:
             {
-                result ~= "JmpFalse &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
+                result ~= "JmpFalse &" ~ itos((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
             }
             break;
         case LongInst.JmpTrue:
             {
-                result ~= "JmpTrue &" ~ to!string((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
+                result ~= "JmpTrue &" ~ itos((has4ByteOffset ? hi - 4 : hi)) ~ "\n";
             }
             break;
 
         case LongInst.JmpNZ:
             {
-                result ~= "JmpNZ " ~ localName(stackMap, lw >> 16) ~ ", &" ~ to!string(
+                result ~= "JmpNZ " ~ localName(stackMap, lw >> 16) ~ ", &" ~ itos(
                     (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
             }
             break;
 
         case LongInst.JmpZ:
             {
-                result ~= "JmpZ " ~ localName(stackMap, lw >> 16) ~ ", &" ~ to!string(
+                result ~= "JmpZ " ~ localName(stackMap, lw >> 16) ~ ", &" ~ itos(
                     (has4ByteOffset ? hi - 4 : hi)) ~ "\n";
             }
             break;
@@ -1768,7 +1767,7 @@ string printInstructions(const int* startInstructions, uint length, const string
             break;
         case LongInst.RelJmp:
             {
-                result ~= "RelJmp &" ~ to!string(cast(short)(lw >> 16) + (pos - 2)) ~ "\n";
+                result ~= "RelJmp &" ~ itos(cast(short)(lw >> 16) + (pos - 2)) ~ "\n";
             }
             break;
         case LongInst.Prt:
@@ -1799,7 +1798,7 @@ string printInstructions(const int* startInstructions, uint length, const string
             break;
         case LongInst.BuiltinCall:
             {
-                result ~= "BuiltinCall Fn{" ~ to!string(lw >> 16) ~ "} (" ~ to!string(hi) ~ ")\n";
+                result ~= "BuiltinCall Fn{" ~ itos(lw >> 16) ~ "} (" ~ itos(hi) ~ ")\n";
             }
             break;
         case LongInst.Alloc:
@@ -1816,9 +1815,9 @@ string printInstructions(const int* startInstructions, uint length, const string
             {
                 auto commentLength = hi;
                 auto alignedLength = align4(commentLength) / 4;
-                result ~= "CommentBegin (CommentLength: " ~  to!string(commentLength) ~ ")\n";
+                result ~= "CommentBegin (CommentLength: " ~  itos(commentLength) ~ ")\n";
                 // alignLengthBy2
-                assert(alignedLength <= length, "comment (" ~ to!string(alignedLength) ~") longer then code (" ~ to!string(length) ~ ")");
+                assert(alignedLength <= length, "comment (" ~ itos(alignedLength) ~") longer then code (" ~ itos(length) ~ ")");
 
                 foreach(c4i; pos .. pos + alignedLength)
                 {
@@ -1831,7 +1830,7 @@ string printInstructions(const int* startInstructions, uint length, const string
             break;
         case LongInst.Line:
             {
-                result ~= "Line #" ~ to!string(hi) ~ "\n";
+                result ~= "Line #" ~ itos(hi) ~ "\n";
             }
             break;
 
@@ -1909,7 +1908,6 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     BCValue* debugOutput = null,+/ uint stackOffset = 0)  @trusted
 {
     __gshared static uint callDepth;
-    import std.conv;
     import std.stdio;
 
     bool paused; // true if we are in a breakpoint.
@@ -1972,7 +1970,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             break;
         default:
             //return -1;
-                   assert(0, "unsupported Type " ~ to!string(arg.type));
+                   assert(0, "unsupported Type " ~ enumToString(arg.type.type));
         }
     }
     uint ip = 4;
@@ -1994,7 +1992,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             debug
             {
                 import std.stdio;
-                if (!__ctfe) writeln("Order: ", to!string(command.order));
+                if (!__ctfe) writeln("Order: ", enumToString(command.order));
             }
 
             Switch : final switch(command.order) with(DebugCmdEnum)
@@ -2038,8 +2036,6 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
         } while (paused || command.order != DebugCmdEnum.Nothing);
 +/
-        import std.range;
-
         debug (bc_stack)
             foreach (si; 0 .. stackOffset + 32)
             {
@@ -2779,7 +2775,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
         case LongInst.HeapStore64:
             {
-                assert(*lhsRef, "trying to deref null pointer SP[" ~ to!string((lhsRef - &stackP[0])*4) ~ "] at : &" ~ itos (ip - 2));
+                assert(*lhsRef, "trying to deref null pointer SP[" ~ itos(cast(int)(lhsRef - &stackP[0])*4) ~ "] at : &" ~ itos (ip - 2));
                 const heapOffset = *lhsRef;
                 assert(heapOffset < heapPtr.heapSize, "Store out of range at ip: &" ~ itos(ip - 2));
                 (*(heapPtr._heap.ptr + heapOffset)) = (*rhs) & 0xFF_FF_FF_FF;
@@ -3043,8 +3039,8 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     assert(cpySrc, "cpySrc == 0");
                     assert(cpyDst, "cpyDst == 0");
 
-                    assert(cpyDst >= cpySrc + cpySize || cpyDst + cpySize <= cpySrc, "Overlapping MemCpy is not supported --- src: " ~ to!string(cpySrc)
-                        ~ " dst: " ~ to!string(cpyDst) ~ " size: " ~ to!string(cpySize));
+                    assert(cpyDst >= cpySrc + cpySize || cpyDst + cpySize <= cpySrc, "Overlapping MemCpy is not supported --- src: " ~ itos(cpySrc)
+                        ~ " dst: " ~ itos(cpyDst) ~ " size: " ~ itos(cpySize));
                     heapPtr._heap[cpyDst .. cpyDst + cpySize] = heapPtr._heap[cpySrc .. cpySrc + cpySize];
                 }
             }
