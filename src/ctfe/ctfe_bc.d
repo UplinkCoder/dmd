@@ -4894,16 +4894,28 @@ static if (is(BCGen))
 
         uint offset = SliceDescriptor.Size;
 
+        BCValue defaultValue;
+
         foreach (elem; *ale.elements)
         {
             if (!elem)
             {
-                bailout("Null Element in ArrayLiteral-Expression: " ~ ale.toString);
-                return ;
+                // Null element means default initalizer of the array element type
+                if (elemType.type.anyOf(smallIntegerTypes)
+                    || elemType.type.anyOf([BCTypeEnum.i32]))
+                {
+                    defaultValue = imm32(0);
+                    defaultValue.type = elemType;
+                }
+                else
+                {
+                    bailout("Null Element in ArrayLiteral-Expression: " ~ ale.toString);
+                    return ;
+                }
             }
 
 
-            auto elexpr = genExpr(elem, "ArrayLiteralElement");
+            auto elexpr = elem ? genExpr(elem, "ArrayLiteralElement") : defaultValue;
 
             if (elexpr.type.type.anyOf([BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.i8, BCTypeEnum.f23]))
             {
@@ -5641,9 +5653,10 @@ static if (is(BCGen))
         }
     }
 +/
+
     void setArraySliceDesc(BCValue arr, BCArray arrayType)
     {
-        //debug (NullAllocCheck)
+        debug (NullAllocCheck)
         {
             Assert(arr.i32, addError(lastLoc, "trying to set sliceDesc null Array"));
         }
@@ -5666,6 +5679,52 @@ static if (is(BCGen))
                 Add3(offset, offset, imm32(_sharedCtfeState.size(et)));
             }
         }
+    }
+
+    /// writes a default initalized array of a given type into the given base-offset
+    bool genDefaultArray(BCValue base, BCType arrayType)
+    {
+        assert(arrayType.type == BCTypeEnum.Array, "this function expects an array type");
+        BCArray _array = _sharedCtfeState.arrayTypes[arrayType.typeIndex - 1];
+
+        const elemType = _array.elementType;
+        BCValue defaultValue;
+
+        const heapAdd = _sharedCtfeState.size(elemType);
+
+        if (elemType.type.anyOf(smallIntegerTypes)
+            || elemType.type.anyOf([BCTypeEnum.i32]))
+        {
+            defaultValue = imm32(0);
+            defaultValue.type = elemType;
+        }
+        else
+        {
+            bailout("We don't support this initalizer-type yet" ~ enumToString(elemType.type));
+            return false;
+        }
+
+        BCValue ea = genTemporary(i32Type);
+        BCValue cpyCounter = genTemporary(i32Type);
+        
+        Set(ea, base.i32);
+
+        auto arrayLength = _array.length;
+
+        {
+            auto Lbegin = genLabel();
+            Lt3(BCValue.init, cpyCounter, imm32(arrayLength));
+            auto cjContinue = beginCndJmp(BCValue.init, true);
+            Add3(cpyCounter, cpyCounter, imm32(1));
+            defaultValue.heapRef = BCHeapRef(ea);
+            StoreToHeapRef(defaultValue);
+            Add3(ea, ea, imm32(heapAdd));
+            endJmp(beginJmp(), Lbegin);
+            auto Lend = genLabel();
+            endCndJmp(cjContinue, Lend);
+        }
+
+        return true;
     }
 
     /// Params: structPtr = assumed to point to already allocated memory
@@ -5692,15 +5751,26 @@ static if (is(BCGen))
                 Comment("Array intialisation");
                 auto offset2 = genTemporary(i32Type);
 
-                auto initValue = genExpr(type.initializerExps[i]);
-                if (!initValue)
+                const initExp = type.initializerExps[i];
+                auto initValue =  genExpr(type.initializerExps[i]);
+                if (!initExp)
+                {
+                    if (!genDefaultArray(base, mt))
+                        return ;
+                }
+
+                if (initExp && !initValue)
                 {
                     bailout("structInitValue could not be genrated");
                     return ;
                 }
-                auto initBase = getBase(initValue);
 
-                copyArray(&base, &initBase, getLength(initValue), _sharedCtfeState.size(_sharedCtfeState.elementType(mt)));
+                if (initExp)
+                {
+                    auto initBase = getBase(initValue);
+                    copyArray(&base, &initBase, getLength(initValue), _sharedCtfeState.size(_sharedCtfeState.elementType(mt)));
+                }
+
                 Comment("Array intialisation End");
             }
             else if (mt.type == BCTypeEnum.Struct)
