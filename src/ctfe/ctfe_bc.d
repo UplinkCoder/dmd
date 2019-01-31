@@ -679,7 +679,7 @@ struct BCStruct
 
     BCType[bc_max_members] memberTypes;
     bool[bc_max_members] voidInit;
-    uint[][bc_max_members] initializers;
+    Expression[bc_max_members] initializerExps;
 
     string toString() const
     {
@@ -699,11 +699,10 @@ struct BCStruct
         return result;
     }
 
-    void addField(const BCType bct, bool isVoid, uint[] initValue)
+    void addField(const BCType bct, bool isVoid, Expression initExp)
     {
         memberTypes[memberCount] = bct;
-        initializers[memberCount].length = initValue.length;
-        initializers[memberCount][0 .. initValue.length] = initValue[0 .. initValue.length];
+        this.initializerExps[memberCount] = initExp;
         voidInit[memberCount++] = isVoid;
 
         size += align4(_sharedCtfeState.size(bct, true));
@@ -914,6 +913,7 @@ struct SharedCtfeState(BCGenT)
     RetainedError[bc_max_errors] errors;
     uint errorCount;
     pragma(msg, "sizeof errors = ", int(errors.sizeof/1024), "k");
+
     string typeToString(const BCType type) const
     {
         string result;
@@ -974,29 +974,6 @@ struct SharedCtfeState(BCGenT)
             return BCType(BCTypeEnum.c8);
         else
             return BCType.init;
-    }
-
-    uint[] initializer(const BCType type) const
-    {
-        assert(type.type == BCTypeEnum.Struct, "only structs can have initializers... Type passed: " ~ type.type.enumToString);
-        assert(type.typeIndex && type.typeIndex <= structCount, "invalid structTypeIndex passed: " ~ itos(type.typeIndex));
-        auto structType = structTypes[type.typeIndex - 1];
-        uint[] result;
-        uint offset;
-        result.length = structType.size;
-
-        foreach(i, init;structType.initializers[0 .. structType.memberCount])
-        {
-            auto _size = _sharedCtfeState.size(structType.memberTypes[i]);
-            auto endOffset = offset + _size;
-
-            if (init.length == _size)
-                result[offset .. endOffset] = init[0 .. _size];
-
-            offset = endOffset;
-        }
-
-        return result;
     }
 
     const(BCType) pointerOf(const BCType type) pure
@@ -1969,7 +1946,7 @@ extern (C++) final class BCTypeVisitor : Visitor
         VarDeclaration currentField;
         string reason;
 
-        __gshared static bcv = new BCV!BCGenT; // TODO don't do this.
+//        __gshared static bcv = new BCV!BCGenT; // TODO don't do this.
 
         addFieldLoop : foreach (mi, sMember; sd.fields)
         {
@@ -2001,24 +1978,14 @@ extern (C++) final class BCTypeVisitor : Visitor
             }
             else if (sMember._init)
             {
+                Expression initExp;
                 if (sMember._init.isVoidInitializer)
-                    st.addField(bcType, true, []);
+                    st.addField(bcType, true, null);
                 else
                 {
-                    uint[] initializer;
-
-                    if(auto initExp = sMember._init.toExpression)
+                    initExp = sMember._init.toExpression;
+                    if(initExp)
                     {
-/+
-                        if (initExp.op == TOK.TOKarrayliteral)
-                        {
-                            // array literals as initalizers have may not have a type on themselves
-                            // we need to copy the literal and stick the type of sMember in
-
-                            auto cpy = initExp.copy();
-                            initExp = cpy;
-                        }
-+/
                         if(!initExp.type && !calledSemantic)
                         {
                             initExp.semantic(sMember._scope);
@@ -2027,7 +1994,6 @@ extern (C++) final class BCTypeVisitor : Visitor
 
                         if (!initExp.type && calledSemantic)
                         {
-                            //("initExp.type is null:  " ~ initExp.toString);
                             died = true;
                             import ddmd.asttypename;
                     reason = "type " ~ initExp.type.toString ~ "could not be generated initExp: -- " ~ initExp.toString
@@ -2035,43 +2001,20 @@ extern (C++) final class BCTypeVisitor : Visitor
                             break addFieldLoop;
 
                         }
-
-
-
-
-                        auto initBCValue = bcv.genExpr(initExp);
-                        if (initBCValue)
-                        {
-                            if (initExp.type.ty == Tint32 || initExp.type.ty == Tuns32)
-                            {
-                                initializer = [initBCValue.imm32, 0, 0, 0];
-                            }
-                            else if (initExp.type.ty == Tint64 || initExp.type.ty == Tuns64)
-                            {
-                                initializer = [initBCValue.imm64 & uint.max, 0, 0, 0,
-                                    initBCValue.imm64 >> uint.sizeof*8, 0, 0, 0];
-                            }
-                            else
-                            {
-                                died = true;
-                                reason = "initalizer of type <" ~ enumToString(cast(ENUMTY)initExp.type.ty) ~ "> not handled";
-                            }
-                        }
                     }
                     else
-                        assert(0, "We cannot deal with non-int initializers");
+                        assert(0, "We cannot deal with this initalizer -- " ~ sMember._init.toString());
                         //FIXME change the above assert to something we can bail out on
 
-                    st.addField(bcType, false, initializer);
+                    st.addField(bcType, false, initExp);
                 }
 
             }
             else
-                st.addField(bcType, false, []);
+                st.addField(bcType, false, null);
         }
         assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ "\n\t" ~ reason);
         _sharedCtfeState.endStruct(&st, died);
-        scope(exit) bcv.clear();
     }
 
 }
@@ -5725,7 +5668,7 @@ static if (is(BCGen))
 
     /// Params: structPtr = assumed to point to already allocated memory
     ///         type = a pointer to the BCStruct, if none the type in the structPtr is used.
-    void initStruct(BCValue structPtr, const (BCStruct)* type = null)
+    void initStruct(BCValue structPtr, BCStruct* type = null)
     {
         if (!type)
         {
@@ -5743,14 +5686,13 @@ static if (is(BCGen))
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
                 setArraySliceDesc(offset.i32, _sharedCtfeState.arrayTypes[mt.typeIndex - 1]);
-                const base = getBase(offset.i32);
+                auto base = getBase(offset.i32);
                 Comment("Array intialisation");
                 auto offset2 = genTemporary(i32Type);
-                foreach(int i2, e; type.initializers[i])
-                {
-                    Add3(offset2, base, imm32(4*i2));
-                    Store32(offset2, imm32(e));
-                }
+                auto initValue = genExpr(type.initializerExps[i]);
+                auto initBase = getBase(initValue);
+
+                copyArray(&base, &initBase, getLength(initValue), _sharedCtfeState.size(_sharedCtfeState.elementType(mt)));
                 Comment("Array intialisation End");
             }
             else if (mt.type == BCTypeEnum.Struct)
@@ -5761,18 +5703,18 @@ static if (is(BCGen))
             }
             else if (mt.type == BCTypeEnum.i32)
             {
-                BCValue initValue = imm32(type.initializers[i].length ? type.initializers[i][0] : 0);
+                BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
                 Store32(offset.i32, initValue);
             }
-			else if (mt.type == BCTypeEnum.i64)
+            else if (mt.type == BCTypeEnum.i64)
 			{
-				BCValue initValue = imm64(type.initializers[i].length ? type.initializers[i][0] | ulong(type.initializers[i][4]) << 32UL : 0);
+                BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm64(0);
 				auto offset = genTemporary(pointerToMemberType);
 				Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
 				Store64(offset.i32, initValue);
-			}
+             }
         }
     }
 
@@ -6986,7 +6928,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                         bailout("StructType has invalidSize (this is really bad): " ~ ae.e1.toString);
                         return ;
                     }
-                    const structType = &_sharedCtfeState.structTypes[lhs.type.typeIndex - 1];
+                    auto structType = &_sharedCtfeState.structTypes[lhs.type.typeIndex - 1];
 
                     // HACK allocate space for struct if structPtr is zero
                     auto JstructNotNull = beginCndJmp(lhs.i32, true);
