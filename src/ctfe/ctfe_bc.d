@@ -2520,7 +2520,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         {
             import core.stdc.stdio;
             static if (bailoutMessages)
-                printf("bail out on %s (%d): %s", pfn.ptr, line, message.ptr);
+                printf("bail out on %s (%d): %s\n", pfn.ptr, line, message.ptr);
         }
     }
 
@@ -5691,7 +5691,13 @@ static if (is(BCGen))
                 auto base = getBase(offset.i32);
                 Comment("Array intialisation");
                 auto offset2 = genTemporary(i32Type);
+
                 auto initValue = genExpr(type.initializerExps[i]);
+                if (!initValue)
+                {
+                    bailout("structInitValue could not be genrated");
+                    return ;
+                }
                 auto initBase = getBase(initValue);
 
                 copyArray(&base, &initBase, getLength(initValue), _sharedCtfeState.size(_sharedCtfeState.elementType(mt)));
