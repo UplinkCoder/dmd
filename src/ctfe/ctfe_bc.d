@@ -64,12 +64,6 @@ struct UnresolvedGoto
     uint jumpCount;
 }
 
-struct JumpTarget
-{
-    //    Identifier ident;
-    uint scopeId;
-}
-
 struct UncompiledFunction
 {
     FuncDeclaration fd;
@@ -253,7 +247,7 @@ template LocType()
     alias LocType = Loc;
 }
 
-static immutable smallIntegers = [BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.u8, BCTypeEnum.u16];
+static immutable smallIntegers = [BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.u8, BCTypeEnum.u16, BCTypeEnum.c8, BCTypeEnum.c16];
 
 static if (UseLLVMBackend)
 {
@@ -1667,8 +1661,8 @@ Expression toExpression(const BCValue value, Type expressionType,
                 {
                     static if (bailoutMessages)
                     {
-                        import std.stdio;
-                        writeln("We could not convert the sub-expression of a struct of type ", type.toString);
+                        import core.stdc.stdio;
+                        printf("We could not convert the sub-expression of a struct of type %s\n", type.toString.ptr);
                     }
                     return null;
                 }
@@ -1727,8 +1721,8 @@ Expression toExpression(const BCValue value, Type expressionType,
             {
                 static if (bailoutMessages)
                 {
-                    import std.stdio;
-                    writeln("trying to build void ptr ... we cannot really do this");
+                    import core.stdc.stdio;
+                    printf("trying to build void ptr ... we cannot really do this\n");
                 }
                 return null;
             }
@@ -1749,8 +1743,8 @@ Expression toExpression(const BCValue value, Type expressionType,
     {
         if (!result)
         {
-            import std.stdio;
-            writeln("could not create expression of type: ", cast(ENUMTY)expressionType.ty);
+            import core.stdc.stdio;
+            printf("could not create expression of type: %s\n", enumToString(cast(ENUMTY)expressionType.ty).ptr);
         }
     }
 
@@ -4747,8 +4741,9 @@ static if (is(BCGen))
     override void visit(DotVarExp dve)
     {
         lastLoc = dve.loc;
-
         Line(dve.loc.linnum);
+
+        const bcType = toBCType(dve.e1.type);
         if (dve.e1.type.ty == Tstruct && (cast(TypeStruct) dve.e1.type).sym)
         {
             auto structDeclPtr = (cast(TypeStruct) dve.e1.type).sym;
@@ -4756,11 +4751,12 @@ static if (is(BCGen))
             if (structTypeIndex)
             {
                 BCStruct _struct = _sharedCtfeState.structTypes[structTypeIndex - 1];
-                import ddmd.ctfeexpr : findFieldIndexByName;
 
                 auto vd = dve.var.isVarDeclaration;
                 assert(vd);
-                auto fIndex = findFieldIndexByName(structDeclPtr, vd);
+                
+                const fInfo = getFieldInfo(bcType, vd);
+                const fIndex = fInfo.index;
                 if (fIndex == -1)
                 {
                     bailout("Field cannot be found " ~ dve.toString);
@@ -4773,13 +4769,13 @@ static if (is(BCGen))
                     return ;
                 }
 
-                int offset = _struct.offset(fIndex);
+                int offset = fInfo.offset;
                 if (offset == -1)
                 {
                     bailout("Could not get field-offset of" ~ vd.toString);
                     return ;
                 }
-                BCType varType = _struct.memberTypes[fIndex];
+                BCType varType = fInfo.type;
                 if (!varType.type)
                 {
                     bailout("struct member " ~ itos(fIndex) ~ " has an empty type... This must not happen! -- " ~ dve.toString);
@@ -4839,7 +4835,6 @@ static if (is(BCGen))
         }
         else if (dve.e1.type.ty == Tclass && (cast(TypeClass) dve.e1.type).sym)
         {
-            const bcType = toBCType(dve.e1.type);
             const c = _sharedCtfeState.classTypes[bcType.typeIndex - 1];
             const fInfo = getFieldInfo(bcType, cast(VarDeclaration)dve.var);
             const offset = fInfo.offset;
