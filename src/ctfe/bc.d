@@ -2746,7 +2746,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             break;
         case LongInst.HeapStore32:
             {
-                assert(*lhsRef, "trying to deref null pointer SP[" ~ to!string((lhsRef - &stackP[0])*4) ~ "] at : &" ~ to!string (ip - 2));
+                assert(*lhsRef, "trying to deref null pointer SP[" ~ itos(cast(int)((lhsRef - &stackP[0])*4)) ~ "] at : &" ~ itos (ip - 2));
                 (*(heapPtr._heap.ptr + *lhsRef)) = (*rhs) & 0xFF_FF_FF_FF;
                 debug
                 {

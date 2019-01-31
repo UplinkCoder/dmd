@@ -94,7 +94,7 @@ struct C_BCGen
         import std.range;
 
         // first we generate the signature
-        return (
+        const rv = (
             (
             (fname is null) ? "((BCValue[] args, BCHeap* heapPtr) @safe {\n"
             : "BCValue " ~ fname ~ "(BCValue[] args) {\n") ~ "\n\tint stackOffset;\n\tBCValue retval;\n\nlong[" ~ itos(
@@ -107,6 +107,7 @@ struct C_BCGen
         }
                 } ~ cast(
             string) code ~ q{return fn0(args, heapPtr);} ~ ((fname is null) ? "\n})" : "\n}"));
+        return rv;
     }
 
 
@@ -236,9 +237,9 @@ pure:
 
     void endJmp(BCAddr atIp, BCLabel target)
     {
-        import std.format;
-
-        string lns = format("%04d", target.addr);
+        const n = itos(target.addr);
+        char[4] lns = '0';
+        lns[$-n.length .. $] = n[0 .. $];
         assert(lns.length == 4);
         foreach (i, c; lns)
         {
@@ -276,11 +277,13 @@ pure:
 
     BCLabel genLabel()
     {
-        import std.format;
-
         if (!sameLabel)
         {
-            code ~= format("label_%04d", ++labelCount) ~ ":\n";
+            const n = itos(++labelCount);
+            char[4] lc = '0';
+            lc[$-n.length .. $] = n[0 .. $];
+
+            code ~= "label_" ~ lc ~ ":\n";
             sameLabel = true;
             return BCLabel(BCAddr(labelCount));
         }
@@ -381,17 +384,15 @@ pure:
     void Alloc(BCValue heapPtr, BCValue size)
     {
         sameLabel = false;
-        import std.format;
 
-        code ~= format(q{
-        if ((heapPtr.heapSize + (%s)) < heapPtr.heapMax) {
-            (%s) = heapPtr.heapSize;
-            heapPtr.heapSize += (%s);
+        code ~= `
+        if ((heapPtr.heapSize + (` ~ toCode(size) ~ `)) < heapPtr.heapMax) {
+            (` ~ toCode(heapPtr) ~ `) = heapPtr.heapSize;
+            heapPtr.heapSize += (` ~ toCode(size) ~ `);
         } else {
             assert(0, "HEAP OVERFLOW!");
         }
-        },
-            toCode(size), toCode(heapPtr), toCode(size));
+`;
     }
 
     void MemCpy(BCValue target, BCValue source, BCValue size)
