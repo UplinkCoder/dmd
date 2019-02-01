@@ -33,7 +33,7 @@ enum abortOnCritical = 1;
 
 private static void clearArray(T)(auto ref T array, uint count)
 {
-        array[0 .. count] = typeof(array[0]).init;
+    array[0 .. count] = typeof(array[0]).init;
 }
 
 version = ctfe_noboundscheck;
@@ -5779,14 +5779,14 @@ static if (is(BCGen))
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
                 initStruct(offset, &_sharedCtfeState.structTypes[mt.typeIndex - 1]);
             }
-            else if (mt.type == BCTypeEnum.i32)
+            else if (mt.type == BCTypeEnum.i32 || mt.type == BCTypeEnum.f23)
             {
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
                 Store32(offset.i32, initValue);
             }
-            else if (mt.type == BCTypeEnum.i64)
+            else if (mt.type == BCTypeEnum.i64 || mt.type == BCTypeEnum.f52)
 			{
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm64(0);
 				auto offset = genTemporary(pointerToMemberType);
@@ -8068,7 +8068,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 retval = genTemporary(toType);
                 F32ToI(retval, from);
             }
-            else if (toType.type == BCTypeEnum.f52)
+            else if (fromType.type == BCTypeEnum.f52)
             {
                 const from = retval;
                 retval = genTemporary(toType);
