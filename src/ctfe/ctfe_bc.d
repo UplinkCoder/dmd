@@ -21,9 +21,9 @@ import ddmd.root.rmem;
 
 import core.stdc.stdio : printf;
 
-enum perf = 0;
+enum perf = 1;
 enum bailoutMessages = 1;
-enum printResult = 1;
+enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -2436,7 +2436,6 @@ extern (C++) final class BCV(BCGenT) : Visitor
         auto elementSize = _sharedCtfeState.size(elementType);
 
         Mul3(effectiveSize, newLength, imm32(elementSize));
-
         Alloc(newBase, effectiveSize, slice.type);
         setBase(slice, newBase);
         setLength(slice, newLength);
@@ -3408,9 +3407,9 @@ public:
                     if (vd == f)
                     {
                         index = i;
-                        offset = c.offset(i); 
+                        offset = c.offset(i);
                         fInfo.type = c.memberTypes[i];
-                        break FindField; 
+                        break FindField;
                     }
                 }
                 cd = cd.baseClass;
@@ -4699,7 +4698,7 @@ static if (is(BCGen))
 
                 auto vd = dve.var.isVarDeclaration;
                 assert(vd);
-                
+
                 const fInfo = getFieldInfo(bcType, vd);
                 const fIndex = fInfo.index;
                 if (fIndex == -1)
@@ -5697,6 +5696,8 @@ static if (is(BCGen))
         {
             defaultValue = imm32(0);
             defaultValue.type = elemType;
+
+            ArrayBroadcast(base, _array, defaultValue);
         }
         else
         {
@@ -5704,27 +5705,45 @@ static if (is(BCGen))
             return false;
         }
 
+        return true;
+    }
+
+    /// broadcasts an element to an array
+    void ArrayBroadcast(BCValue base, BCArray array, BCValue broadCastElem)
+    {
+        Comment("Broadcast_Assignment");
         BCValue ea = genTemporary(i32Type);
         BCValue cpyCounter = genTemporary(i32Type);
-        
-        Set(ea, base.i32);
+        const arrayLength = array.length;
 
-        auto arrayLength = _array.length;
+        bailout(broadCastElem.type != array.elementType,
+            "ArrayBroadCast array.elementType(" ~ _sharedCtfeState.typeToString(array.elementType) ~
+                ") and broadcastElem(" ~ _sharedCtfeState.typeToString(broadCastElem.type) ~
+            ") mismatch ... "
+        );
+        const heapAdd = _sharedCtfeState.size(array.elementType);
 
+        Set(ea, base.i32); // ea = &array[0]
         {
-            auto Lbegin = genLabel();
-            Lt3(BCValue.init, cpyCounter, imm32(arrayLength));
-            auto cjContinue = beginCndJmp(BCValue.init, true);
-            Add3(cpyCounter, cpyCounter, imm32(1));
-            defaultValue.heapRef = BCHeapRef(ea);
-            StoreToHeapRef(defaultValue);
-            Add3(ea, ea, imm32(heapAdd));
-            endJmp(beginJmp(), Lbegin);
-            auto Lend = genLabel();
+            auto Lbegin = genLabel(); // LBegin:
+            Lt3(BCValue.init, cpyCounter, imm32(arrayLength)); // flag = cpyCounter < array.length
+            auto cjContinue = beginCndJmp(BCValue.init);  // if (!flag) goto Lend;
+            {
+                Add3(cpyCounter, cpyCounter, imm32(1)); // cpyCounter++;
+                {
+                    broadCastElem.heapRef = BCHeapRef(ea);
+                    StoreToHeapRef(broadCastElem);
+                }  // *ea = broadCastElem;
+
+                Add3(ea, ea, imm32(heapAdd)); // ea += elementSize
+                endJmp(beginJmp(), Lbegin); // goto Lbegin;
+            }
+            auto Lend = genLabel();// Lend:
             endCndJmp(cjContinue, Lend);
+
+            // this line sets the Lend in "if (!flag) goto Lend;" above
         }
 
-        return true;
     }
 
     /// Params: structPtr = assumed to point to already allocated memory
@@ -5751,24 +5770,33 @@ static if (is(BCGen))
                 Comment("Array intialisation");
                 auto offset2 = genTemporary(i32Type);
 
-                const initExp = type.initializerExps[i];
-                auto initValue =  genExpr(type.initializerExps[i]);
+                auto initExp = type.initializerExps[i];
+                auto initValue = initExp ? genExpr(type.initializerExps[i]) : BCValue.init;
+
                 if (!initExp)
                 {
                     if (!genDefaultArray(base, mt))
                         return ;
                 }
-
-                if (initExp && !initValue)
+                else if (!initValue) // implies the initExp was not null.
                 {
                     bailout("structInitValue could not be genrated");
                     return ;
                 }
-
-                if (initExp)
+                else // implies we could generate an initValue
                 {
-                    auto initBase = getBase(initValue);
-                    copyArray(&base, &initBase, getLength(initValue), _sharedCtfeState.size(_sharedCtfeState.elementType(mt)));
+                    BCArray _array = _sharedCtfeState.arrayTypes[mt.typeIndex - 1];
+                    const elemTypeSize = _sharedCtfeState.size(_array.elementType);
+
+                    if (initValue.type.type == BCTypeEnum.Array)
+                    {
+                        auto initBase = getBase(initValue);
+                        copyArray(&base, &initBase, getLength(initValue), elemTypeSize);
+                    }
+                    else
+                    {
+                        ArrayBroadcast(base, _array, initValue);
+                    }
                 }
 
                 Comment("Array intialisation End");
@@ -5787,11 +5815,11 @@ static if (is(BCGen))
                 Store32(offset.i32, initValue);
             }
             else if (mt.type == BCTypeEnum.i64 || mt.type == BCTypeEnum.f52)
-			{
+            {
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm64(0);
-				auto offset = genTemporary(pointerToMemberType);
-				Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
-				Store64(offset.i32, initValue);
+                auto offset = genTemporary(pointerToMemberType);
+                Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
+                Store64(offset.i32, initValue);
              }
         }
     }
@@ -6683,7 +6711,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 }
             } ();
 
-            const typeEnum = fInfo.type.type; 
+            const typeEnum = fInfo.type.type;
             if (!typeEnum.anyOf(supportedStructTypes))
             {
                 bailout("only " ~ enumArrayToString(supportedStructTypes) ~ " are supported for structs (for now)... not : " ~ enumToString(typeEnum));
