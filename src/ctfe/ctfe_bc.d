@@ -23,7 +23,7 @@ import core.stdc.stdio : printf;
 
 enum perf = 1;
 enum bailoutMessages = 1;
-enum printResult = 0;
+enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -1676,7 +1676,7 @@ Expression toExpression(const BCValue value, Type expressionType,
             result = new RealExp(lastLoc, *cast(float*)&value.imm32, expressionType);
         }
         break;
-    case Tfloat64:
+    case Tfloat64, Tfloat80:
         {
             result = new RealExp(lastLoc, *cast(double*)&value.imm64, expressionType);
         }
@@ -1770,7 +1770,7 @@ extern (C++) final class BCTypeVisitor : Visitor
         case ENUMTY.Tfloat64:
             return BCType(BCTypeEnum.f52);
         case ENUMTY.Tfloat80:
-            //return BCType(BCTypeEnum.f52);
+            return BCType(BCTypeEnum.f52);
         case ENUMTY.Timaginary32:
         case ENUMTY.Timaginary64:
         case ENUMTY.Timaginary80:
@@ -2028,7 +2028,7 @@ struct BCScope
 
 debug = nullPtrCheck;
 debug = nullAllocCheck;
-//debug = ctfe;
+debug = ctfe;
 debug = MemCpyLocation;
 //debug = SetLocation;
 //debug = LabelLocation;
@@ -4737,6 +4737,7 @@ static if (is(BCGen))
                     toBCType(dve.type));
 
                 auto lhs = genExpr(dve.e1, "DotVarExp: dve.e1");
+                Comment("We should now have lhs");
                 if (lhs.type.type != BCTypeEnum.Struct)
                 {
                     bailout(
@@ -5254,6 +5255,7 @@ static if (is(BCGen))
             import std.stdio;
 
             writeln("PtrExp: ", pe.toString, " = ", addr);
+            writeln("addr.type: ", addr.type);
         }
 
         if (!addr)
@@ -5282,13 +5284,25 @@ static if (is(BCGen))
         {
             Load64(retval, addr);
         }
+        else if (baseType.type == BCTypeEnum.Ptr)
+        {
+            assert(0, "Don't support multiple levels of indirection yet");
+        }
+        else if (baseType.type == BCTypeEnum.Struct)
+        {
+            const size = _sharedCtfeState.size(baseType);
+            if (size)
+            {
+                Alloc(retval.i32, imm32(size));
+                MemCpy(retval.i32, addr.i32, imm32(size));
+            }
+        }
         else
         {
-            /+
-            bailout("Only 4 byte or 8 byte basic type are supported not " ~ itos(bts)
+            assert(0, "Only 4 byte or 8 byte basic type are supported not " ~ itos(bts)
                 ~ "on  "~ _sharedCtfeState.typeToString(baseType) ~ " for -- " ~ pe.toString);
             return ;
-            +/
+            
         }
 
         // FIXME when we are ready to support more than i32Ptr the direct calling of load
@@ -6188,9 +6202,9 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             break;
         case TOK.TOKshlass:
             {
-                static if (is(BCGen))
-                    if (lhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.i32)
-                        bailout("BCGen does not suppport 32bit bit-operations");
+//                static if (is(BCGen))
+//                    if (lhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.i32)
+//                        bailout("BCGen does not suppport 32bit bit-operations");
 
                 Lsh3(lhs, lhs, rhs);
                 retval = lhs;

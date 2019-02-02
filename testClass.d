@@ -17,12 +17,11 @@ class D : C
 
 class E : D
 {
-//  int x,y,z,w;
-//  int _i;
-//  this(int _i)
-//  {
-//    this._i = 3;
-//  }
+  int x,y,z,w;
+  this()
+  {
+    this._i = 3;
+  }
   override int i() {return _i;}
   override float f() { return 2.0f; }
 }
