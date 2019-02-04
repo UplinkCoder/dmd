@@ -2730,16 +2730,20 @@ public:
             Add3(cvp, cvp, imm32(cv.offset));
 
             auto bctype = toBCType(vd.type);
-            auto var = genLocal(bctype, cast(string)vd.ident.toString);
+            BCValue var = genLocal(bctype, cast(string)vd.ident.toString);
 
+            // because a struct is represented via a ptr into the closure memory
+            // we must make the created local point to that
             if (bctype.type == BCTypeEnum.Struct)
             {
-                Comment("Allocate memory for struct_type");
-                Alloc(var, imm32(_sharedCtfeState.size(bctype)), bctype);
+                Set(var.i32, cvp.i32);
+            }
+            else
+            {
+                var.heapRef = BCHeapRef(cvp);
+                LoadFromHeapRef(var);
             }
 
-            var.heapRef = BCHeapRef(cvp);
-            LoadFromHeapRef(var);
             setVariable(vd, var);
             return var;
         }
@@ -3064,7 +3068,9 @@ public:
         foreach(ref v;fd.closureVars)
         {
             setClosureVarOffset(v, closureChainSize);
-            closureChainSize += _sharedCtfeState.size(toBCType(v.type), true);
+            auto type = toBCType(v.type);
+
+            closureChainSize += _sharedCtfeState.size(type, true);
         }
 
         BCValue newClosure = genLocal(i32Type, "newClosure");
@@ -5088,9 +5094,6 @@ static if (is(BCGen))
 
         structVal.type = BCType(BCTypeEnum.Struct, idx);
 
-        auto rv_stackValue = structVal.i32;
-        rv_stackValue.vType = BCValueType.StackValue;
-        //MemCpyConst(rv_stackValue, _sharedCtfeState.initializer(BCType(BCTypeEnum.Struct, idx)));
         initStruct(structVal);
 
         uint offset = 0;
@@ -5120,9 +5123,9 @@ static if (is(BCGen))
             if (!insideArgumentProcessing)
             {
                 if (offset)
-                    Add3(fieldAddr, rv_stackValue, imm32(offset));
+                    Add3(fieldAddr, structVal.i32, imm32(offset));
                 else
-                    Set(fieldAddr, rv_stackValue);
+                    Set(fieldAddr, structVal.i32);
                 // abi hack for slices slice;
                 if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Ptr]))
                 {
@@ -7846,10 +7849,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             if (fd ? fd.isNested() && me.closureVars.dim : false)
             {
                 bc_args[lastArgIdx + !!thisPtr] = closureChain;
-                // now we need to store back into the closure
+                // now we need to load the the closure bak into our localsc
                 auto closureptr_offset = genLocal(i32Type, "closureptr_offset");
                 foreach(cv, offset; closureVarOffsets)
                 {
+                    gen.Comment("Closure Load Back");
                     // here the "gen." is needed although it should be found via
                     // alias this
                     //TODO investiage bug!
@@ -8001,6 +8005,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         assert(!inReturnStatement);
         assert(!discardValue, "A returnStatement cannot be in discarding mode");
+
         if (rs.exp !is null)
         {
             auto retval = genExpr(rs.exp, "ReturnStatement");
@@ -8029,7 +8034,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         else
         {
-            // rs.exp is null for  "return ";
+            // rs.exp is null for  "return ;"
             // return ; is only legal when the return type is void
             // so we can return a bcNull without fearing consequences.
 

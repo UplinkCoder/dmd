@@ -270,8 +270,30 @@ enum BCTypeEnum : ubyte
 
 enum BCTypeFlags : ubyte
 {
-    None = 0x0,
-    Const = 0x1,
+    None = 0,
+    Const = 1 << 0,
+}
+
+string typeFlagsToString(BCTypeFlags flags) pure @safe
+{
+    string result;
+ 
+    if (!flags)
+    {
+        result = "None";
+        goto Lret;
+    }
+
+    if (flags & flags.Const)
+    {
+        result ~= "Const|";
+    }
+
+    // trim last |
+    result = result[0 .. $-1];
+
+Lret:
+    return result;
 }
 
 struct BCType
@@ -287,7 +309,7 @@ struct BCType
         string result;
 
         result ~= "BCType(type: " ~ enumToString(type) ~ ", " ~ "typeIndex: " ~ itos(
-                typeIndex) ~ ", " ~ "flags: " ~ enumToString(flags) ~ ")";
+                typeIndex) ~ ", " ~ "flags: " ~ typeFlagsToString(flags) ~ ")";
 
         return result;
     }

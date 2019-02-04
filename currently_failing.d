@@ -1,3 +1,4 @@
+/+
 struct S
 {
     int beginning = 63;
@@ -44,10 +45,11 @@ S makeS()
 
 pragma(msg, makeS());
 
++/
 
 struct S2
 {
-  int x;
+  int x = 64;
   int[2] a;
 }
 
@@ -67,6 +69,4 @@ S2 fn2()
 }
 
 
-// pragma(msg, fn2());
-
-//static assert(fn2() == S2(1, [2, 3]));
+static assert(fn2() == S2(1, [2, 3]));
