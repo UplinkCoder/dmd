@@ -2028,7 +2028,7 @@ struct BCScope
 
 debug = nullPtrCheck;
 debug = nullAllocCheck;
-debug = ctfe;
+//debug = ctfe;
 debug = MemCpyLocation;
 //debug = SetLocation;
 //debug = LabelLocation;
@@ -5293,12 +5293,15 @@ static if (is(BCGen))
         }
         else if (baseType.type == BCTypeEnum.Struct)
         {
+/+
             const size = _sharedCtfeState.size(baseType);
             if (size)
             {
                 Alloc(retval.i32, imm32(size));
                 MemCpy(retval.i32, addr.i32, imm32(size));
             }
++/
+            Set(retval.i32, addr.i32);
         }
         else
         {
