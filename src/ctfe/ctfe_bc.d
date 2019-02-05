@@ -7029,7 +7029,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     }
                     else if (rhs.type == arrayType.elementType)
                     {
-                        bailout("broadcast assignment not supported for now -- " ~ ae.toString);
+                        ArrayBroadcast(base, arrayType, rhs);
                         return ;
                     }
                     else
@@ -7101,6 +7101,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                      || (lhs.type.type == BCTypeEnum.string8 && rhs.type.type == BCTypeEnum.c8))
                 {
                     // this is a broadcast assignment to a slice
+                    // TODO replace with  ArrayBroadcast(base, _array, defaultValue);
                     Comment("Broadcast Assignment");
                     const elemType = _sharedCtfeState.elementType(lhs.type);
                     auto length = getLength(lhs);
