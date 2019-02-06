@@ -5729,9 +5729,9 @@ static if (is(BCGen))
     }
 
     /// broadcasts an element to an array
-    void ArrayBroadcast(BCValue base, BCArray array, BCValue broadCastElem)
+    void ArrayBroadcast(BCValue base, BCArray array, BCValue broadCastElem, int line = __LINE__)
     {
-        Comment("Broadcast_Assignment");
+        Comment("Broadcast_Assignment from: " ~ itos(line));
         BCValue ea = genTemporary(i32Type);
         BCValue cpyCounter = genTemporary(i32Type);
         const arrayLength = array.length;
@@ -7033,7 +7033,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     else if (rhs.type == arrayType.elementType)
                     {
                         ArrayBroadcast(base, arrayType, rhs);
-                        return ;
                     }
                     else
                     {
