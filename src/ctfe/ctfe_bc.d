@@ -101,14 +101,8 @@ struct SwitchFixupEntry
 
 struct BoolExprFixupEntry
 {
-    BCAddr unconditional;
     CndJmpBegin conditional;
-    /*
-    this(BCAddr unconditional) pure
-    {
-        this.unconditional = unconditional;
-    }
-*/
+
     this(CndJmpBegin conditional) pure
     {
         this.conditional = conditional;
@@ -5054,6 +5048,7 @@ static if (is(BCGen))
             return ;
         }
         BCStruct _struct = _sharedCtfeState.structTypes[idx - 1];
+        auto st = _sharedCtfeState.structDeclpointerTypes[idx - 1];
 
         foreach (i; 0 .. _struct.memberCount)
         {
@@ -5098,8 +5093,10 @@ static if (is(BCGen))
 
         uint offset = 0;
         BCValue fieldAddr = genTemporary(i32Type);
-        foreach (elem; *sle.elements)
+
+        foreach (i, elem; *sle.elements)
         {
+            BCType field_type = toBCType(st.fields[i].type);
             Comment("StructLiteralExp element: " ~ elem.toString);
             if (!elem)
             {
@@ -5126,8 +5123,29 @@ static if (is(BCGen))
                     Add3(fieldAddr, structVal.i32, imm32(offset));
                 else
                     Set(fieldAddr, structVal.i32);
-                // abi hack for slices slice;
-                if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Ptr]))
+
+                if (field_type.type == BCTypeEnum.Array)
+                {
+                    BCArray _array = _sharedCtfeState.arrayTypes[field_type.typeIndex - 1];
+
+                    if (_array.elementType == elexpr.type)
+                    {
+                        auto base = getBase(fieldAddr);
+                        ArrayBroadcast(base, _array, elexpr);
+                    }
+                    else
+                    {
+                        bailout("Broadcast assignment types don't match!");
+                        return ;
+                    }
+                }
+                else if (field_type.type == BCTypeEnum.Slice)
+                {
+                    bailout("We can currently not support broadcast_slice_assignemt in struct lterals");
+                    return ;
+                }
+                // abi hack for slices of slices
+                else if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Ptr]))
                 {
                     // copy Member
                     MemCpy(fieldAddr, elexpr, imm32(_size));
@@ -5293,14 +5311,14 @@ static if (is(BCGen))
         }
         else if (baseType.type == BCTypeEnum.Struct)
         {
-/+
+
             const size = _sharedCtfeState.size(baseType);
             if (size)
             {
                 Alloc(retval.i32, imm32(size));
                 MemCpy(retval.i32, addr.i32, imm32(size));
             }
-+/
+
             Set(retval.i32, addr.i32);
         }
         else
@@ -6980,15 +6998,14 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     (lhs.type.type == BCTypeEnum.Slice && rhs.type.type == BCTypeEnum.Array) ||
                     (lhs.type.type == BCTypeEnum.Slice && rhs.type.type == BCTypeEnum.Slice))
                 {
+/+ This is probably not needed ....
                     if (ae.op == TOKconstruct)
                     {
-/+
                         auto CJLhsIsNull = beginCndJmp(lhs.i32, true);
                         Alloc(lhs.i32, imm32(SliceDescriptor.Size));
                         endCndJmp(CJLhsIsNull, genLabel());
-+/
                     }
-
++/
                     MemCpy(lhs.i32, rhs.i32, imm32(SliceDescriptor.Size));
                 }
                 else if (lhs.type.type == BCTypeEnum.Delegate && rhs.type.type == BCTypeEnum.Delegate)
@@ -7081,14 +7098,14 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                         bailout("We would do a null allocation in " ~ ae.toString);
                         return ;
                     }
-
+/+
                     if (ae.op == TOKconstruct)
                     {
                         auto CJLhsIsNull = beginCndJmp(lhs.i32, true);
                         Alloc(lhs.i32, imm32(allocSize), lhs.type);
                         endCndJmp(CJLhsIsNull, genLabel());
                     }
-
++/
                     MemCpy(lhs.i32, rhs.i32, imm32(structSize));
                 }
                 else if (lhs.type.type == BCTypeEnum.Class && rhs.type.type == BCTypeEnum.Class)
@@ -7104,7 +7121,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 {
                     // this is a broadcast assignment to a slice
                     // TODO replace with  ArrayBroadcast(base, _array, defaultValue);
-                    Comment("Broadcast Assignment");
+                    Comment("Broadcast Assignment (Slice)");
                     const elemType = _sharedCtfeState.elementType(lhs.type);
                     auto length = getLength(lhs);
                     BCValue idx = genTemporary(i32Type);
@@ -7225,7 +7242,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             // we end up fixing the jump up to ourselves.
             foreach (fixup; _uls.breakFixups[0 .. _uls.breakFixupCount])
             {
-                //HACK the will leave a nop in the bcgen
+                //HACK this will leave a nop in the bcgen
                 //but it will break llvm or other potential backends;
                 Comment("Putting unrolled_loopStatement-breakFixup");
                 if (fixup.addr != afterUnrolledLoop.addr)
