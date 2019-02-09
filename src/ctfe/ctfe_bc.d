@@ -5135,7 +5135,9 @@ static if (is(BCGen))
                     }
                     else
                     {
-                        bailout("Broadcast assignment types don't match!");
+                        bailout("Broadcast assignment types don't match!"
+                            ~ " elexpr.type: " ~ _sharedCtfeState.typeToString(elexpr.type) 
+                            ~ " _array.elementType: " ~ _sharedCtfeState.typeToString(_array.elementType));
                         return ;
                     }
                 }
