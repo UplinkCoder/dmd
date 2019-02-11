@@ -5792,7 +5792,7 @@ static if (is(BCGen))
     {
         if (!type)
         {
-            assert(structPtr.type.type == BCTypeEnum.Struct, "when no explicit type os passed we need the type in the bcvalue");
+            assert(structPtr.type.type == BCTypeEnum.Struct, "when no explicit type is passed we need the type in the bcvalue");
             type = &_sharedCtfeState.structTypes[structPtr.type.typeIndex - 1];
         }
 
