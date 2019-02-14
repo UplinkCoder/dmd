@@ -26,7 +26,7 @@ enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -431,6 +431,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         asw.stop();
         bcv.compileUncompiledFunctions();
         bcv.buildVtbls();
+        bcv.dumpVtbls();
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledConstructors();
         bcv.compileUncompiledDynamicCasts();
@@ -7950,6 +7951,22 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         if (!fIdx)
         {
             addUncompiledFunction(fd, &fIdx, true);
+        }
+    }
+
+    void dumpVtbls()
+    {
+        foreach(ci;0 .. _sharedCtfeState.classCount)
+        {
+            auto ct = _sharedCtfeState.classTypes[ci];
+            auto cdtp = _sharedCtfeState.classDeclTypePointers[ci];
+            printf("Vtbl for: %s\n", cdtp.toChars());
+            if (ct.vtblPtr) foreach(uvi;ct.usedVtblIdxs)
+            {
+                const idx = ct.vtblPtr + (uvi * 4);
+                auto value = _sharedExecutionState.heap._heap[idx];
+                printf("    [%d] = %d\n", uvi, value);
+            }
         }
     }
 
