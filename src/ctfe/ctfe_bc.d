@@ -18,12 +18,12 @@ import ddmd.root.rmem;
 /**
  * Written By Stefan Koch in 2016-19
  */
-
+ 
 import core.stdc.stdio : printf;
 
-enum perf = 1;
-enum bailoutMessages = 1;
-enum printResult = 1;
+enum perf = 0;
+enum bailoutMessages = 0;
+enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -175,7 +175,7 @@ struct BlackList
                 "modify14304", //because of fail_compilation/fail14304.d; We should not be required to check for this.
                 "bug2931", //temporarily to pass a test for multi-dimensional arrays
                 "bug2931_2", //temporarily to pass a test for multi-dimensional arrays
-//                "wrongcode3139", //temporarily to pass nested-switch test
+                "wrongcode3139", //temporarily to pass nested-switch test
         ]);
     }
 
@@ -431,7 +431,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         asw.stop();
         bcv.compileUncompiledFunctions();
         bcv.buildVtbls();
-        bcv.dumpVtbls();
+        static if (bailoutMessages) bcv.dumpVtbls();
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledConstructors();
         bcv.compileUncompiledDynamicCasts();
@@ -5326,7 +5326,7 @@ static if (is(BCGen))
         }
         else
         {
-            assert(0, "Only 4 byte or 8 byte basic type are supported not " ~ itos(bts)
+           bailout("Only 4 byte or 8 byte basic type are supported not " ~ itos(bts)
                 ~ "on  "~ _sharedCtfeState.typeToString(baseType) ~ " for -- " ~ pe.toString);
             return ;
             
@@ -7284,8 +7284,20 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         if (lhs.type.type == BCTypeEnum.i32 || lhs.type.type == BCTypeEnum.Ptr || lhs.type.type == BCTypeEnum.Struct
             || lhs.type.type == BCTypeEnum.Class)
         {
-            Assert(lhs.i32, addError(ae.loc,
-                ae.msg ? ae.msg.toString : "Assert Failed"));
+            string errorMessage;
+            if (!ae.msg)
+            {
+                const char* msg = ae.toChars();
+                import core.stdc.string : strlen;
+
+                auto len = strlen(msg);
+                errorMessage = cast(string) msg[0 .. len];
+            }
+            else
+            {
+                errorMessage = ae.msg.toString;
+            }
+            Assert(lhs.i32, addError(ae.loc, errorMessage));
         }
         else
         {
@@ -7698,7 +7710,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Comment("vtblLoad");
                 enum sizeofVtblEntry = 4;
                 IndexedScaledLoad32(fnValue.i32, vtblPtr.i32, imm32(vtblIndex + 1), sizeofVtblEntry);
-                //bailout("A virtual call ... Oh No! -- " ~ ce.toString);
+                bailout("A virtual call ... Oh No! -- " ~ ce.toString);
             }
             else
             {
@@ -7829,7 +7841,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 auto vd = cast(VarDeclaration) cv;
                 gen.Add3(closureptr_offset, closureChain, imm32(offset));
                 BCValue var = getVariable(vd);
-                printf("Generating Store-Back for %s\n", vd.toChars()); //debugline
+                //printf("Generating Store-Back for %s\n", vd.toChars()); //debugline
                 var.heapRef = BCHeapRef(closureptr_offset);
                 gen.Comment("Store local variable in closure_chain --  "~ vd.toString());
                 StoreToHeapRef(var);
@@ -7939,13 +7951,17 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         ClassDeclaration vtblRoot = _sharedCtfeState.classDeclTypePointers[t.typeIndex - 1];
 
         BCClass* bcClass = &_sharedCtfeState.classTypes[t.typeIndex - 1];
+
+        bool seenIdx = false;
+
         foreach (uvi; bcClass.usedVtblIdxs)
         {
             if (uvi == vtblIdx)
-                return ;
+                seenIdx = true;
         }
 
-        bcClass.usedVtblIdxs ~= vtblIdx;
+        if (!seenIdx)
+            bcClass.usedVtblIdxs ~= vtblIdx;
 
         int fIdx = _sharedCtfeState.getFunctionIndex(fd);
         if (!fIdx)
@@ -7975,7 +7991,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     printf("    [%d] = %d (%s(%s))\n", uvi, value,
                         fd ? fd.toPrettyChars
                             : "unused vtbl slot",
-                        fd ? fd.parameters.toChars
+                        fd && fd.parameters ? fd.parameters.toChars
                             : ""
                     );
                 }
