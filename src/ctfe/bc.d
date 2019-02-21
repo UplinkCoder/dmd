@@ -667,7 +667,6 @@ pure:
     {
         debug
         {
-        uint alignedLength = align4(cast(uint) comment.length) / 4;
         uint commentLength = cast(uint) comment.length;
 
         emitLongInst(LongInst.Comment, StackAddr.init, Imm32(commentLength));
@@ -682,13 +681,13 @@ pure:
         switch(commentLength)
         {
             case 3 :
-                byteCodeArray[ip] |= comment[idx+2] << 24;
+                byteCodeArray[ip] |= comment[idx+2] << 16;
             goto case;
             case 2 :
-                byteCodeArray[ip] |= comment[idx+1] << 16;
+                byteCodeArray[ip] |= comment[idx+1] << 8;
             goto case;
             case 1 :
-                 byteCodeArray[ip++] |= comment[idx] << 8;
+                 byteCodeArray[ip++] |= comment[idx] << 0;
             goto case;
             case 0 :
             break;
@@ -1278,9 +1277,9 @@ string localName(const string[ushort] stackMap, uint addr) pure
     localName(stackMap, cast(ushort)addr);
 }
 */
+
 string localName(const string[ushort] stackMap, ushort addr) pure
 {
-
     const(string)* name;
     if (stackMap)
     {
@@ -1289,21 +1288,15 @@ string localName(const string[ushort] stackMap, ushort addr) pure
         {
             return *name;
         }
-        else 
-            goto LnotFound;
     }
 
-    else
-    {
-    LnotFound:
-        return "SP[" ~ itos(addr) ~ "]";
-    }
+    return "SP[" ~ itos(addr) ~ "]";
 }
 
 string printInstructions(const int* startInstructions, uint length, const string[ushort] stackMap = null) pure
 {
 
-    string result = "StartInstructionDump: \n";
+    char[] result = cast(char[])"StartInstructionDump: \n";
     uint pos = 0;
 
     bool has4ByteOffset;
@@ -1814,15 +1807,34 @@ string printInstructions(const int* startInstructions, uint length, const string
         case LongInst.Comment:
             {
                 auto commentLength = hi;
-                auto alignedLength = align4(commentLength) / 4;
+                const lengthOverFour = commentLength / 4;
+                auto restLength =  commentLength % 4;
+                const alignedLength = align4(commentLength) / 4;
                 result ~= "CommentBegin (CommentLength: " ~  itos(commentLength) ~ ")\n";
                 // alignLengthBy2
                 assert(alignedLength <= length, "comment (" ~ itos(alignedLength) ~") longer then code (" ~ itos(length) ~ ")");
+                auto insertPos = result.length;
+                result.length += commentLength;
 
-                foreach(c4i; pos .. pos + alignedLength)
+                result[insertPos .. insertPos + commentLength] = '_';
+
+                foreach(chars; arr[pos .. pos + lengthOverFour])
                 {
-                    result ~= *(cast(const(char[4])*) &arr[c4i]);
+                    result[insertPos++] = chars >> 0x00 & 0xFF;
+                    result[insertPos++] = chars >> 0x08 & 0xFF;
+                    result[insertPos++] = chars >> 0x10 & 0xFF;
+                    result[insertPos++] = chars >> 0x18 & 0xFF;
                 }
+
+                int shiftAmount = 0;
+                const lastChars = restLength ? arr[pos + lengthOverFour] : 0;
+
+                while(restLength--)
+                {
+                    result[insertPos++] = lastChars >> shiftAmount & 0xFF;
+                    shiftAmount += 8;
+                }
+
                 pos += alignedLength;
                 length -= alignedLength;
                 result ~= "\nCommentEnd\n";
@@ -1836,7 +1848,7 @@ string printInstructions(const int* startInstructions, uint length, const string
 
         }
     }
-    return result ~ "\nEndInstructionDump\n";
+    return (cast(string)result) ~ "\nEndInstructionDump\n";
 }
 
 static if (is(typeof({ import ddmd.ctfe.ctfe_bc; })))
