@@ -26,7 +26,7 @@ enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -7960,12 +7960,29 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         {
             auto ct = _sharedCtfeState.classTypes[ci];
             auto cdtp = _sharedCtfeState.classDeclTypePointers[ci];
-            printf("Vtbl for: %s\n", cdtp.toChars());
+            printf("Vtbl for: %s (At: %d, parentAt: %d)\n", cdtp.toChars(), ct.vtblPtr, _sharedExecutionState.heap._heap[ct.vtblPtr]);
             if (ct.vtblPtr) foreach(uvi;ct.usedVtblIdxs)
             {
-                const idx = ct.vtblPtr + (uvi * 4);
+                const parentVtblPtr = ct.vtblPtr;
+                const idx = ct.vtblPtr + (uvi * 4) + 4;
                 auto value = _sharedExecutionState.heap._heap[idx];
-                printf("    [%d] = %d\n", uvi, value);
+                if (_sharedCtfeState.functionCount >= value)
+                {
+                    auto fd = value
+                        ? cast(FuncDeclaration)_sharedCtfeState.functions[value - 1].funcDecl
+                        : null;
+
+                    printf("    [%d] = %d (%s(%s))\n", uvi, value,
+                        fd ? fd.toPrettyChars
+                            : "unused vtbl slot",
+                        fd ? fd.parameters.toChars
+                            : ""
+                    );
+                }
+                else
+                {
+                    printf("    [%d] = %d (%s)\n", uvi, value, "Invalid function pointer".ptr);
+                }
             }
         }
     }
