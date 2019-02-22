@@ -6918,7 +6918,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Store64(effectiveAddr, rhs);
             else
                bailout("cannot deal with this store");
-
+            // FIXME HACK this technically only works with 32 bit values or less
+            Set(retval.i32, rhs.i32);
         }
         else
         {
