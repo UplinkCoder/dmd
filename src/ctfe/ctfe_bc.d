@@ -6919,7 +6919,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             else
                bailout("cannot deal with this store");
             // FIXME HACK this technically only works with 32 bit values or less
-            Set(retval.i32, rhs.i32);
+            // FIXME EVEN WORSE HACK! there are cases in which in vaild retval
+            // is avilable in which is why we check for a valid vType.
+            // ideally we should be able to assert that the vType is always valid here
+
+            if (retval.vType) Set(retval.i32, rhs.i32);
         }
         else
         {
