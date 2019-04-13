@@ -360,9 +360,9 @@ else
         return gcc_jit_context_new_rvalue_from_long(ctx, unsigned ? u64type : i64type, v);
     }
 
-    private jrvalue rvalue_int(int v)
+    private jrvalue rvalue_int(int v, bool unsigned = false)
     {
-        return gcc_jit_context_new_rvalue_from_int(ctx, i32type, v);
+        return gcc_jit_context_new_rvalue_from_int(ctx, unsigned ? u32type : i32type, v);
     }
 
     private StackAddr addStackValue(jlvalue val)
@@ -404,7 +404,7 @@ else
 
         printf_fn = gcc_jit_context_get_builtin_function(ctx, "printf");
 
-        // memcpy = gcc_jit_context_get_builtin_function(ctx, "memcpy");
+        memcpy = gcc_jit_context_get_builtin_function(ctx, "memcpy");
 
         heapType =
             gcc_jit_type_get_pointer(u32type);
@@ -979,7 +979,7 @@ else
 
         auto _result = gcc_jit_context_new_binary_op (
             ctx, null,
-            GCC_JIT_BINARY_OP_LSHIFT, i64type,
+            GCC_JIT_BINARY_OP_RSHIFT, i64type,
             rvalue(lhs),
             rvalue(rhs)
         );
@@ -1029,7 +1029,7 @@ else
     {
         if (l != Loc.init)
         {
-            Comment("CallFrom:" ~ itos(l.tupleof[0]));
+            Comment("CallFrom:" ~ itos(l.tupleof[1]));
         }
 
         jrvalue[5] fnArgs;
@@ -1131,13 +1131,46 @@ else
     void Store64(BCValue _to, BCValue value)
     {
         auto rValueHeap = rvalue(_heap);
+        auto rValue = rvalue(value);
+        jrvalue high_value;
+
+
+        auto low_value = gcc_jit_context_new_binary_op (
+            ctx, null,
+            GCC_JIT_BINARY_OP_BITWISE_AND, u32type,
+            rValue,
+            rvalue(uint.max, true);
+        );
+
+        //safe low
         gcc_jit_block_add_assignment(block, currentLoc,
             gcc_jit_context_new_array_access(ctx, currentLoc, rvalue(_heap), rvalue(_to)),
             gcc_jit_context_new_cast(ctx, currentLoc,
-                rvalue(value),
+                low_value,
                 i32type
             )
         );
+
+        auto high_addr = genTemporary(_to.type);
+	Add3(high_addr, high_addr, imm32(4));
+
+        auto low_value = gcc_jit_context_new_binary_op (
+            ctx, null,
+            GCC_JIT_BINARY_OP_BITWISE_RSHIFT, u32type,
+            rValue,
+            rvalue(32);
+        );
+        
+        //safe high
+        gcc_jit_block_add_assignment(block, currentLoc,
+            gcc_jit_context_new_array_access(ctx, currentLoc, rvalue(_heap), rvalue(_to)),
+            gcc_jit_context_new_cast(ctx, currentLoc,
+                
+                i32type
+            )
+        );
+
+        assert(0, __PRETTY_FUNCTION__ ~ " is not properly implemented yet");
 
     }
 
@@ -1185,7 +1218,7 @@ else
 
         jrvalue size_times_four = gcc_jit_context_new_binary_op (
             ctx, null,
-            GCC_JIT_BINARY_OP_MULT, i64type,
+            GCC_JIT_BINARY_OP_MULT, u32type,
             _size,
             rvalue(uint.sizeof)
         );
