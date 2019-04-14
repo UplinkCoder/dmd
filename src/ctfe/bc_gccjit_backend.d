@@ -124,6 +124,8 @@ else
 
     BCValue run(uint fnId, BCValue[] args, BCHeap *heapPtr)
     {
+        BCValue result_v;
+
         extern (C) struct ReturnType
         {
             long imm64;
@@ -133,7 +135,7 @@ else
         assert(result, "No result. Did you try to run before calling Finalize?");
 
         alias fType =
-            extern (C) ReturnType function(uint fnId, long[max_params] args,
+            extern (C) int function(uint fnId, long[max_params] args,
                 uint* heapSize, uint* heap, ReturnType* returnValue);
 
 
@@ -151,9 +153,15 @@ else
 
         auto rv = func(fnId, fnArgs, &heapPtr.heapSize, &heapPtr._heap[0], &returnValue);
         writeln(returnValue);
-        return imm64(returnValue.imm64);
+        result_v = imm64(returnValue.imm64);
+        result_v.vType = cast(BCValueType)returnValue.type;
 
-
+        if (result_v.vType == BCValueType.Error)
+        {
+            result_v = imm32(returnValue.imm64 & uint.max);
+            result_v.vType = BCValueType.Error;
+        }
+        return result_v;
     }
 
 
@@ -1240,7 +1248,7 @@ else
     void Ret(BCValue val)
     {
         gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueImm64Field), rvalue(val));
-        //gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueTypeField), rvalue_int(val.vType, true));
+        gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueTypeField), rvalue_int(BCValueType.Immediate, true));
         gcc_jit_block_end_with_return(block, currentLoc, rvalue(1));
     }
 
@@ -1249,12 +1257,12 @@ else
         jrvalue rHeap = rvalue(_heap);
 
         jlvalue size_remaining =
-            gcc_jit_function_new_local(func, currentLoc, u32type, "size_remaining");
+            gcc_jit_function_new_local(func, currentLoc, i32type, "size_remaining");
 
         gcc_jit_block_add_assignment(block, currentLoc,
             size_remaining,
             gcc_jit_context_new_cast(ctx, currentLoc,
-                rvalue(size), u32type
+                rvalue(size), i32type
             )
         );
 
@@ -1273,7 +1281,7 @@ else
         jrvalue keep_going = gcc_jit_context_new_comparison(ctx, currentLoc,
             GCC_JIT_COMPARISON_GT,
             rvalue(size_remaining),
-            rvalue_int(0, true)
+            rvalue_int(0)
         );
 
         auto cpy_block = newBlock("memcpy_cpy");
@@ -1301,7 +1309,7 @@ else
                 gcc_jit_block_add_assignment_op(block, currentLoc,
                     val,
                     GCC_JIT_BINARY_OP_MINUS,
-                    rvalue_int(1, true)
+                    rvalue_int(1)
                  );
             }
 
