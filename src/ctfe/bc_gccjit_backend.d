@@ -474,14 +474,19 @@ else
         dispArgs[3] = gcc_jit_param_as_rvalue(runParams[3]);
 
         auto runnerBlock = gcc_jit_function_new_block(runnerFn, "Runner");
+        auto retval = gcc_jit_function_new_local(runnerFn, currentLoc, i64type, "retval");
         auto dispCall =
             gcc_jit_context_new_call(ctx, currentLoc, dispatcherFn, 4, &dispArgs[0]);
-        gcc_jit_block_add_eval(runnerBlock, currentLoc, dispCall);
+
+        gcc_jit_block_add_assignment(runnerBlock, currentLoc,
+            retval,
+            dispCall
+        );
         gcc_jit_block_add_assignment(runnerBlock, currentLoc,
             gcc_jit_rvalue_dereference(gcc_jit_param_as_rvalue(runParams[4]), currentLoc),
             rvalue(returnVal)
         );
-        gcc_jit_block_end_with_return(runnerBlock, currentLoc, rvalue(0));
+        gcc_jit_block_end_with_return(runnerBlock, currentLoc, rvalue(retval));
 
     }
 
@@ -532,7 +537,7 @@ else
             if (i2 == 0)
             {
                 jrvalue[2] printfArgs;
-                printfArgs[0] = gcc_jit_context_new_string_literal(ctx, "Calling fnIdx: %d\n");
+                printfArgs[0] = gcc_jit_context_new_string_literal(ctx, "Calling fnIdx: %d \n");
                 printfArgs[1] = rvalue(fnIdx);
                 gcc_jit_block_add_eval(blocks[i2], currentLoc,
                     gcc_jit_context_new_call(ctx, currentLoc, printf_fn, 2, &printfArgs[0])
