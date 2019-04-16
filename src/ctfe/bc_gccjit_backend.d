@@ -71,7 +71,6 @@ else
 
     static void bc_jit_main()
     {
-
         BCHeap heap;
         heap.heapSize = 100;
         writeln(heap.heapSize);
@@ -276,8 +275,6 @@ else
 
         auto heapBase = gcc_jit_lvalue_get_address(_heap, currentLoc);
 
-
-
         print_int(rvalue(base));
 
         print_string(rvalue(base), rvalue(length));
@@ -355,12 +352,12 @@ else
 
     private jrvalue rvalue(jlvalue val)
     {
-            return gcc_jit_lvalue_as_rvalue(val);
+        return gcc_jit_lvalue_as_rvalue(val);
     }
 
     private jrvalue rvalue(jrvalue val)
     {
-            return val;
+        return val;
     }
 
 
@@ -503,6 +500,8 @@ else
 
         foreach(int i, f; functions[0 .. functionCount])
         {
+            gcc_jit_function_dump_to_dot(f.func, ("fn" ~ itos(i) ~ ".dot\0").ptr);
+
             auto i2 = i * 2;
             blocks[i2] = gcc_jit_function_new_block(dispatcherFn, null);
 
@@ -515,7 +514,6 @@ else
             gcc_jit_block_add_eval(blocks[i2 + 1], currentLoc,
                 gcc_jit_context_new_call(ctx, currentLoc, f.func, 3, &args[0])
             );
-
         }
                 //printf("%s\n", gcc_jit_object_get_debug_string(gcc_jit_location_as_object(currentLoc)));
 

@@ -232,7 +232,7 @@ FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argt
 	sideeffect statement staticassert target tokens traits utf visitor	\
 	typinf utils statement_rewrite_walker statementsem safe blockexit asttypename \
 	ctfe/ctfe_bc ctfe/bc_common ctfe/bc_limits ctfe/fpconv_ctfe ctfe/bc_test \
-	ctfe/bc ctfe/bc_printer_backend ctfe/bc_c_backend))
+	ctfe/bc ctfe/bc_printer_backend ctfe/bc_c_backend ctfe/bc_gccjit_backend))
 
 ifeq ($(D_OBJC),1)
 	FRONT_SRCS += $D/objc.d
@@ -363,8 +363,8 @@ ifdef ENABLE_LTO
 dmd: $(DMD_SRCS) $(ROOT_SRCS) $G/newdelete.o $(GLUE_OBJS) $(BACK_OBJS) $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)
 	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -J$G -J../res -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
 else
-dmd: $(DMD_SRCS) $(ROOT_SRCS) $G/newdelete.o backend.a $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)
-	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -J$G -J../res -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
+dmd: $(DMD_SRCS) $(ROOT_SRCS) newdelete.o backend.a $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)
+	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -J$G -J../res -L-L/usr/lib/gcc/x86_64-linux-gnu/8 -L-lgccjit -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
 endif
 
 

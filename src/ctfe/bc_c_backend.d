@@ -163,7 +163,7 @@ pure:
     BCValue genTemporary(BCType bct)
     {
         auto tmp = BCValue(sp, bct, temporaryCount++);
-        currentFunctionState.sp += align4(basicTypeSize(bct.type)); //sharedState.size(bct.type, typeIndex));
+        currentFunctionState.sp += isBasicBCType(bct) ? align4(basicTypeSize(bct.type)) : 4; 
 
         return tmp;
     }

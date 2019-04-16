@@ -68,7 +68,7 @@ string astTypeName(RootObject node)
 }
 
 mixin
-({
+(() {
     string astTypeNameFunctions;
     string visitOverloads;
 
@@ -104,7 +104,7 @@ extern(C++) final class AstTypeNameVisitor : Visitor
 public :
     string typeName;
 ` ~ visitOverloads ~ "}";
-}());
+} ());
 
 ///
 unittest

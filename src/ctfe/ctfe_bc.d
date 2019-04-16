@@ -29,7 +29,7 @@ enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
-enum UseGCCJITBackend = 0;
+enum UseGCCJITBackend = 1;
 enum abortOnCritical = 1;
 enum state_logging = 1;
 
@@ -5170,8 +5170,8 @@ static if (is(BCGen))
                 if (lhs.type.type != BCTypeEnum.Struct)
                 {
                     bailout(
-                        "lhs.type != Struct but: " ~ enumToString(lhs.type.type) ~ " " ~ dve
-                        .e1.toString);
+                        "lhs.type != Struct but: " ~ enumToString(lhs.type.type) ~ " in " ~ dve
+                        .toString);
                 }
 
                 if (!(isStackValueOrParameter(lhs) || lhs.vType == BCValueType.Temporary))
