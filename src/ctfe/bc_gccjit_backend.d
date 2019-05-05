@@ -153,7 +153,7 @@ else
         auto rv = func(fnId, fnArgs, &heapPtr.heapSize, &heapPtr._heap[0], &returnValue);
         writeln(returnValue);
         result_v = imm64(returnValue.imm64);
-        result_v.vType = cast(BCValueType)returnValue.type;
+        result_v.vType = cast(BCValueType) returnValue.type;
 
         if (result_v.vType == BCValueType.Error)
         {
@@ -644,8 +644,9 @@ else
 
         if (bct != i32Type && bct != BCType(BCTypeEnum.i64))
             assert(0, "can currently only create params of i32Type not: " ~ enumToString(bct.type));
-        //parameters[parameterCount] =
-        auto r = BCValue(BCParameter(parameterCount++, bct, StackAddr(0)));
+        const pCount = parameterCount++;
+        parameters[pCount] = param(pCount);
+        auto r = BCValue(BCParameter(pCount, bct, StackAddr(0)));
         return r;
 
     }
@@ -1253,7 +1254,7 @@ else
     void Ret(BCValue val)
     {
         gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueImm64Field), rvalue(val));
-        gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueTypeField), rvalue_int(BCValueType.Immediate, true));
+        gcc_jit_block_add_assignment(block, currentLoc, gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueTypeField), rvalue_int(val.vType, true));
         gcc_jit_block_end_with_return(block, currentLoc, rvalue(1));
     }
 

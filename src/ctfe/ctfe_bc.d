@@ -347,7 +347,9 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         import ddmd.tokens;
         if (arg.op == TOKcall)
         {
+            writeln("CallExp:", (cast(CallExp)arg).toString);
             bcv.bailout("Cannot handle calls in arguments");
+            return null;
         }
 
         if (arg.type.ty == Tfunction)
@@ -489,6 +491,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
                 &_sharedExecutionState.heap, &_sharedCtfeState.functions[0], &bcv.calls[0],
                 &errorValues[0], &errorValues[1], &errorValues[2], &errorValues[3],
                 &_sharedCtfeState.errors[0], _sharedExecutionState.stack[], null, bcv.stackMap());
+
 /*            if (fd.ident == Identifier.idPool("extractAttribFlags"))
             {
                 import ddmd.hdrgen;
