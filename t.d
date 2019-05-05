@@ -1,6 +1,6 @@
 long echo ( long l) { return l; }
 
-//static assert(() { return ((1L << 52) | 16).echo.echo; } () == ((1L << 52) | 16));
+static assert(() { return ((1L << 52) | 16).echo.echo; } () == ((1L << 52) | 16));
 
 struct S
 {

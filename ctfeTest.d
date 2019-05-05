@@ -15,7 +15,7 @@ int fn2(V3 v3) {
 
 }
 
-static assert(fn(V3(1,20,3)) == 20);
+static assert(() { return fn(V3(1,20,3)); } () == 20);
 static assert(fn2(V3()) == 60);
 
 int fun(string s1, string s2, string s3) {

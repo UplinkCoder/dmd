@@ -637,16 +637,7 @@ else
 
     BCValue genParameter(BCType bct, string name = null)
     {
-        import std.string;
-        //TODO we might want to keep track of the parameter type ?
-        if (bct.type == BCTypeEnum.Struct || BCTypeEnum.Class)
-            bct = i32Type;
-
-        if (bct != i32Type && bct != BCType(BCTypeEnum.i64))
-            assert(0, "can currently only create params of i32Type not: " ~ enumToString(bct.type));
-        const pCount = parameterCount++;
-        parameters[pCount] = param(pCount);
-        auto r = BCValue(BCParameter(pCount, bct, StackAddr(0)));
+        auto r = BCValue(BCParameter(parameterCount++, bct, StackAddr(0)));
         return r;
 
     }

@@ -3200,7 +3200,7 @@ public:
         }
         auto oldRetval = retval;
         import ddmd.asttypename;
-        // import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
+        //import std.stdio; static string currentIndent = ""; writeln(currentIndent, "genExpr(" ~ expr.astTypeName ~ ") from: ", line, (debugMessage ? " \"" ~ debugMessage ~ "\" -- " : " -- ") ~ expr.toString); currentIndent ~= "\t"; scope (exit) currentIndent = currentIndent[0 .. $-1]; //DEBUGLINE
 
         if (processingArguments)
         {
@@ -8389,7 +8389,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
             if (bc_args[i].type.type == BCTypeEnum.i64)
             {
-                if (!is(BCGen) && !is(Print_BCGen))
+                if (!is(BCGen) && !is(Print_BCGen) && !is(GCCJIT_BCGen))
                 {
                     bailout(arg.toString ~ " cannot safely pass 64bit arguments yet");
                     return ;
