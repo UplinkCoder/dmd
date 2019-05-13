@@ -18,10 +18,10 @@ import ddmd.root.rmem;
 /**
  * Written By Stefan Koch in 2016-19
  */
- 
+
 import core.stdc.stdio : printf;
 
-enum perf = 0;
+enum perf = 1;
 enum bailoutMessages = 0;
 enum printResult = 0;
 enum cacheBC = 1;
@@ -5137,7 +5137,7 @@ static if (is(BCGen))
                     else
                     {
                         bailout("Broadcast assignment types don't match!"
-                            ~ " elexpr.type: " ~ _sharedCtfeState.typeToString(elexpr.type) 
+                            ~ " elexpr.type: " ~ _sharedCtfeState.typeToString(elexpr.type)
                             ~ " _array.elementType: " ~ _sharedCtfeState.typeToString(_array.elementType));
                         return ;
                     }
@@ -5329,7 +5329,6 @@ static if (is(BCGen))
            bailout("Only 4 byte or 8 byte basic type are supported not " ~ itos(bts)
                 ~ "on  "~ _sharedCtfeState.typeToString(baseType) ~ " for -- " ~ pe.toString);
             return ;
-            
         }
 
         // FIXME when we are ready to support more than i32Ptr the direct calling of load
@@ -7715,7 +7714,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Comment("vtblLoad");
                 enum sizeofVtblEntry = 4;
                 IndexedScaledLoad32(fnValue.i32, vtblPtr.i32, imm32(vtblIndex + 1), sizeofVtblEntry);
-                bailout("A virtual call ... Oh No! -- " ~ ce.toString);
+                // bailout("A virtual call ... Oh No! -- " ~ ce.toString);
             }
             else
             {
@@ -7985,8 +7984,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             if (ct.vtblPtr) foreach(uvi;ct.usedVtblIdxs)
             {
                 const parentVtblPtr = ct.vtblPtr;
-                const idx = ct.vtblPtr + (uvi * 4) + 4;
-                auto value = _sharedExecutionState.heap._heap[idx];
+                const offset = ct.vtblPtr + (uvi * 4) + 4;
+                auto value = _sharedExecutionState.heap._heap[offset];
                 if (_sharedCtfeState.functionCount >= value)
                 {
                     auto fd = value
@@ -8014,6 +8013,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         {
             auto ct = &_sharedCtfeState.classTypes[ci];
             auto cdtp = _sharedCtfeState.classDeclTypePointers[ci];
+            static if (bailoutMessages)
+            {
+                printf("Buidling vtbl for: %s\n", cdtp.toPrettyChars);
+            }
+
             int maxIdx;
             uint[] vtbl = new uint[](16);
             vtbl.length = 16;
@@ -8035,7 +8039,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
             foreach(vti;ct.usedVtblIdxs)
             {
-                if (vti > maxIdx)
+                if (vti >= maxIdx)
                 {
                     maxIdx = vti  + 1;
                     if (maxIdx >= vtbl.length)
@@ -8047,6 +8051,10 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 auto fd = vtblEntry.isFuncDeclaration();
                 assert(fd, "vtblEntry is no funcDecl ? -- " ~ vtblEntry.toString);
                 auto fIdx = _sharedCtfeState.getFunctionIndex(fd);
+                static if (bailoutMessages)
+                {
+                    printf("\twriting entry #%d for: '%s' fIdx: %d\n", vti, fd.toPrettyChars, fIdx);
+                }
                 if (!fIdx)
                 {
                     addUncompiledFunction(fd, &fIdx, true);
@@ -8055,16 +8063,18 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 vtbl[vti + 1] = fIdx;
             }
             const vtblLength = maxIdx + 1;
-
+            static if (bailoutMessages)
+            {
+                printf("vtblLength: %d\n", vtblLength);
+            }
             const vtblPtr = _sharedExecutionState.heap.heapSize;
             foreach(vti;0 .. vtblLength)
             {
-                const idx = vtblPtr + (vti * 4);
-                _sharedExecutionState.heap._heap[idx] = vtbl[vti];
+                const offset = vtblPtr + (vti * 4);
+                _sharedExecutionState.heap._heap[offset] = vtbl[vti];
             }
             _sharedExecutionState.heap.heapSize += vtblLength * 4;
             ct.vtblPtr = vtblPtr;
-
         }
         compileUncompiledFunctions();
     }

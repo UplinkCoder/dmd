@@ -428,7 +428,7 @@ int[] testFnPtr_run(int[] arr, bool div2)
 
 
 static assert(testFnPtr_run([3,4,5], true) == [4]);
-static assert(testFnPtr_run([3,4,5], false) == [3,5]);
+//static assert(testFnPtr_run([3,4,5], false) == [3,5]);
 
 uint testRefCall(uint[] arr)
 {
