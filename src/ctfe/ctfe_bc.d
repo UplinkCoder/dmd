@@ -23,7 +23,7 @@ import core.stdc.stdio : printf;
 
 enum perf = 1;
 enum bailoutMessages = 0;
-enum printResult = 0;
+enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -2060,6 +2060,9 @@ extern (C++) final class BCV(BCGenT) : Visitor
     GenExprFlags exprFlags;
 
     bool IGaveUp;
+    /// causes the generator to not emit LineNumbers
+    /// used in array literals for example
+    bool surpressLine;
 
     void clear()
     {
@@ -2083,6 +2086,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         IGaveUp = false;
         discardValue = false;
         ignoreVoid = false;
+        surpressLine = false;
 
         lastConstVd = lastConstVd.init;
         unrolledLoopState = null;
@@ -2520,7 +2524,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
     void Line(uint line)
     {
-        if (line && line != lastLine)
+        if (!surpressLine && line && line != lastLine)
         {
             gen.Line(line);
             lastLine = line;
@@ -4896,7 +4900,7 @@ static if (is(BCGen))
         uint offset = SliceDescriptor.Size;
 
         BCValue defaultValue;
-
+        surpressLine = true;
         foreach (elem; *ale.elements)
         {
             if (!elem)
@@ -5011,6 +5015,7 @@ static if (is(BCGen))
 
             offset += heapAdd;
         }
+        surpressLine = false;
         //        if (!oldInsideArrayLiteralExp)
         retval = arrayAddr;
         retval.type = BCType(BCTypeEnum.Array, _sharedCtfeState.arrayCount);
@@ -7099,7 +7104,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     }
 
                     const structSize = _sharedCtfeState.size(lhs.type);
-                    const allocSize = structSize.align4;
+                    const allocSize = align4(structSize);
+
                     if (!allocSize)
                     {
                         bailout("We would do a null allocation in " ~ ae.toString);
