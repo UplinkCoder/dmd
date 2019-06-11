@@ -5793,7 +5793,7 @@ static if (is(BCGen))
 
     /// Params: structPtr = assumed to point to already allocated memory
     ///         type = a pointer to the BCStruct, if none the type in the structPtr is used.
-    void initStruct(BCValue structPtr, BCStruct* type = null)
+    void initStruct(BCValue structPtr, BCStruct* type = null, int line = __LINE__)
     {
         if (!type)
         {
@@ -5805,6 +5805,7 @@ static if (is(BCGen))
         uint memberCount = type.memberCount;
         foreach(int i, mt; type.memberTypes[0 .. memberCount])
         {
+            Comment("StructInitForMember: " ~ _sharedCtfeState.typeToString(mt));
             auto pointerToMemberType = _sharedCtfeState.pointerOf(mt);
             if (mt.type == BCTypeEnum.Array)
             {
@@ -5846,6 +5847,33 @@ static if (is(BCGen))
 
                 Comment("Array intialisation End");
             }
+            else if (mt.type == BCTypeEnum.Slice)
+            {
+                BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
+
+                BCValue srcLength = getLength(initValue);
+                assert(srcLength.vType == BCValueType.Immediate);
+
+                int sliceMemSize = 
+                    SliceDescriptor.Size +
+                    srcLength.imm32 *
+                    sharedCtfeState.size(_sharedCtfeState.elementType(initValue.type));
+
+
+
+                auto offset = genTemporary(pointerToMemberType);
+                Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
+                auto slicePtr = genTemporary(mt);
+
+                Alloc(slicePtr.i32, imm32(sliceMemSize));
+                Store32(offset.i32, slicePtr);
+                auto dstSliceBase = genTemporary(i32Type);
+                Add3(dstSliceBase, slicePtr.i32, imm32(SliceDescriptor.Size));
+                setLength(slicePtr, srcLength);
+                setBase(slicePtr, dstSliceBase.i32);
+                MemCpy(dstSliceBase, getBase(initValue), imm32(sliceMemSize - SliceDescriptor.Size));
+                assert(0, "Slices in structInitializers have not be implemented correctly yet!");
+            }
             else if (mt.type == BCTypeEnum.Struct)
             {
                 auto offset = genTemporary(pointerToMemberType);
@@ -5865,7 +5893,12 @@ static if (is(BCGen))
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
                 Store64(offset.i32, initValue);
-             }
+            }
+            else
+            {
+                bailout("StructInitializer could not be generated for member-type: " ~ _sharedCtfeState.typeToString(mt));
+                return ;
+            }
         }
     }
 
@@ -6586,7 +6619,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         lastLoc = ae.loc;
 
         Line(ae.loc.linnum);
-        debug (ctfe)
+        //debug (ctfe)
         {
             import std.stdio;
 

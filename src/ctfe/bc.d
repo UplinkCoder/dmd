@@ -377,7 +377,7 @@ struct BCGen
 
 @safe:
 
-    string[ushort] stackMap()
+    string[ushort] stackMap() pure
     {
         string[ushort] result;
         foreach(local;locals[0 .. localCount])
@@ -1267,7 +1267,7 @@ pure:
 
 }
 
-string printInstructions(const int[] arr, const string[ushort] stackMap = null) pure
+string printInstructions(const int[] arr, const string[ushort] stackMap = null) pure @trusted
 {
     return printInstructions(arr.ptr, cast(uint) arr.length, stackMap);
 }
