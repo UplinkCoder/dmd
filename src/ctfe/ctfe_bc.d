@@ -686,7 +686,7 @@ struct BCStruct
         foreach(i; 0 .. memberCount)
         {
             result ~= memberTypes[i].toString;
-            result ~= " ofsset: {" ~ itos(offset(i)) ~ "}, ";
+            result ~= " offset: {" ~ itos(offset(i)) ~ "}, ";
         }
 
         result ~= "]\n";
@@ -4456,7 +4456,7 @@ static if (is(BCGen))
             BCValue cond = genExpr(fs.condition, "ForStatement.condition");
             if (!cond)
             {
-                bailout("For: No cond generated");
+                bailout("Condition in for loop could not be generated");
                 return ;
             }
 
@@ -4467,8 +4467,8 @@ static if (is(BCGen))
             if (fs.increment)
             {
                 fs.increment.accept(this);
-                fixupContinue(oldContinueFixupCount, _body.end);
             }
+            fixupContinue(oldContinueFixupCount, _body.end);
             Jmp(condEval);
             auto afterLoop = genLabel();
             fixupBreak(oldBreakFixupCount, afterLoop);
@@ -5987,6 +5987,8 @@ static if (is(BCGen))
             import ddmd.asttypename;
             assert(0, "VarExpType unkown: " ~ ve.var.astTypeName);
         }
+
+        // static if (is(BCGen)) Prt(retval);
 
         debug (ctfe)
         {
