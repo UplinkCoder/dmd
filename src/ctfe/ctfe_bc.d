@@ -1730,9 +1730,9 @@ extern (C++) final class BCTypeVisitor : Visitor
     uint prevAggregateTypeCount;
     Type[32] prevAggregateTypes;
 
-    const(BCType) toBCType(Type t, Type tla = null) /*pure*/
+    const(BCType) toBCType(Type t, Type tla = null, int line = __LINE__) /*pure*/
     {
-        assert(t !is null);
+        assert(t !is null, "t is null when called from: " ~ itos(line));
         switch (t.ty)
         {
         case ENUMTY.Tbool:
@@ -6957,12 +6957,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Store64(effectiveAddr, rhs);
             else
                bailout("cannot deal with this store");
-            // FIXME HACK this technically only works with 32 bit values or less
-            // FIXME EVEN WORSE HACK! there are cases in which in vaild retval
-            // is avilable in which is why we check for a valid vType.
-            // ideally we should be able to assert that the vType is always valid here
-
-            if (retval.vType) Set(retval.i32, rhs.i32);
         }
         else
         {
