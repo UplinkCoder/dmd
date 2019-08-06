@@ -377,6 +377,24 @@ else
         return StackAddr(stackValueCount++);
     }
 
+    void increment_u32(jblock b, jlvalue val)
+    {
+        gcc_jit_block_add_assignment_op(b, currentLoc,
+            val,
+            GCC_JIT_BINARY_OP_PLUS,
+            rvalue_int(1, true)
+        );
+    }
+    
+    void decrement_i32(jblock b, jlvalue val)
+    {
+        gcc_jit_block_add_assignment_op(b, currentLoc,
+            val,
+            GCC_JIT_BINARY_OP_MINUS,
+            rvalue_int(1)
+        );
+    }
+
     jtype heapType;
     jtype returnType;
     jfunc dispatcherFn;
@@ -384,6 +402,97 @@ else
     jtype paramArrayType;
 
     jfunc printf_fn;
+    jfunc memcpy_fn;
+
+
+    jfunc create_memcpy_fn()
+    {
+        jparam[3] p;
+        p[0] = gcc_jit_context_new_param(ctx, currentLoc, u32type, "dst");// u32 args;
+        p[1] = gcc_jit_context_new_param(ctx, currentLoc, u32type, "src"); //u32 src
+        p[2] = gcc_jit_context_new_param(ctx, currentLoc, u32type, "size"); //u32 size
+
+        auto p_dst = gcc_jit_param_as_rvalue(p[0]);
+        auto p_src = gcc_jit_param_as_rvalue(p[1]);
+        auto p_size = gcc_jit_param_as_rvalue(p[2]);
+
+        auto f = gcc_jit_context_new_function(ctx,
+            null, GCC_JIT_FUNCTION_INTERNAL, i32type,
+            "__memcpy__",
+            cast(int)p.length, &p[0], 0
+        );
+
+
+        {
+            jlvalue size_remaining =
+                gcc_jit_function_new_local(f, currentLoc, i32type, "size_remaining");
+                
+            jlvalue fromIdx = gcc_jit_function_new_local(f, currentLoc, u32type, "fromIdx");
+            jlvalue toIdx = gcc_jit_function_new_local(f, currentLoc, u32type, "toIdx");
+
+
+
+
+            auto be = gcc_jit_function_new_block(f, "memcpy_entry");
+            {
+                gcc_jit_block_add_assignment(be, currentLoc,
+                    size_remaining,
+                    gcc_jit_context_new_cast(ctx, currentLoc,
+                        rvalue(p_size), i32type
+                    )
+                );
+                gcc_jit_block_add_assignment(be, currentLoc, fromIdx, rvalue(p_src));
+                gcc_jit_block_add_assignment(be, currentLoc, toIdx, rvalue(p_dst));
+            }
+
+            auto bb = gcc_jit_function_new_block(f, "memcpy_body");
+
+
+                auto continue_cpy = gcc_jit_context_new_comparison(ctx,
+                    currentLoc,
+                    GCC_JIT_COMPARISON_GT,
+                    rvalue(size_remaining), rvalue_int(0)
+                    );
+                
+                gcc_jit_block_add_eval(bb, currentLoc, continue_cpy);
+
+
+
+            auto bc = gcc_jit_function_new_block(f, "memcpy_cpy");
+            {
+                gcc_jit_block_add_assignment(bc, currentLoc,
+                    gcc_jit_context_new_array_access(ctx, currentLoc,
+                        rvalue(_heap), rvalue(toIdx)
+                    ),
+                    rvalue(
+                        gcc_jit_context_new_array_access(ctx, currentLoc,
+                            rvalue(_heap), rvalue(fromIdx)
+                        )
+                    )
+                );
+
+                increment_u32(bc, fromIdx);
+                increment_u32(bc, toIdx);
+                decrement_i32(bc, size_remaining);
+            }
+
+            auto bx = gcc_jit_function_new_block(f, "memcpy_exit");
+            {
+                gcc_jit_block_end_with_return(bx, currentLoc,
+                    rvalue(size_remaining));
+            }
+
+            gcc_jit_block_end_with_jump(bc, currentLoc, bb);
+
+
+            gcc_jit_block_end_with_conditional(bb, currentLoc,
+                continue_cpy, bc, bx);
+
+            gcc_jit_block_end_with_jump(be, currentLoc, bb);
+        }
+
+        return f;
+    }
 
     void Initialize()
     {
@@ -448,7 +557,10 @@ else
 
 
         returnVal = gcc_jit_context_new_global(ctx, currentLoc, GCC_JIT_GLOBAL_INTERNAL, returnType, "__g_return");
+         _heap = gcc_jit_context_new_global(ctx, currentLoc, GCC_JIT_GLOBAL_INTERNAL, heapType, "__g_heap"); 
         flag = gcc_jit_context_new_global(ctx, currentLoc, GCC_JIT_GLOBAL_INTERNAL, gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_BOOL), "__g_flag");
+
+        memcpy_fn = create_memcpy_fn();
 
 
         auto runnerFn = gcc_jit_context_new_function(ctx,
@@ -500,6 +612,9 @@ else
 
         foreach(int i, f; functions[0 .. functionCount])
         {
+            printf("f.func: %p\n", f.func);
+
+            printf("dumping to dot: %s\n", gcc_jit_object_get_debug_string(gcc_jit_function_as_object(f.func)));
             gcc_jit_function_dump_to_dot(f.func, ("fn" ~ itos(i) ~ ".dot\0").ptr);
 
             auto i2 = i * 2;
@@ -553,6 +668,9 @@ else
         gcc_jit_context_dump_to_file(ctx, "ctx.c", 1);
         result = gcc_jit_context_compile(ctx);
         gcc_jit_context_release(ctx);
+
+        functions[0 .. functionCount] = functions[0].init;
+        functionCount = 0;
     }
 
     void beginFunction(uint fnId, void* fd = null)
@@ -580,14 +698,18 @@ else
         p[2] = gcc_jit_context_new_param(ctx, currentLoc, heapType, "heap"); //uint[2^^26] heap
 
         assert(!functions[functionCount].funcDecl);
-        functions[functionCount].funcDecl = fd;
+        auto f = &functions[functionCount];
 
-        functions[functionCount].fname = cast(char*) (name ? name : ("f" ~ itos(fnId)).toStringz);
-        functions[functionCount].func =  gcc_jit_context_new_function(ctx,
+        f.funcDecl = fd;
+
+        f.fname = cast(char*) (name ? name : ("f" ~ itos(fnId)).toStringz);
+        f.func =  gcc_jit_context_new_function(ctx,
             null, GCC_JIT_FUNCTION_INTERNAL, i64type,
             cast(const) functions[functionCount].fname,
             cast(int)p.length, cast(jparam*)&p, 0
         );
+
+        printf("creating function: %s at %p\n", f.fname, f.func);
 
         newBlock("prologue");
 
@@ -1292,27 +1414,9 @@ else
         );
 
         {
-            void increment_u32(jlvalue val)
-            {
-                gcc_jit_block_add_assignment_op(block, currentLoc,
-                    val,
-                    GCC_JIT_BINARY_OP_PLUS,
-                    rvalue_int(1, true)
-                 );
-            }
-
-            void decrement_u32(jlvalue val)
-            {
-                gcc_jit_block_add_assignment_op(block, currentLoc,
-                    val,
-                    GCC_JIT_BINARY_OP_MINUS,
-                    rvalue_int(1)
-                 );
-            }
-
-            increment_u32(fromIdx);
-            increment_u32(toIdx);
-            decrement_u32(size_remaining);
+            increment_u32(block, fromIdx);
+            increment_u32(block, toIdx);
+            decrement_i32(block, size_remaining);
         }
 
 

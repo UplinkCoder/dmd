@@ -16,7 +16,10 @@ int fn2(V3 v3) {
 }
 
 static assert(() { return fn(V3(1,20,3)); } () == 20);
-static assert(fn2(V3()) == 60);
+pragma(msg, () { return V3(1,20,3); } ());
+//static assert(fn2(V3()) == 60);
+
+__EOF__
 
 int fun(string s1, string s2, string s3) {
         return cast(int)s2[2];
