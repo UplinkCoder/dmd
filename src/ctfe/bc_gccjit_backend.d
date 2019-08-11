@@ -1198,27 +1198,34 @@ else
         fnArgs[2] = rvalue(heapSize);
         fnArgs[3] = rvalue(_heap);
 
-        if (fn.vType == BCValueType.Immediate && fn.imm32 < functionCount)
         {
+            jrvalue call;
 
-            assert(functions[fn.imm32 - 1].func);
-            auto call = gcc_jit_context_new_call(
-                ctx, currentLoc,
-                functions[fn.imm32 - 1].func, 3, &fnArgs[1]
-            );
+            if (fn.vType == BCValueType.Immediate && fn.imm32 < functionCount)
+            {
+
+                assert(functions[fn.imm32 - 1].func);
+                call = gcc_jit_context_new_call(
+                    ctx, currentLoc,
+                    functions[fn.imm32 - 1].func, 3, &fnArgs[1]
+                );
+            }
+            else
+            {
+                call = gcc_jit_context_new_call(
+                    ctx, currentLoc,
+                    dispatcherFn, 4, &fnArgs[0]
+                );
+            }
 
             gcc_jit_block_add_eval(block, currentLoc, call);
         }
-        else
+
+        if (result)
         {
-            auto call = gcc_jit_context_new_call(
-                ctx, currentLoc,
-                dispatcherFn, 4, &fnArgs[0]
-            );
-
-            gcc_jit_block_add_eval(block, currentLoc, call);
+            auto lresult = gcc_jit_lvalue_access_field(returnVal, currentLoc, returnValueImm64Field);
+            gcc_jit_block_add_assignment(block, currentLoc, lvalue(result), rvalue(lresult));
         }
-
     }
 
     void Load32(BCValue _to, BCValue from)
