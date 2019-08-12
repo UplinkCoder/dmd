@@ -181,6 +181,7 @@ enum LongInst : ushort
     Cat,
     Comment,
     Line,
+    File,
 
 }
 //Imm-Instructions and corresponding 2Operand instructions have to be in the same order
@@ -1840,6 +1841,11 @@ string printInstructions(const int* startInstructions, uint length, const string
                 result ~= "\nCommentEnd\n";
             }
             break;
+        case LongInst.File:
+            {
+                result ~= "File Directive\n";
+            }
+            break;
         case LongInst.Line:
             {
                 result ~= "Line #" ~ itos(hi) ~ "\n";
@@ -3094,6 +3100,10 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                         }
                     }
                 }
+            }
+            break;
+        case LongInst.File :
+            {
             }
             break;
         case LongInst.Line :
