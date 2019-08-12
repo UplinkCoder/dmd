@@ -702,7 +702,7 @@ else
 
         f.funcDecl = fd;
 
-        f.fname = cast(char*) (name ? name : ("f" ~ itos(fnId)).toStringz);
+        f.fname = cast(char*) (name ? (fromStringz(name) ~ itos(fnId)).toStringz : ("f" ~ itos(fnId)).toStringz);
         f.func =  gcc_jit_context_new_function(ctx,
             null, GCC_JIT_FUNCTION_INTERNAL, i64type,
             cast(const) functions[functionCount].fname,
