@@ -2526,8 +2526,15 @@ extern (C++) final class BCV(BCGenT) : Visitor
     {
         if (!surpressLine && line && line != lastLine)
         {
-            gen.Line(line);
             lastLine = line;
+            static if (is(typeof(gen.Line(uint.init))))
+            {
+                gen.Line(line);
+            }
+            else
+            {
+                gen.Comment("Line " ~ itos(line));
+            }
         }
 
     }
