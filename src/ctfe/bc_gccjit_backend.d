@@ -1,5 +1,5 @@
 module ddmd.ctfe.bc_gccjit_backend;
-static if (!is(typeof ({ import gccjit.c;  })))
+static if (!is(typeof ({ import gccjit.c; })))
 {
     pragma(msg, "gccjit header not there ... not compiling bc_gccjit backend");
 }
@@ -55,6 +55,9 @@ else
     pragma(msg, FunctionState.sizeof);
 
     FunctionState[] functionStates;
+
+    gcc_jit_location *source_location = null;
+    const (char)* source_filename = null;
 
     jfunc func()
     {
@@ -182,9 +185,25 @@ else
 
     gcc_jit_location* currentLoc(int line = __LINE__)
     {
-         return gcc_jit_context_new_location(ctx,
-         "src/ctfe/bc_gccjit_backend.d", line, 0
-        );
+        debug
+        {
+            enum codegen_location = true;
+        }
+        else
+        {
+            enum codegen_location = false;
+        }
+
+        if (!source_location || codegen_location)
+        {
+            return gcc_jit_context_new_location(ctx,
+                "src/ctfe/bc_gccjit_backend.d", line, 0
+            );
+        }
+        else
+        {
+            return source_location;
+        }
     }
 
     uint functionCount;
@@ -671,6 +690,9 @@ else
 
         functions[0 .. functionCount] = functions[0].init;
         functionCount = 0;
+
+        source_filename = null;
+        source_location = null;
     }
 
     void beginFunction(uint fnId, void* fd = null)
@@ -1367,8 +1389,12 @@ else
 
     void Line(uint line)
     {
-        //if (blockCount)
-        //    gcc_jit_block_add_comment(block, currentLoc, ("# Line (" ~ to!string(line) ~ ")").toStringz);
+        source_location = gcc_jit_context_new_location(ctx, source_filename, line, 0);
+    }
+
+    void File(string filename)
+    {
+        source_filename = toStringz(filename);
     }
 
     void Ret(BCValue val)
