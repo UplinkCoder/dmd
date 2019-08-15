@@ -595,6 +595,11 @@ struct Print_BCGen
         result ~= indent ~ "Line(" ~ itos(line) ~ ");\n";
     }
 
+    void File(string filename)
+    {
+        result ~= indent ~ "File(\"" ~ filename ~ "\");\n";
+    }
+
     void IToF32(BCValue _result, BCValue value)
     {
         result ~= indent ~ "IToF32(" ~ print(_result) ~ ", " ~ print(value) ~ ");\n";
