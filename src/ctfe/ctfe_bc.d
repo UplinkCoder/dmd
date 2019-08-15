@@ -3264,8 +3264,8 @@ public:
             if (parameters)
                 linkRefsCallee(parameters);
 
-            Line(me.loc.linnum);
             File(fromStringz(me.loc.filename));
+            Line(me.loc.linnum);
 
             beginFunction(fnIdx - 1, cast(void*)me);
 
@@ -3292,8 +3292,8 @@ public:
                 // insert a dummy return after void functions because they can omit a returnStatement
                 Ret(bcNull);
             }
-            Line(me.endloc.linnum);
             File(fromStringz(me.endloc.filename));
+            Line(me.endloc.linnum);
             endFunction();
 
             if (IGaveUp)
@@ -3506,8 +3506,8 @@ public:
         }
 
         //writeln("going to eval: ", fd.toString);
-        Line(fd.loc.linnum);
         File(fromStringz(fd.loc.filename));
+        Line(fd.loc.linnum);
         if (auto fbody = fd.fbody.isCompoundStatement)
         {
             vars.destroy();
@@ -3569,8 +3569,8 @@ public:
                 auto osp2 = sp.addr;
             }
 
-            Line(fd.endloc.linnum);
             File(fromStringz(fd.endloc.filename));
+            Line(fd.endloc.linnum);
             endFunction();
             if (IGaveUp)
             {
@@ -3650,8 +3650,8 @@ static if (is(BCGen))
     {
         lastLoc = e.loc;
 
-        Line(e.loc.linnum);
         File(fromStringz(e.loc.filename));
+        Line(e.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -4129,8 +4129,8 @@ static if (is(BCGen))
     override void visit(SymOffExp se)
     {
         lastLoc = se.loc;
-        Line(se.loc.linnum);
         File(fromStringz(se.loc.filename));
+        Line(se.loc.linnum);
 
         auto var = se.var;
         auto vd = se.var.isVarDeclaration();
@@ -4254,8 +4254,8 @@ static if (is(BCGen))
     {
         lastLoc = ie.loc;
 
-        Line(ie.loc.linnum);
         File(fromStringz(ie.loc.filename));
+        Line(ie.loc.linnum);
         auto oldIndexed = currentIndexed;
         scope(exit) currentIndexed = oldIndexed;
 /+
@@ -4468,8 +4468,8 @@ static if (is(BCGen))
     {
         lastLoc = fs.loc;
 
-        Line(fs.loc.linnum);
         File(fromStringz(fs.loc.filename));
+        Line(fs.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -4544,8 +4544,8 @@ static if (is(BCGen))
     {
         lastLoc = e.loc;
 
-        Line(e.loc.linnum);
         File(fromStringz(e.loc.filename));
+        Line(e.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -4603,8 +4603,8 @@ static if (is(BCGen))
     {
         lastLoc = ne.loc;
 
-        Line(ne.loc.linnum);
         File(fromStringz(ne.loc.filename));
+        Line(ne.loc.linnum);
         retval = BCValue.init;
         retval.vType = BCValueType.Immediate;
         retval.type.type = BCTypeEnum.Null;
@@ -4616,8 +4616,8 @@ static if (is(BCGen))
     {
         lastLoc = he.loc;
 
-        Line(he.loc.linnum);
         File(fromStringz(he.loc.filename));
+        Line(he.loc.linnum);
         retval = BCValue.init;
         Assert(imm32(0), addError(he.loc, "HaltExp"));
     }
@@ -4632,8 +4632,8 @@ static if (is(BCGen))
     {
         lastLoc = se.loc;
 
-        Line(se.loc.linnum);
         File(fromStringz(se.loc.filename));
+        Line(se.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -4736,8 +4736,8 @@ static if (is(BCGen))
     override void visit(DotVarExp dve)
     {
         lastLoc = dve.loc;
-        Line(dve.loc.linnum);
         File(fromStringz(dve.loc.filename));
+        Line(dve.loc.linnum);
 
         const bcType = toBCType(dve.e1.type);
         if (dve.e1.type.ty == Tstruct && (cast(TypeStruct) dve.e1.type).sym)
@@ -4890,8 +4890,8 @@ static if (is(BCGen))
     {
         lastLoc = ale.loc;
 
-        Line(ale.loc.linnum);
         File(fromStringz(ale.loc.filename));
+        Line(ale.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -5083,8 +5083,8 @@ static if (is(BCGen))
     {
         lastLoc = sle.loc;
 
-        Line(sle.loc.linnum);
         File(fromStringz(sle.loc.filename));
+        Line(sle.loc.linnum);
 
         debug (ctfe)
         {
@@ -5246,8 +5246,8 @@ static if (is(BCGen))
     {
         lastLoc = de.loc;
 
-        Line(de.loc.linnum);
         File(fromStringz(de.loc.filename));
+        Line(de.loc.linnum);
         if (currentIndexed.type.type == BCTypeEnum.Array
             || currentIndexed.type.type == BCTypeEnum.Slice
             || currentIndexed.type.type == BCTypeEnum.string8)
@@ -5266,8 +5266,8 @@ static if (is(BCGen))
     {
         lastLoc = ae.loc;
 
-        Line(ae.loc.linnum);
         File(fromStringz(ae.loc.filename));
+        Line(ae.loc.linnum);
         //bailout("We don't handle AddrExp");
         auto e1 = genExpr(ae.e1, GenExprFlags.asAddress, "AddrExp");
 
@@ -5299,8 +5299,8 @@ static if (is(BCGen))
     {
         lastLoc = te.loc;
 
-        Line(te.loc.linnum);
         File(fromStringz(te.loc.filename));
+        Line(te.loc.linnum);
         import std.stdio;
 
         debug (ctfe)
@@ -5316,8 +5316,8 @@ static if (is(BCGen))
     {
         lastLoc = ce.loc;
 
-        Line(ce.loc.linnum);
         File(fromStringz(ce.loc.filename));
+        Line(ce.loc.linnum);
         Not(retval, genExpr(ce.e1));
     }
 
@@ -5325,8 +5325,8 @@ static if (is(BCGen))
     {
         lastLoc = pe.loc;
 
-        Line(pe.loc.linnum);
         File(fromStringz(pe.loc.filename));
+        Line(pe.loc.linnum);
         bool isFunctionPtr = pe.type.ty == Tfunction;
         auto addr = genExpr(pe.e1);
 
@@ -5409,8 +5409,8 @@ static if (is(BCGen))
     {
         lastLoc = ne.loc;
 
-        Line(ne.loc.linnum);
         File(fromStringz(ne.loc.filename));
+        Line(ne.loc.linnum);
         auto type = toBCType(ne.newtype);
         uint typeSize;
         BCValue ptr;
@@ -5509,8 +5509,8 @@ static if (is(BCGen))
     {
         lastLoc = ale.loc;
 
-        Line(ale.loc.linnum);
         File(fromStringz(ale.loc.filename));
+        Line(ale.loc.linnum);
         auto array = genExpr(ale.e1);
         auto arrayType = array.type.type;
         if (arrayType == BCTypeEnum.string8 || arrayType == BCTypeEnum.Slice || arrayType == BCTypeEnum.Array)
@@ -5962,8 +5962,8 @@ static if (is(BCGen))
     {
         lastLoc = ve.loc;
 
-        Line(ve.loc.linnum);
         File(fromStringz(ve.loc.filename));
+        Line(ve.loc.linnum);
         auto vd = ve.var.isVarDeclaration;
         auto symd = ve.var.isSymbolDeclaration;
         auto fd = ve.var.isFuncDeclaration;
@@ -6059,8 +6059,8 @@ static if (is(BCGen))
     {
         lastLoc = de.loc;
 
-        Line(de.loc.linnum);
         File(fromStringz(de.loc.filename));
+        Line(de.loc.linnum);
         auto oldRetval = retval;
         auto vd = de.declaration.isVarDeclaration();
 
@@ -6158,8 +6158,8 @@ static if (is(BCGen))
     {
         lastLoc = vd.loc;
 
-        Line(vd.loc.linnum);
         File(fromStringz(vd.loc.filename));
+        Line(vd.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -6228,8 +6228,8 @@ static if (is(BCGen))
     {
         lastLoc = e.loc;
 
-        Line(e.loc.linnum);
         File(fromStringz(e.loc.filename));
+        Line(e.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -6383,8 +6383,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ie.loc;
 
-        Line(ie.loc.linnum);
         File(fromStringz(ie.loc.filename));
+        Line(ie.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -6426,8 +6426,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = re.loc;
 
-        Line(re.loc.linnum);
         File(fromStringz(re.loc.filename));
+        Line(re.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -6456,8 +6456,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ce.loc;
 
-        Line(ce.loc.linnum);
         File(fromStringz(ce.loc.filename));
+        Line(ce.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -6472,8 +6472,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = se.loc;
 
-        Line(se.loc.linnum);
         File(fromStringz(se.loc.filename));
+        Line(se.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -6539,8 +6539,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ce.loc;
 
-        Line(ce.loc.linnum);
         File(fromStringz(ce.loc.filename));
+        Line(ce.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -6618,8 +6618,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ce.loc;
 
-        Line(ce.loc.linnum);
         File(fromStringz(ce.loc.filename));
+        Line(ce.loc.linnum);
         //TODO ConstructExp is basically the same as AssignExp
         // find a way to merge those
 
@@ -6686,8 +6686,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ae.loc;
 
-        Line(ae.loc.linnum);
         File(fromStringz(ae.loc.filename));
+        Line(ae.loc.linnum);
         //debug (ctfe)
         {
             import std.stdio;
@@ -7282,8 +7282,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = _.loc;
 
-       Line(_.loc.linnum);
         File(fromStringz(_.loc.filename));
+        Line(_.loc.linnum);
         //assert(0, "encounterd SwitchErrorStatement" ~ toString(_));
     }
 
@@ -7291,8 +7291,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ne.loc;
 
-        Line(ne.loc.linnum);
         File(fromStringz(ne.loc.filename));
+        Line(ne.loc.linnum);
         auto e1 = genExpr(ne.e1);
         retval = assignTo ? assignTo : genTemporary(toBCType(ne.type));
         auto zero = imm32(0);
@@ -7304,8 +7304,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ne.loc;
 
-        Line(ne.loc.linnum);
         File(fromStringz(ne.loc.filename));
+        Line(ne.loc.linnum);
         {
             retval = assignTo ? assignTo : genTemporary(i32Type);
             Eq3(retval, genExpr(ne.e1).i32, imm32(0));
@@ -7317,8 +7317,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = uls.loc;
 
-        Line(uls.loc.linnum);
         File(fromStringz(uls.loc.filename));
+        Line(uls.loc.linnum);
         //FIXME This will break if UnrolledLoopStatements are nested,
         // I am not sure if this can ever happen
         if (unrolledLoopState)
@@ -7373,8 +7373,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = _is.loc;
 
-        Line(_is.loc.linnum);
         File(fromStringz(_is.loc.filename));
+        Line(_is.loc.linnum);
         // can be skipped
         return ;
     }
@@ -7383,8 +7383,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ae.loc;
 
-        Line(ae.loc.linnum);
         File(fromStringz(ae.loc.filename));
+        Line(ae.loc.linnum);
 
         if (isBoolExp(ae.e1))
         {
@@ -7422,8 +7422,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ss.loc;
 
-        Line(ss.loc.linnum);
         File(fromStringz(ss.loc.filename));
+        Line(ss.loc.linnum);
         if (switchStateCount)
             bailout("We cannot deal with nested switches right now");
 
@@ -7545,8 +7545,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = gcs.loc;
 
-        Line(gcs.loc.linnum);
         File(fromStringz(gcs.loc.filename));
+        Line(gcs.loc.linnum);
         with (switchState)
         {
             *switchFixup = SwitchFixupEntry(beginJmp(), gcs.cs.index + 1);
@@ -7558,8 +7558,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = gd.loc;
 
-        Line(gd.loc.linnum);
         File(fromStringz(gd.loc.filename));
+        Line(gd.loc.linnum);
         with (switchState)
         {
             *switchFixup = SwitchFixupEntry(beginJmp(), -1);
@@ -7588,8 +7588,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = gs.loc;
 
-        Line(gs.loc.linnum);
         File(fromStringz(gs.loc.filename));
+        Line(gs.loc.linnum);
         auto ident = cast(void*) gs.ident;
 
         if (auto labeledBlock = ident in labeledBlocks)
@@ -7606,8 +7606,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ls.loc;
 
-        Line(ls.loc.linnum);
         File(fromStringz(ls.loc.filename));
+        Line(ls.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -7662,8 +7662,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = cs.loc;
 
-        Line(cs.loc.linnum);
         File(fromStringz(cs.loc.filename));
+        Line(cs.loc.linnum);
         if (cs.ident)
         {
             if (auto target = cast(void*) cs.ident in labeledBlocks)
@@ -7689,8 +7689,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = bs.loc;
 
-        Line(bs.loc.linnum);
         File(fromStringz(bs.loc.filename));
+        Line(bs.loc.linnum);
         if (bs.ident)
         {
             if (auto target = cast(void*) bs.ident in labeledBlocks)
@@ -7733,8 +7733,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ce.loc;
 
-        Line(ce.loc.linnum);
         File(fromStringz(ce.loc.filename));
+        Line(ce.loc.linnum);
         bool wrappingCallFn;
         if (!insideFunction)
         {
@@ -8199,8 +8199,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = rs.loc;
 
-        Line(rs.loc.linnum);
         File(fromStringz(rs.loc.filename));
+        Line(rs.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -8254,8 +8254,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
         lastLoc = ce.loc;
 
-        Line(ce.loc.linnum);
         File(fromStringz(ce.loc.filename));
+        Line(ce.loc.linnum);
         //FIXME make this handle casts properly
         //e.g. do truncation and so on
         debug (ctfe)
@@ -8431,8 +8431,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = es.loc;
 
-        Line(es.loc.linnum);
         File(fromStringz(es.loc.filename));
+        Line(es.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -8450,8 +8450,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ds.loc;
 
-        Line(ds.loc.linnum);
         File(fromStringz(ds.loc.filename));
+        Line(ds.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -8518,8 +8518,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = s.loc;
 
-        Line(s.loc.linnum);
         File(fromStringz(s.loc.filename));
+        Line(s.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -8534,8 +8534,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = fs.loc;
 
-        Line(fs.loc.linnum);
         File(fromStringz(fs.loc.filename));
+        Line(fs.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -8599,8 +8599,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = ss.loc;
 
-        Line(ss.loc.linnum);
         File(fromStringz(ss.loc.filename));
+        Line(ss.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
@@ -8614,8 +8614,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         lastLoc = cs.loc;
 
-        Line(cs.loc.linnum);
         File(fromStringz(cs.loc.filename));
+        Line(cs.loc.linnum);
         debug (ctfe)
         {
             import std.stdio;
