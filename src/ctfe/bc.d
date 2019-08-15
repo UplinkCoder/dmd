@@ -659,6 +659,57 @@ pure:
         emitLongInst(LongInst.MemCpy, size.stackAddr, dst.stackAddr, src.stackAddr);
     }
 
+
+    void outputBytes(string s)
+    {
+        outputBytes(cast(const ubyte[]) s);
+    }
+
+    void outputBytes (const ubyte[] bytes)
+    {
+        auto len = bytes.length;
+        size_t idx = 0;
+
+        while (len >= 4)
+        {
+            byteCodeArray[ip++] =
+                bytes[idx+0] << 0 |
+                bytes[idx+1] << 8 |
+                bytes[idx+2] << 16 |
+                bytes[idx+3] << 24;
+
+            idx += 4;
+            len -= 4;
+        }
+
+        uint lastField;
+
+        final switch(len)
+        {
+            case 3 :
+                lastField |= bytes[idx+2] << 16;
+                goto case;
+            case 2 :
+                lastField |= bytes[idx+1] << 8;
+                goto case;
+            case 1 :
+                lastField |= bytes[idx+0] << 0;
+                byteCodeArray[ip++] = lastField;
+                goto case;
+            case 0 :
+                break;
+        }
+    }
+
+    void File(string filename)
+    {
+        auto filenameLength = cast(uint) filename.length;
+
+        emitLongInst(LongInst.File, StackAddr.init, Imm32(filenameLength));
+
+        outputBytes(filename);
+    }
+
     void Line(uint line)
     {
          emitLongInst(LongInst.Line, StackAddr(0), Imm32(line));
@@ -668,32 +719,11 @@ pure:
     {
         debug
         {
-        uint commentLength = cast(uint) comment.length;
+            uint commentLength = cast(uint) comment.length;
 
-        emitLongInst(LongInst.Comment, StackAddr.init, Imm32(commentLength));
-        uint idx;
-        while(commentLength >= 4)
-        {
-            byteCodeArray[ip++] = comment[idx] | comment[idx+1] << 8 | comment[idx+2] << 16 | comment[idx+3] << 24;
-            idx += 4;
-            commentLength -= 4;
-        }
+            emitLongInst(LongInst.Comment, StackAddr.init, Imm32(commentLength));
 
-        switch(commentLength)
-        {
-            case 3 :
-                byteCodeArray[ip] |= comment[idx+2] << 16;
-            goto case;
-            case 2 :
-                byteCodeArray[ip] |= comment[idx+1] << 8;
-            goto case;
-            case 1 :
-                 byteCodeArray[ip++] |= comment[idx] << 0;
-            goto case;
-            case 0 :
-            break;
-            default : assert(0);
-        }
+            outputBytes(comment);
         }
     }
 
@@ -1312,6 +1342,40 @@ string printInstructions(const int* startInstructions, uint length, const string
     result ~= "Length : " ~ itos(cast(int)length) ~ "\n";
     auto arr = startInstructions[0 .. length];
 
+    void printText(uint textLength)
+    {
+        const lengthOverFour = textLength / 4;
+        auto restLength =  textLength % 4;
+        const alignedLength = align4(textLength) / 4;
+        
+        // alignLengthBy2
+        assert(alignedLength <= length, "text (" ~ itos(alignedLength) ~") longer then code (" ~ itos(length) ~ ")");
+        auto insertPos = result.length;
+        result.length += textLength;
+        
+        result[insertPos .. insertPos + textLength] = '_';
+        
+        foreach(chars; arr[pos .. pos + lengthOverFour])
+        {
+            result[insertPos++] = chars >> 0x00 & 0xFF;
+            result[insertPos++] = chars >> 0x08 & 0xFF;
+            result[insertPos++] = chars >> 0x10 & 0xFF;
+            result[insertPos++] = chars >> 0x18 & 0xFF;
+        }
+        
+        int shiftAmount = 0;
+        const lastChars = restLength ? arr[pos + lengthOverFour] : 0;
+        
+        while(restLength--)
+        {
+            result[insertPos++] = lastChars >> shiftAmount & 0xFF;
+            shiftAmount += 8;
+        }
+        
+        pos += alignedLength;
+        length -= alignedLength;
+    }
+
     while (length--)
     {
         uint lw = arr[pos];
@@ -1808,42 +1872,21 @@ string printInstructions(const int* startInstructions, uint length, const string
         case LongInst.Comment:
             {
                 auto commentLength = hi;
-                const lengthOverFour = commentLength / 4;
-                auto restLength =  commentLength % 4;
-                const alignedLength = align4(commentLength) / 4;
-                result ~= "CommentBegin (CommentLength: " ~  itos(commentLength) ~ ")\n";
-                // alignLengthBy2
-                assert(alignedLength <= length, "comment (" ~ itos(alignedLength) ~") longer then code (" ~ itos(length) ~ ")");
-                auto insertPos = result.length;
-                result.length += commentLength;
 
-                result[insertPos .. insertPos + commentLength] = '_';
+                result ~= "// ";
 
-                foreach(chars; arr[pos .. pos + lengthOverFour])
-                {
-                    result[insertPos++] = chars >> 0x00 & 0xFF;
-                    result[insertPos++] = chars >> 0x08 & 0xFF;
-                    result[insertPos++] = chars >> 0x10 & 0xFF;
-                    result[insertPos++] = chars >> 0x18 & 0xFF;
-                }
+                printText(commentLength);
 
-                int shiftAmount = 0;
-                const lastChars = restLength ? arr[pos + lengthOverFour] : 0;
-
-                while(restLength--)
-                {
-                    result[insertPos++] = lastChars >> shiftAmount & 0xFF;
-                    shiftAmount += 8;
-                }
-
-                pos += alignedLength;
-                length -= alignedLength;
-                result ~= "\nCommentEnd\n";
+                result ~= "\n";
             }
             break;
         case LongInst.File:
             {
-                result ~= "File Directive\n";
+                result ~= "File (";
+
+                printText(hi);
+
+                result ~= ")\n";
             }
             break;
         case LongInst.Line:
@@ -3063,6 +3106,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 }
             }
             break;
+
         case LongInst.Comment:
             {
                 ip += align4(hi) / 4;
@@ -3104,6 +3148,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             break;
         case LongInst.File :
             {
+                goto case LongInst.Comment;
             }
             break;
         case LongInst.Line :
