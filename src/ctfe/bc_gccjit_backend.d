@@ -1384,11 +1384,16 @@ else
 
     void Comment(string msg, int line = __LINE__)
     {
-        gcc_jit_block_add_comment(block, gcc_jit_context_new_location(ctx, __FILE__, line, 0), msg.toStringz);
+        if (blockCount)
+            gcc_jit_block_add_comment(block, gcc_jit_context_new_location(ctx, __FILE__, line, 0), msg.toStringz);
     }
 
-    void Line(uint line)
+    void Line(uint line, uint callerLine = __LINE__)
     {
+        if (blockCount)
+        {
+            gcc_jit_block_add_comment(block, gcc_jit_context_new_location(ctx, __FILE__, callerLine, 0), ("Line " ~ itos(line)).toStringz);
+        }
         source_location = gcc_jit_context_new_location(ctx, source_filename, line, 0);
     }
 
