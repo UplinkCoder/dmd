@@ -2,8 +2,8 @@
 struct S
 {
     int beginning = 63;
-    int[4] a = 1;
-    int[4] b = 4;
+    int[] a;
+    int[] b;
     int end = 256;
 }
 
@@ -11,13 +11,29 @@ pragma(msg, "S.sizeof: ", S.sizeof);
 
 S makeS()
 {
-    S s;
-    int i;
+    S s = S();
 
+    s.a.length = 4;
+    s.b.length = 4;
+    s.a[] = 1;
+    s.b[] = 4;
 
-    bool buildNext()
+    int i = 0;
+
+    void setBegining(int begining)
     {
+        s.beginning = begining;
+    }
 
+    void setElem0(int el)
+    {
+        s.a[0] = el;
+        s.b[0] = el;
+    }
+/+
+    bool buildNext = true;
+    while(buildNext)
+    {
         if (i < S.a.length + S.b.length)
         {
             assert(s.beginning == 63);
@@ -33,19 +49,22 @@ S makeS()
             }
 
             i++;
-            return true;
+            continue;
         }
-        return false;
+        buildNext = false;
     }
 
-    while(buildNext()) {}
+    // while(buildNext()) {}
++/
+    setBegining(7);
+    setElem0(21);
 
     return s;
 }
 
 pragma(msg, makeS());
 
-
+/+
 
 struct S2
 {
@@ -72,7 +91,7 @@ S2 fn2()
 
 static assert(fn2() == S2(1, [2, 3]));
 
-/+
+
 /**************************************************
     3901 Arbitrary struct assignment, ref return
 **************************************************/

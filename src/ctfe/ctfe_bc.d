@@ -5908,7 +5908,6 @@ static if (is(BCGen))
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
 
                 BCValue srcLength = getLength(initValue);
-                assert(srcLength.vType == BCValueType.Immediate);
 
                 int sliceMemSize = 
                     SliceDescriptor.Size +
@@ -5928,7 +5927,6 @@ static if (is(BCGen))
                 setLength(slicePtr, srcLength);
                 setBase(slicePtr, dstSliceBase.i32);
                 MemCpy(dstSliceBase, getBase(initValue), imm32(sliceMemSize - SliceDescriptor.Size));
-                assert(0, "Slices in structInitializers have not be implemented correctly yet!");
             }
             else if (mt.type == BCTypeEnum.Struct)
             {
