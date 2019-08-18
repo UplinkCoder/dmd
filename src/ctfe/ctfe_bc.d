@@ -5234,7 +5234,6 @@ static if (is(BCGen))
                         auto memSize = AllocSlice(fieldAddr, length, field_type);
                         MemCpy(getBase(fieldAddr), getBase(elexpr), memSize);
                     }
-                    return ;
                 }
                 // abi hack for slices of slices
                 else if (elexpr.type.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Ptr]))
