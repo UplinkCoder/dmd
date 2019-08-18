@@ -1246,7 +1246,7 @@ struct SharedCtfeState(BCGenT)
 
         if (isBasicBCType(type))
         {
-            assert(basicTypeSize(type.type) != 0);
+            assert(type.type == BCTypeEnum.Void || basicTypeSize(type.type) != 0, _sharedCtfeState.typeToString(type) ~ " is both seen as a basicType and has the size of 0");
             return basicTypeSize(type.type);
         }
 
@@ -5957,16 +5957,16 @@ static if (is(BCGen))
             {
                 auto sliceType = _sharedCtfeState.sliceTypes[mt.typeIndex - 1];
                 Comment("Gen slice initializer");
-                BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
-
-                BCValue srcLength = getLength(initValue);
+                BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : BCValue.init;
                 
-                auto offset = genTemporary(pointerToMemberType);
-                Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
-
-                auto sliceMemSize = AllocSlice(offset, srcLength, mt);
-
-                MemCpy(getBase(offset), getBase(initValue), sliceMemSize);
+                if (initValue)
+                {
+                    BCValue srcLength = getLength(initValue);
+                    auto offset = genTemporary(pointerToMemberType);
+                    Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
+                    auto sliceMemSize = AllocSlice(offset, srcLength, mt);
+                    MemCpy(getBase(offset), getBase(initValue), sliceMemSize);
+                }
             }
             else if (mt.type == BCTypeEnum.Struct)
             {

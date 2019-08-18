@@ -2,7 +2,7 @@
 struct S
 {
     int beginning = 63;
-    int[] a;
+    int[] a = [];
     int[] b;
     int end = 256;
 }
@@ -11,7 +11,7 @@ pragma(msg, "S.sizeof: ", S.sizeof);
 
 S makeS()
 {
-    S s = S();
+    S s;
 
     s.a.length = 4;
     s.b.length = 4;
