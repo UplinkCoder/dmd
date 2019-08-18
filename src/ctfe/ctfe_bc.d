@@ -5079,6 +5079,29 @@ static if (is(BCGen))
         }
     }
 
+    BCValue AllocSlice(BCValue sliceDescAddr, BCValue desired_length, BCType slice_type)
+    {
+        if (slice_type.type == BCTypeEnum.Slice)
+        {
+            BCSlice slice = _sharedCtfeState.sliceTypes[slice_type.typeIndex - 1];
+            auto elType = slice.elementType;
+            auto elSize = _sharedCtfeState.size(elType, true);
+
+            auto allocSize = genTemporary(i32Type);
+            auto newMem = genTemporary(i32Type);
+
+
+            Mul3(allocSize, desired_length, imm32(elSize));
+            Alloc(newMem, allocSize, slice_type);
+            setLength(sliceDescAddr, desired_length);
+            setBase(sliceDescAddr, newMem);
+
+            return allocSize;
+        }
+        else
+            assert(0, "Alloc Slice is only supposed to be called on slices");
+    }
+
     override void visit(StructLiteralExp sle)
     {
         lastLoc = sle.loc;
@@ -5186,7 +5209,7 @@ static if (is(BCGen))
                     if (_array.elementType == elexpr.type)
                     {
                         auto base = getBase(fieldAddr);
-                        ArrayBroadcast(base, _array, elexpr);
+                        ArrayBroadcast(base, imm32(_array.length), field_type, elexpr);
                     }
                     else
                     {
@@ -5198,7 +5221,16 @@ static if (is(BCGen))
                 }
                 else if (field_type.type == BCTypeEnum.Slice)
                 {
-                    bailout("We can currently not support broadcast_slice_assignemt in struct lterals");
+                    BCSlice _slice = _sharedCtfeState.sliceTypes[field_type.typeIndex - 1];
+                    if (_slice.elementType == elexpr.type)
+                    {
+                        auto length = getLength(elexpr);
+                        AllocSlice(fieldAddr, length, field_type);
+                    }
+                    else
+                    {
+                        bailout("We can currently not support broadcast_slice_assignemt in struct lterals");
+                    }
                     return ;
                 }
                 // abi hack for slices of slices
@@ -5798,7 +5830,7 @@ static if (is(BCGen))
             defaultValue = imm32(0);
             defaultValue.type = elemType;
 
-            ArrayBroadcast(base, _array, defaultValue);
+            ArrayBroadcast(base, imm32(_array.length), arrayType, defaultValue);
         }
         else
         {
@@ -5810,24 +5842,40 @@ static if (is(BCGen))
     }
 
     /// broadcasts an element to an array
-    void ArrayBroadcast(BCValue base, BCArray array, BCValue broadCastElem, int line = __LINE__)
+    void ArrayBroadcast(BCValue base, BCValue length, BCType array_or_slice, BCValue broadCastElem, int line = __LINE__)
     {
+        BCValue arrayLength;
+        BCType elType;
+        int heapAdd = -1;
+        if (array_or_slice.type == BCTypeEnum.Array)
+        {
+            BCArray array = _sharedCtfeState.arrayTypes[array_or_slice.typeIndex - 1];
+            elType = array.elementType;
+            arrayLength = imm32(array.length);
+        }
+        else if (array_or_slice.type == BCTypeEnum.Slice)
+        {
+            BCSlice slice = _sharedCtfeState.sliceTypes[array_or_slice.typeIndex - 1];
+            elType = slice.elementType;
+            arrayLength = length;
+        }
+
+        heapAdd = _sharedCtfeState.size(elType, true);
+
         Comment("Broadcast_Assignment from: " ~ itos(line));
         BCValue ea = genTemporary(i32Type);
         BCValue cpyCounter = genTemporary(i32Type);
-        const arrayLength = array.length;
 
-        bailout(broadCastElem.type != array.elementType,
-            "ArrayBroadCast array.elementType(" ~ _sharedCtfeState.typeToString(array.elementType) ~
+        bailout(broadCastElem.type != elType,
+            "ArrayBroadCast array.elementType(" ~ _sharedCtfeState.typeToString(elType) ~
                 ") and broadcastElem(" ~ _sharedCtfeState.typeToString(broadCastElem.type) ~
             ") mismatch ... "
         );
-        const heapAdd = _sharedCtfeState.size(array.elementType);
 
         Set(ea, base.i32); // ea = &array[0]
         {
             auto Lbegin = genLabel(); // LBegin:
-            Lt3(BCValue.init, cpyCounter, imm32(arrayLength)); // flag = cpyCounter < array.length
+            Lt3(BCValue.init, cpyCounter, arrayLength); // flag = cpyCounter < array.length
             auto cjContinue = beginCndJmp(BCValue.init);  // if (!flag) goto Lend;
             {
                 Add3(cpyCounter, cpyCounter, imm32(1)); // cpyCounter++;
@@ -5897,7 +5945,7 @@ static if (is(BCGen))
                     }
                     else
                     {
-                        ArrayBroadcast(base, _array, initValue);
+                        ArrayBroadcast(base, imm32(_array.length), mt, initValue);
                     }
                 }
 
@@ -5905,28 +5953,18 @@ static if (is(BCGen))
             }
             else if (mt.type == BCTypeEnum.Slice)
             {
+                auto sliceType = _sharedCtfeState.sliceTypes[mt.typeIndex - 1];
+                Comment("Gen slice initializer");
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
 
                 BCValue srcLength = getLength(initValue);
-
-                int sliceMemSize = 
-                    SliceDescriptor.Size +
-                    srcLength.imm32 *
-                    sharedCtfeState.size(_sharedCtfeState.elementType(initValue.type));
-
-
-
+                
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
-                auto slicePtr = genTemporary(mt);
 
-                Alloc(slicePtr.i32, imm32(sliceMemSize));
-                Store32(offset.i32, slicePtr);
-                auto dstSliceBase = genTemporary(i32Type);
-                Add3(dstSliceBase, slicePtr.i32, imm32(SliceDescriptor.Size));
-                setLength(slicePtr, srcLength);
-                setBase(slicePtr, dstSliceBase.i32);
-                MemCpy(dstSliceBase, getBase(initValue), imm32(sliceMemSize - SliceDescriptor.Size));
+                auto sliceMemSize = AllocSlice(offset, srcLength, mt);
+
+                MemCpy(getBase(offset), getBase(initValue), sliceMemSize);
             }
             else if (mt.type == BCTypeEnum.Struct)
             {
@@ -7155,7 +7193,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     }
                     else if (rhs.type == arrayType.elementType)
                     {
-                        ArrayBroadcast(base, arrayType, rhs);
+                        ArrayBroadcast(base, imm32(arrayType.length), lhs.type, rhs);
                     }
                     else
                     {

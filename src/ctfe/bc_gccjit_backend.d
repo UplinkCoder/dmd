@@ -1213,6 +1213,7 @@ else
 
     void IToF32(BCValue _to, BCValue value){ assert(0, __PRETTY_FUNCTION__ ~ " not implemented"); }
     void IToF64(BCValue _to, BCValue value){ assert(0, __PRETTY_FUNCTION__ ~ " not implemented"); }
+
     void F64ToI(BCValue _to, BCValue value)
     {
         gcc_jit_block_add_assignment(block, currentLoc,
@@ -1225,6 +1226,7 @@ else
             )
         );
     }
+
     void F32ToI(BCValue _to, BCValue value)
     {
         gcc_jit_block_add_assignment(block, currentLoc,
