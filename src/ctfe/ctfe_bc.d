@@ -2521,7 +2521,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         {
             import core.stdc.stdio;
             static if (bailoutMessages)
-                printf("bail out on %s (%d): %s\n", pfn.ptr, line, message.ptr);
+                printf("bail out on %s (%d): %s -- (srcLine: %d)\n", pfn.ptr, line, message.ptr, lastLine);
         }
     }
 
@@ -5213,23 +5213,26 @@ static if (is(BCGen))
                     }
                     else
                     {
-                        bailout("Broadcast assignment types don't match!"
-                            ~ " elexpr.type: " ~ _sharedCtfeState.typeToString(elexpr.type)
-                            ~ " _array.elementType: " ~ _sharedCtfeState.typeToString(_array.elementType));
-                        return ;
+                       auto memSize = _sharedCtfeState.size(_array.elementType, true);
+                       MemCpy(getBase(fieldAddr), getBase(elexpr), imm32(memSize));
                     }
                 }
                 else if (field_type.type == BCTypeEnum.Slice)
                 {
                     BCSlice _slice = _sharedCtfeState.sliceTypes[field_type.typeIndex - 1];
+
+                    auto length = getLength(elexpr);
+                    //AllocSlice(fieldAddr, length, field_type);
+
                     if (_slice.elementType == elexpr.type)
                     {
-                        auto length = getLength(elexpr);
-                        AllocSlice(fieldAddr, length, field_type);
+                        assert(0, "Not sure that an structLiteralExp can contain a boardcast assignment");
+                        //ArrayBroadcast(getBase(fieldAddr), length, field_type);
                     }
                     else
                     {
-                        bailout("We can currently not support broadcast_slice_assignemt in struct lterals");
+                        auto memSize = AllocSlice(fieldAddr, length, field_type);
+                        MemCpy(getBase(fieldAddr), getBase(elexpr), memSize);
                     }
                     return ;
                 }
