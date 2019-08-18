@@ -559,3 +559,30 @@ static if (is(typeof(__traits(newCTFEGaveUp))))
 {
     static assert(!__traits(newCTFEGaveUp));
 }
+
+
+struct S3
+{
+    int[2] a = [3, 4];
+    int[] s = [3, 4];
+}
+
+
+static immutable S3 s3 = S3.init;
+
+S3 fn()
+{
+    S3 sl;
+    return sl;
+}
+
+S3 fn2()
+{
+  S3 sl = S3.init;
+  return sl;
+}
+
+
+static assert(() { return fn() == s3; } ());
+static assert(() { return fn2() == s3; } ());
+
