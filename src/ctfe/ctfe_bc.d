@@ -4902,9 +4902,9 @@ static if (is(BCGen))
 
         auto elemType = toBCType(ale.type.nextOf);
 
-        if (!elemType.type || !_sharedCtfeState.size(elemType))
+        if (elemType.type != BCTypeEnum.Void && (!elemType.type || !_sharedCtfeState.size(elemType)))
         {
-            bailout("elemType type is invalid or has invalid size -- " ~ ale.toString);
+            bailout("elemType type is invalid or has invalid size -- " ~ ale.toString ~ "elemType.type: " ~ enumToString(elemType.type));
             return ;
         }
 /*
@@ -4924,11 +4924,15 @@ static if (is(BCGen))
             writeln("Adding array of Type:  ", arrayType);
         }
 
+        bool emptyLiteral = (elemType.type == BCTypeEnum.Void) && arrayLength == 0;
+
+
+
         _sharedCtfeState.arrayTypes[_sharedCtfeState.arrayCount++] = arrayType;
         retval = assignTo ? assignTo.i32 : genTemporary(BCType(BCTypeEnum.i32));
 
         auto heapAdd = _sharedCtfeState.size(elemType);
-        assert(heapAdd, "heapAdd was zero indicating we had an invalid type in the arrayliteral or something");
+        assert(emptyLiteral || heapAdd, "heapAdd was zero indicating we had an invalid type in the arrayliteral or something");
 
         uint allocSize = uint(SliceDescriptor.Size) + //ptr and length
             arrayLength * heapAdd;

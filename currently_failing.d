@@ -30,32 +30,31 @@ S makeS()
         s.a[0] = el;
         s.b[0] = el;
     }
-/+
-    bool buildNext = true;
-    while(buildNext)
+
+    bool buildNext()
     {
-        if (i < S.a.length + S.b.length)
+        if (i < s.a.length + s.b.length)
         {
             assert(s.beginning == 63);
             assert(s.end == 256);
 
-            if (i < S.a.length)
+            if (i < s.a.length)
             {
                 s.a[i] = i;
             }
             else
             {
-                s.b[i - S.a.length] = i;
+                s.b[i - s.a.length] = i;
             }
 
             i++;
-            continue;
+            return true;
         }
-        buildNext = false;
+        return false;
     }
 
-    // while(buildNext()) {}
-+/
+    while(buildNext()) {}
+
     setBegining(7);
     setElem0(21);
 
