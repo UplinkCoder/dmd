@@ -3,7 +3,7 @@ struct S
 {
     int beginning = 63;
     int[] a = [];
-    int[] b;
+    int[4] b;
     int end = 256;
 }
 
@@ -14,7 +14,6 @@ S makeS()
     S s;
 
     s.a.length = 4;
-    s.b.length = 4;
     s.a[] = 1;
     s.b[] = 4;
 
@@ -63,7 +62,7 @@ S makeS()
 
 pragma(msg, makeS());
 
-/+
+
 
 struct S2
 {
@@ -90,7 +89,7 @@ S2 fn2()
 
 static assert(fn2() == S2(1, [2, 3]));
 
-
+/+
 /**************************************************
     3901 Arbitrary struct assignment, ref return
 **************************************************/

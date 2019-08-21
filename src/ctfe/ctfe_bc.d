@@ -6730,7 +6730,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
         File(fromStringz(ae.loc.filename));
         Line(ae.loc.linnum);
-        //debug (ctfe)
+        debug (ctfe)
         {
             import std.stdio;
 
