@@ -2792,7 +2792,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
         case LongInst.HeapLoad32:
             {
-                assert(*rhs, "trying to deref null pointer");
+                assert(*rhs, "trying to deref null pointer inLine: " ~ itos(lastLine));
                 (*lhsRef) = *(heapPtr._heap.ptr + *rhs);
                 debug
                 {
@@ -2838,7 +2838,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             {
                 assert(*lhsRef, "trying to deref null pointer SP[" ~ itos(cast(int)(lhsRef - &stackP[0])*4) ~ "] at : &" ~ itos (ip - 2));
                 const heapOffset = *lhsRef;
-                assert(heapOffset < heapPtr.heapSize, "Store out of range at ip: &" ~ itos(ip - 2));
+                assert(heapOffset < heapPtr.heapSize, "Store out of range at ip: &" ~ itos(ip - 2) ~ " atLine: " ~ itos(lastLine));
                 (*(heapPtr._heap.ptr + heapOffset)) = (*rhs) & 0xFF_FF_FF_FF;
                 (*(heapPtr._heap.ptr + 4 + heapOffset)) = ((*rhs & 0xFF_FF_FF_FF_00_00_00_00) >> 32);
             }
@@ -3098,7 +3098,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
                     // assert(cpySize, "cpySize == 0");
                     assert(cpySrc, "cpySrc == 0");
-                    assert(cpyDst, "cpyDst == 0");
+                    assert(cpyDst, "cpyDst == 0" ~ " inLine: " ~ itos(lastLine));
 
                     assert(cpyDst >= cpySrc + cpySize || cpyDst + cpySize <= cpySrc, "Overlapping MemCpy is not supported --- src: " ~ itos(cpySrc)
                         ~ " dst: " ~ itos(cpyDst) ~ " size: " ~ itos(cpySize));

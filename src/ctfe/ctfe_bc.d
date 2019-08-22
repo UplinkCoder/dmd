@@ -22,9 +22,9 @@ import ddmd.root.rmem;
 import core.stdc.stdio : printf;
 import std.string : fromStringz;
 
-enum perf = 1;
+enum perf = 0;
 enum bailoutMessages = 0;
-enum printResult = 1;
+enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -1045,6 +1045,16 @@ struct SharedCtfeState(BCGenT)
 
     import ddmd.globals : Loc;
 
+    BCValue addErrorWithMessage(Loc loc, BCValue errorMessage)
+    {
+        auto sa1 = TypedStackAddr(errorMessage.type, errorMessage.stackAddr);
+
+        errors[errorCount++] = RetainedError(loc, null, sa1);
+        auto error = imm32(errorCount);
+        error.vType = BCValueType.Error;
+        return error;
+    }
+
     extern (D) BCValue addError(Loc loc, string msg, BCValue v1 = BCValue.init,
         BCValue v2 = BCValue.init, BCValue v3 = BCValue.init,
         BCValue v4 = BCValue.init)
@@ -1447,6 +1457,10 @@ Expression toExpression(const BCValue value, Type expressionType,
             error(err.loc, err.msg.ptr, e1, e2, e3, e4);
 
         return CTFEExp.cantexp;
+    }
+    else if (value.vType == BCValueType.ErrorWithMessage)
+    {
+        // bla
     }
 
     Expression createArray(BCValue arr, Type arrayType)
@@ -7438,20 +7452,32 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         if (lhs.type.type == BCTypeEnum.i32 || lhs.type.type == BCTypeEnum.Ptr || lhs.type.type == BCTypeEnum.Struct
             || lhs.type.type == BCTypeEnum.Class)
         {
-            string errorMessage;
             if (!ae.msg)
             {
                 const char* msg = ae.toChars();
                 import core.stdc.string : strlen;
 
                 auto len = strlen(msg);
-                errorMessage = cast(string) msg[0 .. len];
+                string errorMessage = cast(string) msg[0 .. len];
+                Assert(lhs.i32, addError(ae.loc, errorMessage));
             }
             else
             {
-                errorMessage = ae.msg.toString;
+/+
+TODO complete this block
+                if (ae.msg.op != TOKstring)
+                {
+                    BCValue errorMessage = genExpr(ae.msg);
+                    Assert(lhs.i32, addErrorWithMessage(ae.loc, errorMessage));
+                }
+                else
++/
+                {
+                    string errorMessage = ae.msg.toString;
+                    Assert(lhs.i32, addError(ae.loc, errorMessage));
+                }
             }
-            Assert(lhs.i32, addError(ae.loc, errorMessage));
+
         }
         else
         {
