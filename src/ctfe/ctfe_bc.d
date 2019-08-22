@@ -1051,7 +1051,7 @@ struct SharedCtfeState(BCGenT)
 
         errors[errorCount++] = RetainedError(loc, null, sa1);
         auto error = imm32(errorCount);
-        error.vType = BCValueType.Error;
+        error.vType = BCValueType.ErrorWithMessage;
         return error;
     }
 
@@ -1400,6 +1400,45 @@ Expression toExpression(const BCValue value, Type expressionType,
         return null;
     }
 
+    StringExp makeString(BCValue value)
+    {
+        auto length = heapPtr._heap[value.imm32 + SliceDescriptor.LengthOffset];
+        auto base = heapPtr._heap[value.imm32 + SliceDescriptor.BaseOffset];
+        uint sz = expressionType.isString ? cast (uint) expressionType.nextOf().size : 1;
+        
+        debug (abi)
+        {
+            import std.stdio;
+            writefln("creating String from {base: &%d = %d} {length: &%d = %d}",
+                value.heapAddr.addr + SliceDescriptor.BaseOffset, base, value.heapAddr.addr + SliceDescriptor.LengthOffset, length);
+        }
+        
+        if (sz != 1)
+        {
+            static if (bailoutMessages)
+            {
+                import std.stdio;
+                writefln("We cannot deal with stringElementSize: %d", sz);
+            }
+            return null;
+        }
+        
+        auto offset = cast(uint)base;
+        import ddmd.root.rmem : allocmemory;
+        
+        auto resultString = cast(char*)allocmemory(length * sz + sz);
+        
+        assert(sz == 1, "missing UTF-16/32 support");
+        foreach (i; 0 .. length)
+            resultString[i] = cast(char) heapPtr._heap[offset + i];
+        resultString[length] = '\0';
+
+        StringExp se = new StringExp(lastLoc, cast(void*)resultString, length);
+        se.ownedByCtfe = OWNEDctfe;
+
+        return se;
+    }
+
     if (value.vType == BCValueType.Bailout)
     {
         if (value.imm32 == 2000)
@@ -1454,13 +1493,15 @@ Expression toExpression(const BCValue value, Type expressionType,
             return null;
         }
         if (err.msg.ptr)
+        {
             error(err.loc, err.msg.ptr, e1, e2, e3, e4);
+        }
+        else
+        {
+            error(err.loc, makeString((*errorValues)[0]).string);
+        }
 
         return CTFEExp.cantexp;
-    }
-    else if (value.vType == BCValueType.ErrorWithMessage)
-    {
-        // bla
     }
 
     Expression createArray(BCValue arr, Type arrayType)
@@ -1544,46 +1585,14 @@ Expression toExpression(const BCValue value, Type expressionType,
 
     if (expressionType.isString)
     {
-        import ddmd.lexer : Loc;
-
-        if (!value.heapAddr)
+        if (!value.imm32)
         {
-           return new NullExp(lastLoc, expressionType);
-        }
-
-        auto length = heapPtr._heap[value.imm32 + SliceDescriptor.LengthOffset];
-        auto base = heapPtr._heap[value.imm32 + SliceDescriptor.BaseOffset];
-        uint sz = cast (uint) expressionType.nextOf().size;
-
-        debug (abi)
-        {
-            import std.stdio;
-            writefln("creating String from {base: &%d = %d} {length: &%d = %d}",
-                value.heapAddr.addr + SliceDescriptor.BaseOffset, base, value.heapAddr.addr + SliceDescriptor.LengthOffset, length);
-        }
-
-        if (sz != 1)
-        {
-            static if (bailoutMessages)
             {
-                import std.stdio;
-                writefln("We cannot deal with stringElementSize: %d", sz);
+                return new NullExp(lastLoc, expressionType);
             }
-            return null;
         }
-
-        auto offset = cast(uint)base;
-        import ddmd.root.rmem : allocmemory;
-
-        auto resultString = cast(char*)allocmemory(length * sz + sz);
-
-        assert(sz == 1, "missing UTF-16/32 support");
-        foreach (i; 0 .. length)
-            resultString[i] = cast(char) heapPtr._heap[offset + i];
-        resultString[length] = '\0';
-
-        result = new StringExp(lastLoc, cast(void*)resultString, length);
-        (cast(StringExp) result).ownedByCtfe = OWNEDctfe;
+        else
+            return makeString(value);
     }
     else
         switch (expressionType.ty)
@@ -2206,6 +2215,23 @@ extern (C++) final class BCV(BCGenT) : Visitor
             }
         }
         return 0;
+    }
+
+    BCValue addErrorWithMessage(Loc loc, BCValue errorMessage)
+    {
+        alias add_error_value_prototype = uint delegate (BCValue);
+        static if (is(typeof(&gen.addErrorValue) == add_error_value_prototype))
+        {
+            addErrorValue(errorMessage);
+        }
+
+        if (errorMessage.vType == BCValueType.Immediate)
+        {
+            BCValue t = genTemporary(errorMessage.type);
+            Set(t, errorMessage);
+        }
+
+        return _sharedCtfeState.addErrorWithMessage(loc, errorMessage);
     }
 
     extern(D) BCValue addError(Loc loc, string msg, BCValue v1 = BCValue.init, BCValue v2 = BCValue.init, BCValue v3 = BCValue.init, BCValue v4 = BCValue.init)
@@ -7463,15 +7489,13 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
             else
             {
-/+
-TODO complete this block
+
                 if (ae.msg.op != TOKstring)
                 {
                     BCValue errorMessage = genExpr(ae.msg);
                     Assert(lhs.i32, addErrorWithMessage(ae.loc, errorMessage));
                 }
                 else
-+/
                 {
                     string errorMessage = ae.msg.toString;
                     Assert(lhs.i32, addError(ae.loc, errorMessage));
