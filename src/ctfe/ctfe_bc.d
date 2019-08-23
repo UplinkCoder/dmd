@@ -1434,8 +1434,9 @@ Expression toExpression(const BCValue value, Type expressionType,
         resultString[length] = '\0';
 
         StringExp se = new StringExp(lastLoc, cast(void*)resultString, length);
+        se.type = Type.tstring;
         se.ownedByCtfe = OWNEDctfe;
-
+        assert(se.type);
         return se;
     }
 
