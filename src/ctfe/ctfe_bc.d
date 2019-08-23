@@ -1498,7 +1498,9 @@ Expression toExpression(const BCValue value, Type expressionType,
         }
         else
         {
-            error(err.loc, makeString((*errorValues)[0]).string);
+            //TODO replace escape sequnces inside the string created
+            // by makeString below.
+            error(err.loc, "\"%s\"", makeString((*errorValues)[0]).string);
         }
 
         return CTFEExp.cantexp;
