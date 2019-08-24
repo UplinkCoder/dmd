@@ -457,15 +457,16 @@ struct Imm32
 {
     uint imm32;
     alias imm32 this;
+    bool signed = true;
 }
 
-BCValue imm32(uint value) pure @trusted
+BCValue imm32(uint value, bool signed = true) pure @trusted
 {
     BCValue ret = void;
     if (__ctfe)
         ret = BCValue.init;
     ret.vType = BCValueType.Immediate;
-    ret.type.type = BCTypeEnum.i32;
+    ret.type.type = signed ? BCTypeEnum.i32 : BCTypeEnum.u32;
     ret.type.typeIndex = 0;
     ret.type.flags = BCTypeFlags.None;
     ret.imm32 = value;
@@ -476,7 +477,7 @@ BCValue imm32(uint value) pure @trusted
     return ret;
 }
 
-BCValue imm64(ulong value) pure @trusted
+BCValue imm64(ulong value, bool signed = true) pure @trusted
 {
     BCValue ret = void;
 
@@ -484,7 +485,7 @@ BCValue imm64(ulong value) pure @trusted
         ret = BCValue.init;
 
     ret.vType = BCValueType.Immediate;
-    ret.type.type = BCTypeEnum.i64;
+    ret.type.type = signed ? BCTypeEnum.i64 : BCTypeEnum.u64;
     ret.type.flags = BCTypeFlags.None;
     ret.imm64 = value;
     return ret;
@@ -492,7 +493,7 @@ BCValue imm64(ulong value) pure @trusted
 
 BCValue i32(BCValue val) pure @safe
 {
-    val.type.type = BCTypeEnum.i32;
+    val.type.type = BCTypeEnum.u32;
     return val;
 }
 
@@ -500,6 +501,7 @@ struct Imm64
 {
     ulong imm64;
     alias imm64 this;
+    bool signed = true;
 }
 
 struct Imm23f
@@ -729,14 +731,14 @@ struct BCValue
 
     this(const Imm32 imm32) pure
     {
-        this.type.type = BCTypeEnum.i32;
+        this.type.type = imm32.signed ? BCTypeEnum.i32 : BCTypeEnum.u32;
         this.vType = BCValueType.Immediate;
         this.imm32.imm32 = imm32.imm32;
     }
 
     this(const Imm64 imm64) pure
     {
-        this.type.type = BCTypeEnum.i64;
+        this.type.type = imm64.signed ? BCTypeEnum.i64 : BCTypeEnum.u64;
         this.vType = BCValueType.Immediate;
         this.imm64 = imm64;
     }

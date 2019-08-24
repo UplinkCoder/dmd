@@ -2009,7 +2009,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
         {
         case BCTypeEnum.i32, BCTypeEnum.f23, BCTypeEnum.c8, BCTypeEnum.i16, BCTypeEnum.i8, BCTypeEnum.c16, BCTypeEnum.c32:
             {
-                *(&stackP[argOffset / 4]) = arg.imm32;
+                *(&stackP[argOffset / 4]) = cast(int)arg.imm32;
                 argOffset += uint.sizeof;
             }
             break;
@@ -2885,7 +2885,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
                         writeln("Ret64 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
-                return BCValue(Imm64(*opRef));
+                return BCValue(Imm64(*opRef, true));
             }
 
         case LongInst.RelJmp:
