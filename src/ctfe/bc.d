@@ -44,7 +44,7 @@ auto instKind(LongInst i)
     case LongInst.ImmAdd, LongInst.ImmSub, LongInst.ImmDiv, LongInst.ImmMul,
             LongInst.ImmEq, LongInst.ImmNeq, LongInst.ImmLt, LongInst.ImmLe, LongInst.ImmGt, LongInst.ImmGe, LongInst.ImmSet,
             LongInst.ImmAnd, LongInst.ImmOr, LongInst.ImmXor, LongInst.ImmLsh,
-            LongInst.ImmRsh, LongInst.ImmMod, LongInst.Call, LongInst.BuiltinCall,
+            LongInst.ImmRsh, LongInst.ImmMod, LongInst, LongInst.BuiltinCall,
             LongInst.SetHighImm:
         {
             return InstKind.LongInstImm32;
@@ -81,6 +81,8 @@ enum LongInst : ushort
     RelJmp,
     Ret32,
     Ret64,
+    RetS32,
+    RetS64,
     Not,
 
     Flg, // writes the conditionFlag into [lw >> 16]
@@ -1078,7 +1080,7 @@ pure:
     void Call(BCValue result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
         calls[callCount++] = RetainedCall(fn, args, functionId, ip, sp, l);
-        emitLongInst(LongInst.Call, result.stackAddr, pushOntoStack(imm32(callCount)).stackAddr);
+        emitLongInst(LongInst, result.stackAddr, pushOntoStack(imm32(callCount)).stackAddr);
     }
 
     void Load32(BCValue _to, BCValue from)
@@ -1814,12 +1816,12 @@ string printInstructions(const int* startInstructions, uint length, const string
             }
             break;
 */
-        case LongInst.Ret32:
+        case LongInst.Ret32, LongInst.RetS32:
             {
                 result ~= "Ret32 " ~ localName(stackMap, lw >> 16) ~ " \n";
             }
             break;
-        case LongInst.Ret64:
+        case LongInst.Ret64, LongInst.RetS64:
             {
                 result ~= "Ret64 " ~ localName(stackMap, lw >> 16) ~ " \n";
             }
@@ -2890,6 +2892,22 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     }
                 return imm32(*opRef & uint.max);
             }
+        case LongInst.RetS32:
+            {
+                debug (bc)
+                    if (!__ctfe)
+                {
+                    import std.stdio;
+                    
+                    writeln("Ret32 SP[", lhsOffset, "] (", *opRef, ")\n");
+                }
+                return imm32(*opRef & uint.max, true);
+            }
+        case LongInst.RetS64:
+            {
+                return BCValue(Imm64(*opRef, true));
+            }
+
         case LongInst.Ret64:
             {
                 debug (bc)
