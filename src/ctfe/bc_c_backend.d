@@ -197,7 +197,7 @@ pure:
             v = imm32(0);
         }
 
-        assert(v.type.type == BCTypeEnum.i32,
+        assert(v.type.type == BCTypeEnum.i32 || v.type.type == BCTypeEnum.u32,
             "i32 expected not: " ~ enumToString(v.type.type));
 
         if (v.vType == BCValueType.StackValue)
@@ -314,10 +314,10 @@ pure:
         sameLabel = false;
         assert(lhs.vType.StackValue, "only StackValues are supported as lhs");
         // FIXME remove the lhs.type == BCTypeEnum.Char as soon as we convert correctly.
-/*        assert(lhs.type == BCTypeEnum.i32 || lhs.type == BCTypeEnum.Char,
-            "only i32 is supported for now not: " ~ to!string(lhs.type.type));
-        assert(rhs.type == BCTypeEnum.i32,
-            "only i32 is supported for now, not: " ~ to!string(rhs.type.type));
+/*        assert(lhs.type == BCTypeEnum.u32 || lhs.type == BCTypeEnum.Char,
+            "only u32 is supported for now not: " ~ to!string(lhs.type.type));
+        assert(rhs.type == BCTypeEnum.u32,
+            "only u32 is supported for now, not: " ~ to!string(rhs.type.type));
 */
         code ~= "\t";
 

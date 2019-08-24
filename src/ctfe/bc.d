@@ -620,7 +620,7 @@ pure:
 
     void Alloc(BCValue heapPtr, BCValue size)
     {
-        assert(size.type.type == BCTypeEnum.i32, "Size for alloc needs to be an i32");
+        assert(size.type.type == BCTypeEnum.u32, "Size for alloc needs to be an u32");
         if (size.vType == BCValueType.Immediate)
         {
             size = pushOntoStack(size);
@@ -762,6 +762,7 @@ pure:
 
         // FIXME Implement utf8 <-> utf32 conversion
         assert(commonType == BCTypeEnum.i32 || commonType == BCTypeEnum.i64
+            || commonType == BCTypeEnum.u32 || commonType == BCTypeEnum.u64
             || commonType == BCTypeEnum.f23 || commonType == BCTypeEnum.c32
             || commonType == BCTypeEnum.c8  || commonType == BCTypeEnum.f52,
             "only i32, i64, f23, f52, is supported for now not: " ~ enumToString(commonType));
@@ -2007,21 +2008,34 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     {
         switch (arg.type.type)
         {
-        case BCTypeEnum.i32, BCTypeEnum.f23, BCTypeEnum.c8, BCTypeEnum.i16, BCTypeEnum.i8, BCTypeEnum.c16, BCTypeEnum.c32:
+            case BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8:
             {
                 *(&stackP[argOffset / 4]) = cast(int)arg.imm32;
                 argOffset += uint.sizeof;
             }
             break;
-        case BCTypeEnum.i64, BCTypeEnum.f52:
-            {
-                *(&stackP[0] + argOffset / 4) = arg.imm64;
-                argOffset += uint.sizeof;
-                //TODO find out why adding ulong.sizeof does not work here
-                //make variable-sized stack possible ... if it should be needed
 
+            case BCTypeEnum.u32, BCTypeEnum.f23, BCTypeEnum.c8, BCTypeEnum.u16, BCTypeEnum.u8, BCTypeEnum.c16, BCTypeEnum.c32:
+            {
+                *(&stackP[argOffset / 4]) = cast(uint)arg.imm32;
+                argOffset += uint.sizeof;
             }
             break;
+
+        case BCTypeEnum.i64:
+            {
+                *(&stackP[0] + argOffset / 4) = cast(long)arg.imm64;
+                argOffset += uint.sizeof;
+            }
+            break;
+
+        case BCTypeEnum.u64, BCTypeEnum.f52:
+        {
+            *(&stackP[0] + argOffset / 4) = arg.imm64;
+            argOffset += uint.sizeof;    
+        }
+        break;
+
         case BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Null:
             {
                 // This might need to be removed again?
@@ -2885,7 +2899,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
                         writeln("Ret64 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
-                return BCValue(Imm64(*opRef, true));
+                return BCValue(Imm64(*opRef, false));
             }
 
         case LongInst.RelJmp:
@@ -3013,8 +3027,9 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     if(isStackValueOrParameter(arg))
                     {
+                        bool signed = stackP[arg.stackAddr.addr / 4] < 0 ? 1 : 0; 
                         if(cast(ulong)(stackP[arg.stackAddr.addr / 4]) <= uint.max)
-                            callArgs[i] = imm32(stackP[arg.stackAddr.addr / 4] & uint.max);
+                            callArgs[i] = imm32(stackP[arg.stackAddr.addr / 4] & uint.max, signed);
                         else
                             callArgs[i] = BCValue(Imm64(stackP[arg.stackAddr.addr / 4]));
                     }

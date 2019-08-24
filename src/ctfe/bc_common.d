@@ -123,6 +123,28 @@ string itos64(const ulong val) pure @trusted nothrow
     return cast(string) "((" ~ hiString ~ "<< 32)" ~ "|" ~ lwString ~ ")";
 }
 
+string sitos(const int val) pure @trusted nothrow
+{
+    int sign = (val < 0) ? 1 : 0;
+    uint abs_val = (val < 0) ? -val : val;
+
+    immutable length = fastLog10(abs_val) + 1;
+    char[] result;
+    result.length = length + sign;
+
+    foreach (i; 0 .. length)
+    {
+        immutable _val = abs_val / fastPow10tbl[i];
+        result[length - i - !sign] = cast(char)((_val % 10) + '0');
+    }
+
+    if (sign)
+    {
+        result[0] = '-';
+    }
+
+    return cast(string) result;
+}
 
 string floatToString(float f)
 {
@@ -460,7 +482,7 @@ struct Imm32
     bool signed = true;
 }
 
-BCValue imm32(uint value, bool signed = true) pure @trusted
+BCValue imm32(uint value, bool signed = false) pure @trusted
 {
     BCValue ret = void;
     if (__ctfe)
@@ -477,7 +499,7 @@ BCValue imm32(uint value, bool signed = true) pure @trusted
     return ret;
 }
 
-BCValue imm64(ulong value, bool signed = true) pure @trusted
+BCValue imm64(ulong value, bool signed = false) pure @trusted
 {
     BCValue ret = void;
 
@@ -493,7 +515,7 @@ BCValue imm64(ulong value, bool signed = true) pure @trusted
 
 BCValue i32(BCValue val) pure @safe
 {
-    val.type.type = BCTypeEnum.u32;
+    val.type.type = BCTypeEnum.i32;
     return val;
 }
 
@@ -689,7 +711,9 @@ struct BCValue
 
     bool opEquals(const BCValue rhs) pure const
     {
-        if (this.vType == rhs.vType && this.type == rhs.type)
+        BCTypeEnum commonType = commonTypeEnum(this.type.type, rhs.type.type);
+       
+        if (this.vType == rhs.vType)
         {
             final switch (this.vType)
             {
@@ -699,13 +723,13 @@ struct BCValue
             case BCValueType.Temporary:
                 return tmpIndex == rhs.tmpIndex;
             case BCValueType.Immediate:
-                switch (this.type.type)
+                switch (commonType)
                 {
-                case BCTypeEnum.i32:
+                case BCTypeEnum.i32, BCTypeEnum.u32:
                     {
                         return imm32.imm32 == rhs.imm32.imm32;
                     }
-                case BCTypeEnum.i64:
+                case BCTypeEnum.i64, BCTypeEnum.u64:
                     {
                         return imm64.imm64 == rhs.imm64.imm64;
                     }
@@ -971,9 +995,21 @@ BCTypeEnum commonTypeEnum(BCTypeEnum lhs, BCTypeEnum rhs) pure @safe
     {
         commonType = BCTypeEnum.f23;
     }
+    else if (lhs == BCTypeEnum.u64 || rhs == BCTypeEnum.u64)
+    {
+        commonType = BCTypeEnum.u64;
+    }
     else if (lhs == BCTypeEnum.i64 || rhs == BCTypeEnum.i64)
     {
         commonType = BCTypeEnum.i64;
+    }
+    else if (lhs == BCTypeEnum.u32 || rhs == BCTypeEnum.u32)
+    {
+        commonType = BCTypeEnum.u32;
+    }
+    else if (lhs == BCTypeEnum.i32 || rhs == BCTypeEnum.i32)
+    {
+        commonType = BCTypeEnum.i32;
     }
     else if (lhs.anyOf(smallIntegerTypes) || rhs.anyOf(smallIntegerTypes))
     {

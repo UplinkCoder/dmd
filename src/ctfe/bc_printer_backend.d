@@ -139,9 +139,13 @@ struct Print_BCGen
                 {
                     result ~= "Imm32('" ~ [cast(char)(val.imm32 & 0xFF)] ~ "')";
                 }
-                else if (val.type.type == BCTypeEnum.i32)
+                else if (val.type.type == BCTypeEnum.u32)
                 {
                     result ~= "Imm32(" ~ itos(val.imm32.imm32) ~ ")";
+                }
+                else if (val.type.type == BCTypeEnum.i32)
+                {
+                    result ~= "Imm32(" ~ sitos(val.imm32.imm32) ~ ", true)";
                 }
                 else if (val.type.type == BCTypeEnum.i64)
                 {
