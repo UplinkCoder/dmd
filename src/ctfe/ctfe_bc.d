@@ -5017,7 +5017,7 @@ static if (is(BCGen))
 
             auto elexpr = elem ? genExpr(elem, "ArrayLiteralElement") : defaultValue;
 
-            if (elexpr.type.type.anyOf([BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.i8, BCTypeEnum.f23]))
+            if (elexpr.type.type.anyOf([BCTypeEnum.u32, BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.i8, BCTypeEnum.f23]))
             {
                 if (elexpr.vType == BCValueType.Immediate)
                 {
@@ -6312,7 +6312,7 @@ static if (is(BCGen))
 
     static bool canHandleBinExpTypes(const BCTypeEnum lhs, const BCTypeEnum rhs) pure
     {
-        return ((lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.u32 || lhs == BCTypeEnum.u64, lhs == BCTypeEnum.i64, 
+        return ((lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.u32 || lhs == BCTypeEnum.u64 || lhs == BCTypeEnum.i64 ||
                  lhs == BCTypeEnum.f23 || lhs == BCTypeEnum.f52) && rhs == lhs) 
             || (lhs == BCTypeEnum.u32 || lhs == BCTypeEnum.u64 || lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.i64) && 
                (rhs == BCTypeEnum.u32 || rhs == BCTypeEnum.u64 || rhs == BCTypeEnum.i32 || rhs == BCTypeEnum.i64)
