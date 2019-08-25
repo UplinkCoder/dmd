@@ -1466,7 +1466,7 @@ Expression toExpression(const BCValue value, Type expressionType,
 
     if (value.vType == BCValueType.Error)
     {
-        assert(value.type.type == BCTypeEnum.i32, "Error.type is: " ~ _sharedCtfeState.typeToString(value.type));
+        assert(value.type.type == BCTypeEnum.u32, "Error.type is: " ~ _sharedCtfeState.typeToString(value.type));
         assert(value.imm32, "Errors are 1 based indexes");
         import ddmd.ctfeexpr : CTFEExp;
 
@@ -4396,7 +4396,7 @@ static if (is(BCGen))
             bailout("could not get Element-Type-size for: " ~ ie.toString);
             return ;
         }
-        auto offset = genTemporary(i32Type);
+        auto offset = genTemporary(u32Type);
 
         auto oldRetval = retval;
         //retval = assignTo ? assignTo : genTemporary(elemType);
@@ -4445,9 +4445,9 @@ static if (is(BCGen))
                 retval.heapRef = BCHeapRef(ptr);
             }
             else if (elemSize <= 4)
-                Load32(retval.i32, ptr);
+                Load32(retval.u32, ptr);
             else if (elemSize == 8)
-                Load64(retval.i32, ptr);
+                Load64(retval.u32, ptr);
             else
             {
                 bailout("can only load basicTypes (i8, i16,i32 and i64, c8, c16, c32 and f23, f52) not: " ~ elemType.toString);
@@ -4723,7 +4723,7 @@ static if (is(BCGen))
             auto elemSize = _sharedCtfeState.size(elemType);
 
             auto newSlice = genTemporary(origSlice.type);
-            Alloc(newSlice.i32, imm32(SliceDescriptor.Size), origSlice.type);
+            Alloc(newSlice.u32, imm32(SliceDescriptor.Size), origSlice.type);
 
             auto origLength = getLength(origSlice);
             if (!origLength)
@@ -4748,14 +4748,14 @@ static if (is(BCGen))
 
             // this asserts that lwr <= upr
             {
-                Ge3(BCValue.init, lwr.i32, upr.i32);
+                Ge3(BCValue.init, lwr.u32, upr.u32);
                 auto CJoob = beginCndJmp();
                 {
                     Assert(imm32(0), addError(se.loc, "slice [%llu .. %llu] is out of bounds", lwr, upr));
                 }
                 endCndJmp(CJoob, genLabel());
             }
-            Sub3(newLength, upr.i32, lwr.i32);
+            Sub3(newLength, upr.u32, lwr.u32);
 
             setLength(newSlice, newLength);
 
@@ -5184,7 +5184,8 @@ static if (is(BCGen))
 
             auto ty = _struct.memberTypes[i];
             if (!ty.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Slice, BCTypeEnum.Array,
-                BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64, BCTypeEnum.f23, BCTypeEnum.f52,
+                BCTypeEnum.i8, BCTypeEnum.u16, BCTypeEnum.i32, BCTypeEnum.i64, BCTypeEnum.f23, BCTypeEnum.f52,
+                BCTypeEnum.u8, BCTypeEnum.u16, BCTypeEnum.u32, BCTypeEnum.u64, 
                 BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.Function]))
             {
                 bailout( "can only deal with ints and uints atm. not: (" ~ enumToString(ty.type) ~ ", " ~ itos(
@@ -5516,15 +5517,15 @@ static if (is(BCGen))
             BCValue size;
             {
                 ptr = genTemporary(type);
-                size = genTemporary(i32Type);
-                const length = hasLength ? genExpr((*ne.arguments)[0]).i32 : imm32(1);
+                size = genTemporary(u32Type);
+                const length = hasLength ? genExpr((*ne.arguments)[0]).u32 : imm32(1);
 
                 Set(size, length);
                 Mul3(size, size, imm32(elemSize));
                 Add3(size, size, imm32(SliceDescriptor.Size));
                 Alloc(ptr, size, type);
 
-                setLength(ptr.i32, length);
+                setLength(ptr.u32, length);
                 auto base = genTemporary(i32Type);
                 Add3(base, ptr, imm32(SliceDescriptor.Size));
                 setBase(ptr, base);
@@ -5568,7 +5569,7 @@ static if (is(BCGen))
             }
             // ptr  = this; which should already point
             // to freshly allocated memory.
-            cTorArgs[ne.arguments.dim] = ptr.i32;
+            cTorArgs[ne.arguments.dim] = ptr.u32;
 
             Comment("ConstructorCall");
             Call(ptr, imm32(cIdx), cTorArgs);
@@ -5646,8 +5647,8 @@ static if (is(BCGen))
                     length = genTemporary(i32Type);
                     BCValue lengthPtr;
                     // if (arr is null) skip loading the length
-                    auto CJskipLoad = beginCndJmp(arr.i32, /*"skipLoad"*/);
-                    Load32FromOffset(length, arr.i32, SliceDescriptor.LengthOffset);
+                    auto CJskipLoad = beginCndJmp(arr.u32, /*"skipLoad"*/);
+                    Load32FromOffset(length, arr.u32, SliceDescriptor.LengthOffset);
                     auto LAfterLoad = genLabel(/*afterLoad*/);
                     endCndJmp(CJskipLoad, LAfterLoad);
                 }
@@ -5664,17 +5665,17 @@ static if (is(BCGen))
     void setBase(BCValue arr, BCValue newBase)
     {
         BCValue baseAddrPtr;
-        Assert(arr.i32, addError(lastLoc, "cannot set setBase of null array"));
+        Assert(arr.u32, addError(lastLoc, "cannot set setBase of null array"));
         if (SliceDescriptor.BaseOffset)
         {
-            baseAddrPtr = genTemporary(i32Type);
-            Add3(baseAddrPtr, arr.i32, imm32(SliceDescriptor.BaseOffset));
+            baseAddrPtr = genTemporary(u32Type);
+            Add3(baseAddrPtr, arr.u32, imm32(SliceDescriptor.BaseOffset));
         }
         else
         {
-            baseAddrPtr = arr.i32;
+            baseAddrPtr = arr.u32;
         }
-        Store32(baseAddrPtr, newBase.i32);
+        Store32(baseAddrPtr, newBase.u32);
     }
 
     BCValue getBase(BCValue arr)
@@ -5908,7 +5909,6 @@ static if (is(BCGen))
             elType = slice.elementType;
             arrayLength = length;
         }
-
         heapAdd = _sharedCtfeState.size(elType, true);
 
         Comment("Broadcast_Assignment from: " ~ itos(line));
@@ -5963,9 +5963,9 @@ static if (is(BCGen))
             if (mt.type == BCTypeEnum.Array)
             {
                 auto offset = genTemporary(pointerToMemberType);
-                Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
-                setArraySliceDesc(offset.i32, _sharedCtfeState.arrayTypes[mt.typeIndex - 1]);
-                auto base = getBase(offset.i32);
+                Add3(offset.u32, structPtr.u32, imm32(type.offset(i), false));
+                setArraySliceDesc(offset.u32, _sharedCtfeState.arrayTypes[mt.typeIndex - 1]);
+                auto base = getBase(offset.u32);
                 Comment("Array intialisation");
                 auto offset2 = genTemporary(i32Type);
 
@@ -6010,7 +6010,7 @@ static if (is(BCGen))
                 {
                     BCValue srcLength = getLength(initValue);
                     auto offset = genTemporary(pointerToMemberType);
-                    Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
+                    Add3(offset.u32, structPtr.u32, imm32(type.offset(i), false));
                     auto sliceMemSize = AllocSlice(offset, srcLength, mt);
                     MemCpy(getBase(offset), getBase(initValue), sliceMemSize);
                 }
@@ -6018,22 +6018,22 @@ static if (is(BCGen))
             else if (mt.type == BCTypeEnum.Struct)
             {
                 auto offset = genTemporary(pointerToMemberType);
-                Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
+                Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
                 initStruct(offset, &_sharedCtfeState.structTypes[mt.typeIndex - 1]);
             }
-            else if (mt.type == BCTypeEnum.i32 || mt.type == BCTypeEnum.f23)
+            else if (mt.type == BCTypeEnum.u32 || mt.type == BCTypeEnum.i32 || mt.type == BCTypeEnum.f23)
             {
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
                 auto offset = genTemporary(pointerToMemberType);
-                Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
-                Store32(offset.i32, initValue);
+                Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
+                Store32(offset.u32, initValue);
             }
-            else if (mt.type == BCTypeEnum.i64 || mt.type == BCTypeEnum.f52)
+            else if (mt.type == BCTypeEnum.u64 || mt.type == BCTypeEnum.i64 || mt.type == BCTypeEnum.f52)
             {
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm64(0);
                 auto offset = genTemporary(pointerToMemberType);
-                Add3(offset.i32, structPtr.i32, imm32(type.offset(i)));
-                Store64(offset.i32, initValue);
+                Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
+                Store64(offset.u32, initValue);
             }
             else
             {
@@ -6203,24 +6203,28 @@ static if (is(BCGen))
                     // I don't even know why init can be the same as var ... ah well.
                     if (var != _init)
                     {
-                        MemCpy(var.i32, _init.i32, imm32(_sharedCtfeState.size(_init.type)));
+                        MemCpy(var.u32, _init.u32, imm32(_sharedCtfeState.size(_init.type)), false);
                     }
                 }
                 else if (_init.type.type == BCTypeEnum.Class)
                 {
-                    Set(var.i32, _init.i32);
+                    Set(var.u32, _init.u32);
                 }
                 else if (_init.type.type == BCTypeEnum.Slice || _init.type.type == BCTypeEnum.Array || _init.type.type == BCTypeEnum.string8)
                 {
                     // todo introduce a bool function passedByPtr(BCType t)
                     // maybe dangerous who knows ...
-                    MemCpy(var.i32, _init.i32, imm32(SliceDescriptor.Size));
+                    MemCpy(var.u32, _init.u32, imm32(SliceDescriptor.Size));
                 }
                 else if (_init.type.type.anyOf(smallIntegerTypes))
                 {
                     Set(var.i32, _init.i32);
                 }
                 else if (_init.type.type == BCTypeEnum.i64)
+                {
+                    Set(var, _init);
+                }
+                else if (_init.type.type == BCTypeEnum.u64)
                 {
                     Set(var, _init);
                 }
@@ -6308,9 +6312,11 @@ static if (is(BCGen))
 
     static bool canHandleBinExpTypes(const BCTypeEnum lhs, const BCTypeEnum rhs) pure
     {
-        return ((lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.u32 || lhs == BCTypeEnum.f23 || lhs == BCTypeEnum.f52)
-            && rhs == lhs) || lhs == BCTypeEnum.i64
-            && (rhs == BCTypeEnum.i64 || rhs == BCTypeEnum.i32);
+        return ((lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.u32 || lhs == BCTypeEnum.u64, lhs == BCTypeEnum.i64, 
+                 lhs == BCTypeEnum.f23 || lhs == BCTypeEnum.f52) && rhs == lhs) 
+            || (lhs == BCTypeEnum.u32 || lhs == BCTypeEnum.u64 || lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.i64) && 
+               (rhs == BCTypeEnum.u32 || rhs == BCTypeEnum.u64 || rhs == BCTypeEnum.i32 || rhs == BCTypeEnum.i64)
+            || (lhs == BCTypeEnum.i64 && (rhs == BCTypeEnum.i32 || rhs == BCTypeEnum.i64));
     }
 
     override void visit(BinAssignExp e)
@@ -6945,7 +6951,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             () {
                 with(BCTypeEnum)
                 {
-                    return [i8, i32, i64, f23, f52, Function, Delegate, Class];
+                    return [i8, u8, i32, u32, i64, u64, f23, f52, Function, Delegate, Class];
                 }
             } ();
 
@@ -8448,11 +8454,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             else if (toType.type == BCTypeEnum.i64) {} // nop
             else if (toType.type == BCTypeEnum.u32) {} // nop
             else if (toType.type == BCTypeEnum.u64) {} // nop
-            else if (toType.type.anyOf([BCTypeEnum.c8, BCTypeEnum.i8]))
+            else if (toType.type.anyOf([BCTypeEnum.c8, BCTypeEnum.i8, BCTypeEnum.u8]))
             {
                 And3(retval.i32, retval.i32, imm32(0xff));
             }
-            else if (toType.type.anyOf([BCTypeEnum.c16, BCTypeEnum.i16]))
+            else if (toType.type.anyOf([BCTypeEnum.c16, BCTypeEnum.i16, BCTypeEnum.u16]))
             {
                 And3(retval.i32, retval.i32, imm32(0xffff));
             }
