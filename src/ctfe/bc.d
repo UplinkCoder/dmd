@@ -846,10 +846,10 @@ pure:
         assert(isStackValueOrParameter(lhs), "Set lhs is has to be a StackValue. Not: " ~ enumToString(lhs.vType));
         assert(rhs.vType == BCValueType.Immediate || isStackValueOrParameter(rhs), "Set rhs is has to be a StackValue or Imm not: " ~ rhs.vType.enumToString);
 
-        if (rhs.vType == BCValueType.Immediate && (rhs.type.type == BCTypeEnum.i64 || rhs.type.type == BCTypeEnum.f52))
+        if (rhs.vType == BCValueType.Immediate && (rhs.type.type == BCTypeEnum.i64 || rhs.type.type == BCTypeEnum.u64 || rhs.type.type == BCTypeEnum.f52))
         {
             emitLongInst(LongInst.ImmSet, lhs.stackAddr, rhs.imm32);
-            if (rhs.type.type != BCTypeEnum.i64 || rhs.imm64 > uint.max) // if there are high bits
+            if ((!(rhs.type.type == BCTypeEnum.u64 || rhs.type.type == BCTypeEnum.i64)) || rhs.imm64 > uint.max) // if there are high bits
                 emitLongInst(LongInst.SetHighImm, lhs.stackAddr, Imm32(rhs.imm64 >> 32));
         }
 
