@@ -1080,7 +1080,7 @@ pure:
     void Call(BCValue result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
         calls[callCount++] = RetainedCall(fn, args, functionId, ip, sp, l);
-        emitLongInst(LongInst, result.stackAddr, pushOntoStack(imm32(callCount)).stackAddr);
+        emitLongInst(LongInst.Call, result.stackAddr, pushOntoStack(imm32(callCount)).stackAddr);
     }
 
     void Load32(BCValue _to, BCValue from)
