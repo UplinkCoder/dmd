@@ -155,6 +155,16 @@ struct Print_BCGen
                             : itos(val.imm64.imm64 & uint.max) ~ " | (" ~
                                 itos(val.imm64.imm64 >> 32) ~"UL << 32)" 
                         )
+                    ~ ", true)";
+		}
+                else if (val.type.type == BCTypeEnum.u64)
+                {
+                    result ~= "Imm64(" ~ 
+                        ((cast(ulong)val.imm64.imm64 <= uint.max) 
+                            ? itos(val.imm64.imm64 & uint.max) 
+                            : itos(val.imm64.imm64 & uint.max) ~ " | (" ~
+                                itos(val.imm64.imm64 >> 32) ~"UL << 32)" 
+                        )
                     ~ ")";
                 }
                 else if (val.type.type == BCTypeEnum.f23)

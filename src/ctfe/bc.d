@@ -476,6 +476,7 @@ pure:
         return BCValue(StackAddr(localAddr), bct, localIdx, localName);
     }
 
+
     void Initialize()
     {
         callCount = 0;
@@ -620,9 +621,9 @@ pure:
         ip += 2;
     }
 
-    void Alloc(BCValue heapPtr, BCValue size)
+    void Alloc(BCValue heapPtr, BCValue size, uint line = __LINE__)
     {
-        assert(size.type.type == BCTypeEnum.u32, "Size for alloc needs to be an u32");
+        assert(size.type.type == BCTypeEnum.u32, "Size for alloc needs to be an u32" ~ " called by:" ~ itos(line));
         if (size.vType == BCValueType.Immediate)
         {
             size = pushOntoStack(size);

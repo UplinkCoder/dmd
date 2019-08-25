@@ -1772,19 +1772,19 @@ extern (C++) final class BCTypeVisitor : Visitor
         case ENUMTY.Tdchar:
             return BCType(BCTypeEnum.c32);
         case ENUMTY.Tuns8:
-            //return BCType(BCTypeEnum.u8);
+            return BCType(BCTypeEnum.u8);
         case ENUMTY.Tint8:
             return BCType(BCTypeEnum.i8);
         case ENUMTY.Tuns16:
-            //return BCType(BCTypeEnum.u16);
+            return BCType(BCTypeEnum.u16);
         case ENUMTY.Tint16:
-            //return BCType(BCTypeEnum.i16);
+            return BCType(BCTypeEnum.i16);
         case ENUMTY.Tuns32:
-            //return BCType(BCTypeEnum.u32);
+            return BCType(BCTypeEnum.u32);
         case ENUMTY.Tint32:
             return BCType(BCTypeEnum.i32);
         case ENUMTY.Tuns64:
-            //return BCType(BCTypeEnum.u64);
+            return BCType(BCTypeEnum.u64);
         case ENUMTY.Tint64:
             return BCType(BCTypeEnum.i64);
         case ENUMTY.Tfloat32:
@@ -2401,7 +2401,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
             assert(size.vType != BCValueType.Immediate || size.imm32 != 0, "Null Alloc detected in line: " ~ itos(line));
             Comment("Alloc From: " ~ itos(line) ~  " forType: " ~ _sharedCtfeState.typeToString(type));
-            gen.Alloc(result, size);
+            gen.Alloc(result, size.u32);
         }
     }
 
@@ -5690,13 +5690,13 @@ static if (is(BCGen))
             }
             else
             {
-                baseAddr = genLocal(i32Type, "ArrayBase" ~ itos(uniqueCounter++));
+                baseAddr = genLocal(u32Type, "ArrayBase" ~ itos(uniqueCounter++));
                 // TODO: when debugging is finished replace the genLocal() by genTemporary
 
                 BCValue baseAddrPtr;
                 if (SliceDescriptor.BaseOffset)
                 {
-                    baseAddrPtr = genTemporary(i32Type);
+                    baseAddrPtr = genTemporary(u32Type);
                     Add3(baseAddrPtr, arr.i32, imm32(SliceDescriptor.BaseOffset));
                 }
                 else
@@ -5760,7 +5760,7 @@ static if (is(BCGen))
 
         BCValue bitFieldAddr  = genTemporary(i32Type);
         BCValue bitFieldValue = genTemporary(i32Type);
-        Add3(bitFieldAddr, structPtr.i32, imm32(bitfieldOffset(structType)));
+        Add3(bitFieldAddr, structPtr.u32, imm32(bitfieldOffset(structType)));
         Load32(bitFieldValue, bitFieldAddr);
 
         And3(bitFieldValue, bitFieldValue, imm32(1 << bitfieldIndex));
@@ -5771,13 +5771,13 @@ static if (is(BCGen))
     void LoadFromHeapRef(BCValue hrv, uint line = __LINE__)
     {
         // import std.stdio; writeln("Calling LoadHeapRef from: ", line); //DEBUGLINE
-        if(hrv.type.type.anyOf([BCTypeEnum.i64, BCTypeEnum.f52]))
+        if(hrv.type.type.anyOf([BCTypeEnum.i64, BCTypeEnum.u64, BCTypeEnum.f52]))
             Load64(hrv, BCValue(hrv.heapRef));
-        else if (hrv.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.f23]))
+        else if (hrv.type.type.anyOf([BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8, BCTypeEnum.u32, BCTypeEnum.u16, BCTypeEnum.u8, BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.f23]))
             Load32(hrv, BCValue(hrv.heapRef));
         // since the stuff below are heapValues we may not want to do this ??
         else if (hrv.type.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.string8]))
-            MemCpy(hrv.i32, BCValue(hrv.heapRef).i32, imm32(_sharedCtfeState.size(hrv.type)));
+            MemCpy(hrv.u32, BCValue(hrv.heapRef).u32, imm32(_sharedCtfeState.size(hrv.type)));
         else
             bailout(enumToString(hrv.type.type) ~ " is not supported in LoadFromHeapRef");
 
@@ -5790,13 +5790,13 @@ static if (is(BCGen))
         //auto heapRef = genTemporary(_sharedCtfeState.pointerOf(hrv.type));
         //Set(heapRef.i32, BCValue(hrv.heapRef).i32);
 
-        if(hrv.type.type.anyOf([BCTypeEnum.i64, BCTypeEnum.f52]))
+        if(hrv.type.type.anyOf([BCTypeEnum.i64, BCTypeEnum.u64, BCTypeEnum.f52]))
             Store64(heapRef.i32, hrv);
         else if (hrv.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.f23]))
             Store32(heapRef.i32, hrv);
         // since the stuff below are heapValues we may not want to do this??
         else if (hrv.type.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.string8]))
-            MemCpy(heapRef.i32, hrv.i32, imm32(_sharedCtfeState.size(hrv.type)));
+            MemCpy(heapRef.u32, hrv.u32, imm32(_sharedCtfeState.size(hrv.type)));
         else
             bailout(enumToString(hrv.type.type) ~ " is not supported in StoreToHeapRef");
 

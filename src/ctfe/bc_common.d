@@ -513,11 +513,18 @@ BCValue imm64(ulong value, bool signed = false) pure @trusted
     return ret;
 }
 
-BCValue i32(BCValue val) pure @safe
+BCValue i32(BCValue val) pure @safe nothrow
 {
     val.type.type = BCTypeEnum.i32;
     return val;
 }
+
+BCValue u32(BCValue val) pure @safe nothrow
+{
+    val.type.type = BCTypeEnum.u32;
+    return val;
+}
+
 
 struct Imm64
 {
@@ -872,6 +879,8 @@ __gshared static immutable bcFour = BCValue(Imm32(4));
 __gshared static immutable bcOne = BCValue(Imm32(1));
 __gshared static immutable bcZero = BCValue(Imm32(0));
 __gshared static immutable i32Type = BCType(BCTypeEnum.i32);
+__gshared static immutable u32Type = BCType(BCTypeEnum.u32);
+
 
 template BCGenFunction(T, alias fn)
 {

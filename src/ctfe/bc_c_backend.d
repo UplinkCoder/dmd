@@ -768,4 +768,4 @@ int interpret(const C_BCGen gen)(BCValue[] args)
 
 import ddmd.ctfe.bc_test;
 
-static assert(test!C_BCGen);
+// static assert(test!C_BCGen);
