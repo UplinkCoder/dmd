@@ -22,8 +22,8 @@ import ddmd.root.rmem;
 import core.stdc.stdio : printf;
 import std.string : fromStringz;
 
-enum perf = 0;
-enum bailoutMessages = 0;
+enum perf = 1;
+enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
@@ -6479,7 +6479,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
         auto bct = toBCType(ie.type);
         if (bct.type != BCTypeEnum.i32 && bct.type != BCTypeEnum.i64 && bct.type != BCTypeEnum.c8 &&
-            bct.type != BCTypeEnum.c32 && bct.type != BCTypeEnum.i8)
+            bct.type != BCTypeEnum.c32 && bct.type != BCTypeEnum.i8 && bct.type != BCTypeEnum.u32 &&
+            bct.type != BCTypeEnum.u64 && bct.type != BCTypeEnum.u8)
         {
             //NOTE this can happen with cast(char*)size_t.max for example
             bailout("We don't support IntegerExpressions with non-integer types: " ~ enumToString(bct.type));
@@ -6491,14 +6492,14 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         else
         {
-            if (ie.type.ty == Tint32 && (cast(int) ie.value) < 0)
+            if (ie.type.ty == Tuns32)
             {
-                retval = BCValue(Imm64(cast(int)ie.value));
+                retval = BCValue(Imm32(cast(uint)ie.value, false));
                 retval.type = bct;
             }
             else
             {
-                retval = imm32(cast(uint) ie.value);
+                retval = imm32(cast(int) ie.value);
                 retval.type = bct;
             }
         }
@@ -7150,11 +7151,12 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
 
 
-            if ((lhs.type.type == BCTypeEnum.i32 || lhs.type.type == BCTypeEnum.i64) && rhs.type.type == BCTypeEnum.i32)
+            if ((lhs.type.type == BCTypeEnum.i32 || lhs.type.type == BCTypeEnum.u32) && (rhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.u32))
             {
+                //TODO we may need to sign Extend and we should provide an instruction to do so!
                 Set(lhs, rhs);
             }
-            else if (lhs.type.type == BCTypeEnum.i64 && (rhs.type.type == BCTypeEnum.i64 || rhs.type.type == BCTypeEnum.i32))
+            else if ((lhs.type.type == BCTypeEnum.i64 || lhs.type.type == BCTypeEnum.u64) && (rhs.type.type == BCTypeEnum.i64 || rhs.type.type == BCTypeEnum.u64 || rhs.type.type == BCTypeEnum.i32))
             {
                 Set(lhs, rhs);
             }
