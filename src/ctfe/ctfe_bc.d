@@ -6179,13 +6179,17 @@ static if (is(BCGen))
             else if (auto ci = vd.getConstInitializer)
             {
                 auto _init = genExpr(ci);
-                if (_init.type.type == BCTypeEnum.i32)
-               {
+                if (_init.type.type == BCTypeEnum.u32)
+                {
+                    Set(var.u32, _init);
+                }
+                else if (_init.type.type == BCTypeEnum.i32)
+                {
                     Set(var.i32, _init);
                 }
                 else if (_init.type.type == BCTypeEnum.f23)
                 {
-                    Set(var.i32, _init.i32);
+                    Set(var.u32, _init.u32);
                 }
                 else if (_init.type.type == BCTypeEnum.f52)
                 {
@@ -6304,7 +6308,7 @@ static if (is(BCGen))
 
     static bool canHandleBinExpTypes(const BCTypeEnum lhs, const BCTypeEnum rhs) pure
     {
-        return ((lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.f23 || lhs == BCTypeEnum.f52)
+        return ((lhs == BCTypeEnum.i32 || lhs == BCTypeEnum.u32 || lhs == BCTypeEnum.f23 || lhs == BCTypeEnum.f52)
             && rhs == lhs) || lhs == BCTypeEnum.i64
             && (rhs == BCTypeEnum.i64 || rhs == BCTypeEnum.i32);
     }
@@ -6697,7 +6701,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     {
         return (bct.type.anyOf([BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32,
                                 BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64,
-                                BCTypeEnum.f23, BCTypeEnum.f52]));
+                                BCTypeEnum.f23, BCTypeEnum.f52, BCTypeEnum.u32,
+                                BCTypeEnum.u16, BCTypeEnum.u8, BCTypeEnum.u64]));
     }
 /+
     override void visit(ConstructExp ce)
@@ -8319,7 +8324,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             () {
                 with (BCTypeEnum)
                 {
-                    enum a = [c8, i8, c16, i16, c32, i32, i64, f23, f52, Slice, Array, Struct, string8, Function, Class];
+                    enum a = [c8, i8, u8, c16, i16, u16, c32, i32, u32, i64, u64, f23, f52, Slice, Array, Struct, string8, Function, Class];
                     return cast(typeof(a[0])[a.length]) a;
                 }
             } ();
@@ -8401,7 +8406,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         else if (fromType.type == BCTypeEnum.i8 || fromType.type == BCTypeEnum.c8)
         {
             // A "bitcast" is enough. All implementations are assumed to use 32/64bit registers.
-            if (toType.type.anyOf([BCTypeEnum.i8, BCTypeEnum.c8, BCTypeEnum.i32, BCTypeEnum.c32, BCTypeEnum.i16, BCTypeEnum.i64]))
+            if (toType.type.anyOf([BCTypeEnum.i8, BCTypeEnum.c8, BCTypeEnum.i32, BCTypeEnum.u32, BCTypeEnum.c32, BCTypeEnum.i16, BCTypeEnum.i64, BCTypeEnum.u64]))
                 retval.type = toType;
             else
             {
@@ -8425,7 +8430,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
 
         }
-        else if (fromType.type == BCTypeEnum.i32 || fromType.type == BCTypeEnum.i64)
+        else if (fromType.type == BCTypeEnum.i32 || fromType.type == BCTypeEnum.i64 || fromType.type == BCTypeEnum.u32 || fromType.type == BCTypeEnum.u64)
         {
             if (toType.type == BCTypeEnum.f23)
             {
@@ -8441,6 +8446,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
             else if (toType.type == BCTypeEnum.i32) {} // nop
             else if (toType.type == BCTypeEnum.i64) {} // nop
+            else if (toType.type == BCTypeEnum.u32) {} // nop
+            else if (toType.type == BCTypeEnum.u64) {} // nop
             else if (toType.type.anyOf([BCTypeEnum.c8, BCTypeEnum.i8]))
             {
                 And3(retval.i32, retval.i32, imm32(0xff));
@@ -8454,6 +8461,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 bailout("Cast not implemented: " ~ ce.toString);
                 return ;
             }
+            retval.type = toType;
+        }
+        else if ((fromType.type == BCTypeEnum.u64 || fromType.type == BCTypeEnum.u32) &&
+            (toType.type == BCTypeEnum.u64 || toType.type == BCTypeEnum.u32))
+        {
             retval.type = toType;
         }
         else if (fromType.type == BCTypeEnum.Array && fromType.typeIndex
