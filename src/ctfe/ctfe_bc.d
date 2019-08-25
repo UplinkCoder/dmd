@@ -5028,7 +5028,7 @@ static if (is(BCGen))
                     Store32(imm32(arrayAddr.imm32 + offset), elexpr);
                 }
             }
-            else if (elexpr.type.type == BCTypeEnum.i64 || elexpr.type.type == BCTypeEnum.f52)
+            else if (elexpr.type.type == BCTypeEnum.u64 || elexpr.type.type == BCTypeEnum.i64 || elexpr.type.type == BCTypeEnum.f52)
             {
                 if (elexpr.vType == BCValueType.Immediate)
                 {
