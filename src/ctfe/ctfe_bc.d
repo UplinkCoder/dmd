@@ -5801,9 +5801,9 @@ static if (is(BCGen))
         //Set(heapRef.i32, BCValue(hrv.heapRef).i32);
 
         if(hrv.type.type.anyOf([BCTypeEnum.i64, BCTypeEnum.u64, BCTypeEnum.f52]))
-            Store64(heapRef.i32, hrv);
-        else if (hrv.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.f23]))
-            Store32(heapRef.i32, hrv);
+            Store64(heapRef.u32, hrv);
+        else if (hrv.type.type.anyOf([BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.i32, BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32, BCTypeEnum.f23, BCTypeEnum.u32, BCTypeEnum.u16, BCTypeEnum.u8]))
+            Store32(heapRef.u32, hrv);
         // since the stuff below are heapValues we may not want to do this??
         else if (hrv.type.type.anyOf([BCTypeEnum.Struct, BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.string8]))
             MemCpy(heapRef.u32, hrv.u32, imm32(_sharedCtfeState.size(hrv.type)));
