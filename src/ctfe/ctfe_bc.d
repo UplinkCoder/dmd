@@ -1642,6 +1642,15 @@ Expression toExpression(const BCValue value, Type expressionType,
                     imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.heapAddr.addr + offset + 4)) << 32;
                     elm = toExpression(imm64, type);
                 }
+                else if (memberType.type == BCTypeEnum.u64)
+                {
+                    BCValue imm64;
+                    imm64.vType = BCValueType.Immediate;
+                    imm64.type.type = BCTypeEnum.u64;
+                    imm64.imm64 = *(heapPtr._heap.ptr + value.heapAddr.addr + offset);
+                    imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.heapAddr.addr + offset + 4)) << 32;
+                    elm = toExpression(imm64, type);
+                }
                 else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))
                 {
                     elm = toExpression(imm32(value.imm32 + offset), type);
@@ -6499,6 +6508,10 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         if (bct.type == BCTypeEnum.i64)
         {
             retval = BCValue(Imm64(ie.value));
+        }
+        else if (bct.type == BCTypeEnum.u64)
+        {
+            retval = BCValue(Imm64(cast(ulong)ie.value, false));
         }
         else
         {
