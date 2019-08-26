@@ -848,8 +848,8 @@ pure:
 
         if (rhs.vType == BCValueType.Immediate && (rhs.type.type == BCTypeEnum.i64 || rhs.type.type == BCTypeEnum.u64 || rhs.type.type == BCTypeEnum.f52))
         {
-            emitLongInst(LongInst.ImmSet, lhs.stackAddr, rhs.imm32);
-            if ((!(rhs.type.type == BCTypeEnum.u64 || rhs.type.type == BCTypeEnum.i64)) || rhs.imm64 > uint.max) // if there are high bits
+            emitLongInst(LongInst.ImmSet, lhs.stackAddr, imm32(rhs.imm64 & uint.max).imm32);
+            if (((rhs.type.type == BCTypeEnum.u64 || rhs.type.type == BCTypeEnum.i64)) && rhs.imm64 > uint.max) // if there are high bits
                 emitLongInst(LongInst.SetHighImm, lhs.stackAddr, Imm32(rhs.imm64 >> 32));
         }
 
@@ -1220,7 +1220,7 @@ pure:
         }
         else
         {
-                assert(0, "I cannot deal with this type of return" ~ enumToString(val.vType));
+            assert(0, "I cannot deal with this type of return" ~ enumToString(val.vType));
         }
     }
 
