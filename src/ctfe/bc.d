@@ -2911,7 +2911,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
         case LongInst.Ret64:
             {
-                debug (bc)
+                //debug (bc)
                     if (!__ctfe)
                     {
                         import std.stdio;
@@ -3075,7 +3075,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     return cRetval;
                 }
-                if (cRetval.type.type == BCTypeEnum.i64 || cRetval.type.type == BCTypeEnum.f52)
+                if (cRetval.type.type == BCTypeEnum.i64 || cRetval.type.type == BCTypeEnum.u64 || cRetval.type.type == BCTypeEnum.f52)
                 {
                     *lhsRef = cRetval.imm64;
                 }
