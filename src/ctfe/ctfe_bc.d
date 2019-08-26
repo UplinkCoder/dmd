@@ -1633,22 +1633,13 @@ Expression toExpression(const BCValue value, Type expressionType,
 
                 Expression elm;
 
-                if (memberType.type == BCTypeEnum.i64)
+                if (memberType.type == BCTypeEnum.i64 || memberType.type == BCTypeEnum.u64)
                 {
                     BCValue imm64;
                     imm64.vType = BCValueType.Immediate;
-                    imm64.type.type = BCTypeEnum.i64;
-                    imm64.imm64 = *(heapPtr._heap.ptr + value.heapAddr.addr + offset);
-                    imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.heapAddr.addr + offset + 4)) << 32;
-                    elm = toExpression(imm64, type);
-                }
-                else if (memberType.type == BCTypeEnum.u64)
-                {
-                    BCValue imm64;
-                    imm64.vType = BCValueType.Immediate;
-                    imm64.type.type = BCTypeEnum.u64;
-                    imm64.imm64 = *(heapPtr._heap.ptr + value.heapAddr.addr + offset);
-                    imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.heapAddr.addr + offset + 4)) << 32;
+                    imm64.type.type = memberType.type;
+                    imm64.imm64 = *(heapPtr._heap.ptr + value.imm32 + offset);
+                    imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.imm32 + offset + 4)) << 32;
                     elm = toExpression(imm64, type);
                 }
                 else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))

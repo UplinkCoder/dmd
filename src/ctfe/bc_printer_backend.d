@@ -214,7 +214,7 @@ struct Print_BCGen
             {
                 return (val.name ? val.name : "p") ~ "_" ~ itos(val.paramIndex) ~ functionSuffix;
             }
-        case BCValueType.Error:
+        case BCValueType.Error, BCValueType.ErrorWithMessage:
             {
                 char[] _result = cast(char[])"imm32(" ~ itos(val.imm32) ~ ") /*";
                 if (val.imm32)
