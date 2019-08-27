@@ -102,8 +102,12 @@ enum LongInst : ushort
     Mod,
     Eq, //sets condflags
     Neq, //sets condflag
+    Ult,
+    Ule,
     Lt, //sets condflags
     Le,
+    Ugt,
+    Uge,
     Gt, //sets condflags
     Ge,
     Set,
@@ -126,8 +130,12 @@ enum LongInst : ushort
     ImmMod,
     ImmEq,
     ImmNeq,
+    ImmUlt,
+    ImmUle,
     ImmLt,
     ImmLe,
+    ImmUgt,
+    ImmUge,
     ImmGt,
     ImmGe,
     ImmSet,
@@ -871,6 +879,32 @@ pure:
 
     }
 
+    void Ult3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType == BCValueType.Unknown
+            || isStackValueOrParameter(result),
+            "The result for this must be Empty or a StackValue");
+        emitArithInstruction(LongInst.Ult, lhs, rhs);
+
+        if (isStackValueOrParameter(result))
+        {
+            emitFlg(result);
+        }
+    }
+
+    void Ule3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType == BCValueType.Unknown
+            || isStackValueOrParameter(result),
+            "The result for this must be Empty or a StackValue");
+        emitArithInstruction(LongInst.Ule, lhs, rhs);
+
+        if (isStackValueOrParameter(result))
+        {
+            emitFlg(result);
+        }
+    }
+
     void Lt3(BCValue result, BCValue lhs, BCValue rhs)
     {
         assert(result.vType == BCValueType.Unknown
@@ -891,6 +925,30 @@ pure:
             "The result for this must be Empty or a StackValue");
         emitArithInstruction(LongInst.Le, lhs, rhs);
 
+        if (isStackValueOrParameter(result))
+        {
+            emitFlg(result);
+        }
+    }
+
+    void Ugt3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType == BCValueType.Unknown
+            || isStackValueOrParameter(result),
+            "The result for this must be Empty or a StackValue");
+        emitArithInstruction(LongInst.Ugt, lhs, rhs);
+        if (isStackValueOrParameter(result))
+        {
+            emitFlg(result);
+        }
+    }
+
+    void Uge3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        assert(result.vType == BCValueType.Unknown
+            || isStackValueOrParameter(result),
+            "The result for this must be Empty or a StackValue");
+        emitArithInstruction(LongInst.Uge, lhs, rhs);
         if (isStackValueOrParameter(result))
         {
             emitFlg(result);
@@ -1484,6 +1542,27 @@ string printInstructions(const int* startInstructions, uint length, const string
             }
             break;
 
+        case LongInst.ImmUlt:
+            {
+                result ~= "Ult " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmUgt:
+            {
+                result ~= "Ugt " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmUle:
+            {
+                result ~= "Ule " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
+            }
+            break;
+        case LongInst.ImmUge:
+            {
+                result ~= "Uge " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
+            }
+            break;
+
         case LongInst.ImmLt:
             {
                 result ~= "Lt " ~ localName(stackMap, lw >> 16) ~ ", #" ~ itos(hi) ~ "\n";
@@ -1735,19 +1814,40 @@ string printInstructions(const int* startInstructions, uint length, const string
             }
             break;
 
-        case LongInst.Lt:
+        case LongInst.Ule:
             {
-                result ~= "Lt " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
+                result ~= "Ule " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
             }
             break;
-        case LongInst.Gt:
+        case LongInst.Ult:
             {
-                result ~= "Gt " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
+                result ~= "Ult " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Le:
             {
                 result ~= "Le " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
+            }
+            break;
+        case LongInst.Lt:
+            {
+                result ~= "Lt " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
+            }
+            break;
+
+        case LongInst.Ugt:
+            {
+                result ~= "Ugt " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
+            }
+            break;
+        case LongInst.Uge:
+            {
+                result ~= "Uge " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
+            }
+            break;
+        case LongInst.Gt:
+            {
+                result ~= "Gt " ~ localName(stackMap, hi & 0xFFFF) ~ ", " ~ localName(stackMap, hi >> 16) ~ "\n";
             }
             break;
         case LongInst.Ge:
@@ -2247,6 +2347,56 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 }
             }
             break;
+
+        case LongInst.ImmUlt:
+            {
+                if ((cast(ulong)(*lhsStackRef)) < cast(uint)hi)
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+            }
+            break;
+        case LongInst.ImmUgt:
+            {
+                if ((cast(ulong)(*lhsStackRef)) > cast(uint)hi)
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+            }
+            break;
+        case LongInst.ImmUle:
+            {
+                if ((cast(ulong)(*lhsStackRef)) <= cast(uint)hi)
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+            }
+            break;
+        case LongInst.ImmUge:
+            {
+                if ((cast(ulong)(*lhsStackRef)) >= cast(uint)hi)
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+            }
+            break;
+
         case LongInst.ImmLt:
             {
                 if ((*lhsStackRef) < hi)
@@ -2261,7 +2411,7 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             break;
         case LongInst.ImmGt:
             {
-                if ((*lhsStackRef) > hi)
+                if (cast()(*lhsStackRef) > hi)
                 {
                     cond = true;
                 }
@@ -2716,6 +2866,59 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             }
             break;
 
+        case LongInst.Ult:
+            {
+                if ((cast(ulong)(*lhsRef)) < (cast(ulong)*rhs))
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+
+            }
+            break;
+        case LongInst.Ugt:
+            {
+                if ((*lhsRef) > *rhs)
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+
+            }
+            break;
+        case LongInst.Ule:
+            {
+                if ((cast(ulong)(*lhsRef)) <= (cast(ulong)*rhs))
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+
+            }
+            break;
+        case LongInst.Uge:
+            {
+                if ((cast(ulong)(*lhsRef)) >= (cast(ulong)*rhs))
+                {
+                    cond = true;
+                }
+                else
+                {
+                    cond = false;
+                }
+
+            }
+            break;
+
         case LongInst.Lt:
             {
                 if ((*lhsRef) < *rhs)
@@ -2963,12 +3166,12 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                     const uint _lhs =  *lhsRef & uint.max;
                     const uint _rhs =  *rhs & uint.max;
 
-                    const lhsLength = _lhs ? heapPtr._heap[_lhs + SliceDescriptor.LengthOffset] : 0;
-                    const rhsLength = _rhs ? heapPtr._heap[_rhs + SliceDescriptor.LengthOffset] : 0;
+                    const lhUlength = _lhs ? heapPtr._heap[_lhs + SliceDescriptor.LengthOffset] : 0;
+                    const rhUlength = _rhs ? heapPtr._heap[_rhs + SliceDescriptor.LengthOffset] : 0;
 
                     {
                         // TODO if lhs.capacity bla bla
-                        const newLength = rhsLength + lhsLength;
+                        const newLength = rhUlength + lhUlength;
 
                         const lhsBase = heapPtr._heap[_lhs + SliceDescriptor.BaseOffset];
                         const rhsBase = heapPtr._heap[_rhs + SliceDescriptor.BaseOffset];
@@ -2998,18 +3201,18 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
                         heapPtr.heapSize += allocSize;
 
-                        const scaledLhsLength = (lhsLength * elemSize);
-                        const scaledRhsLength = (rhsLength * elemSize);
-                        const resultLhsEnd = resultBase + scaledLhsLength;
+                        const scaledLhUlength = (lhUlength * elemSize);
+                        const scaledRhUlength = (rhUlength * elemSize);
+                        const resultLhsEnd = resultBase + scaledLhUlength;
 
                         heapPtr._heap[resultLength] = newLength;
                         heapPtr._heap[resultBaseP] = resultBase;
 
                         heapPtr._heap[resultBase .. resultLhsEnd] =
-                            heapPtr._heap[lhsBase .. lhsBase + scaledLhsLength];
+                            heapPtr._heap[lhsBase .. lhsBase + scaledLhUlength];
 
-                        heapPtr._heap[resultLhsEnd ..  resultLhsEnd + scaledRhsLength] =
-                            heapPtr._heap[rhsBase .. rhsBase + scaledRhsLength];
+                        heapPtr._heap[resultLhsEnd ..  resultLhsEnd + scaledRhUlength] =
+                            heapPtr._heap[rhsBase .. rhsBase + scaledRhUlength];
 
                         *lhsStackRef = resultPtr;
                     }
@@ -3161,14 +3364,14 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 else
                 {
                     import ddmd.ctfe.bc_abi : SliceDescriptor;
-                    immutable lhsLength = heapPtr._heap[_lhs + SliceDescriptor.LengthOffset];
-                    immutable rhsLength = heapPtr._heap[_rhs + SliceDescriptor.LengthOffset];
-                    if (lhsLength == rhsLength)
+                    immutable lhUlength = heapPtr._heap[_lhs + SliceDescriptor.LengthOffset];
+                    immutable rhUlength = heapPtr._heap[_rhs + SliceDescriptor.LengthOffset];
+                    if (lhUlength == rhUlength)
                     {
                         immutable lhsBase = heapPtr._heap[_lhs + SliceDescriptor.BaseOffset];
                         immutable rhsBase = heapPtr._heap[_rhs + SliceDescriptor.BaseOffset];
                         cond = true;
-                        foreach (i; 0 .. lhsLength)
+                        foreach (i; 0 .. lhUlength)
                         {
                             if (heapPtr._heap[rhsBase + i] != heapPtr._heap[lhsBase + i])
                             {

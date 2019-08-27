@@ -6663,34 +6663,39 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             return ;
         }
 
+        auto common_ty = commonTypeEnum(lhs.type.type, rhs.type.type);
+
+        bool uns = (common_ty >= BCTypeEnum.u8 && common_ty <= BCTypeEnum.u64);
+
+
         if (canWorkWithType(lhs.type) && canWorkWithType(rhs.type) && (!oldAssignTo || canWorkWithType(oldAssignTo.type)))
         {
             switch (ce.op)
             {
             case TOK.TOKlt:
                 {
-                    Lt3(oldAssignTo, lhs, rhs);
+                    uns ? Ult3(oldAssignTo, lhs, rhs) : Lt3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
                 break;
 
             case TOK.TOKgt:
                 {
-                    Gt3(oldAssignTo, lhs, rhs);
+                    uns ? Ugt3(oldAssignTo, lhs, rhs) : Gt3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
                 break;
 
             case TOK.TOKle:
                 {
-                    Le3(oldAssignTo, lhs, rhs);
+                    uns ? Ule3(oldAssignTo, lhs, rhs) : Le3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
                 break;
 
             case TOK.TOKge:
                 {
-                    Ge3(oldAssignTo, lhs, rhs);
+                    uns ? Uge3(oldAssignTo, lhs, rhs) : Ge3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
                 break;
