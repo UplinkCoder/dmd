@@ -8434,21 +8434,17 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 return ;
             }
         }
-        else if (fromType.type == BCTypeEnum.f23 || fromType.type == BCTypeEnum.f52)
+        else if (fromType.type == BCTypeEnum.f52 && toType.type == BCTypeEnum.f23)
         {
-            if (toType.type == BCTypeEnum.f23)
-            {
-                const from = retval;
-                retval = genTemporary(toType);
-                F64ToF32(retval, from);
-            }
-            else if (toType.type == BCTypeEnum.f52)
-            {
-                const from = retval;
-                retval = genTemporary(toType);
-                F32ToF64(retval, from);
-            }
-
+            const from = retval;
+            retval = genTemporary(toType);
+            F64ToF32(retval, from);
+        }
+        else if (fromType.type == BCTypeEnum.f23 && toType.type == BCTypeEnum.f52)
+        {
+            const from = retval;
+            retval = genTemporary(toType);
+            F32ToF64(retval, from);
         }
         else if (fromType.type == BCTypeEnum.i32 || fromType.type == BCTypeEnum.i64 || fromType.type == BCTypeEnum.u32 || fromType.type == BCTypeEnum.u64)
         {
