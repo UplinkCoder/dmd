@@ -8436,17 +8436,17 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         else if (fromType.type == BCTypeEnum.f23 || fromType.type == BCTypeEnum.f52)
         {
-            if (fromType.type == BCTypeEnum.f23)
+            if (toType.type == BCTypeEnum.f23)
             {
                 const from = retval;
                 retval = genTemporary(toType);
-                F32ToI(retval, from);
+                F64ToF32(retval, from);
             }
-            else if (fromType.type == BCTypeEnum.f52)
+            else if (toType.type == BCTypeEnum.f52)
             {
                 const from = retval;
                 retval = genTemporary(toType);
-                F64ToI(retval, from);
+                F32ToF64(retval, from);
             }
 
         }

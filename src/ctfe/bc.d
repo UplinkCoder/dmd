@@ -803,6 +803,10 @@ pure:
             {
                 rhs = pushOntoStack(rhs);
             }
+            else if (rhs.type.type == BCTypeEnum.f52)
+            {
+                rhs = castTo(rhs, lhs.type.type);
+            }
             else
                 assert(0, "did not expect type " ~ enumToString(rhs.type.type) ~ "to be used in a float expression");
 
@@ -1312,6 +1316,24 @@ pure:
         assert(isStackValueOrParameter(rhs));
 
         emitLongInst(LongInst.F64ToI, result.stackAddr, rhs.stackAddr);
+    }
+
+    void F32ToF64(BCValue result, BCValue rhs)
+    {
+        assert(isStackValueOrParameter(result));
+        assert(isStackValueOrParameter(rhs));
+
+        emitLongInst(LongInst.F32ToF64, result.stackAddr, rhs.stackAddr);
+
+    }
+
+    void F64ToF32(BCValue result, BCValue rhs)
+    {
+        assert(isStackValueOrParameter(result));
+        assert(isStackValueOrParameter(rhs));
+
+        emitLongInst(LongInst.F64ToF32, result.stackAddr, rhs.stackAddr);
+
     }
 
 
