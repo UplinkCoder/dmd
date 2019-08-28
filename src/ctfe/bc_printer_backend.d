@@ -404,6 +404,30 @@ struct Print_BCGen
         result ~= indent ~ "Set(" ~ print(lhs) ~ ", " ~ print(rhs) ~ ");\n";
     }
 
+    void Ult3(BCValue _result, BCValue lhs, BCValue rhs)
+    {
+        sameLabel = false;
+        result ~= indent ~ "Ult3(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ");\n";
+    }
+
+    void Ugt3(BCValue _result, BCValue lhs, BCValue rhs)
+    {
+        sameLabel = false;
+        result ~= indent ~ "Ugt3(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ");\n";
+    }
+
+    void Ule3(BCValue _result, BCValue lhs, BCValue rhs)
+    {
+        sameLabel = false;
+        result ~= indent ~ "Ule3(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ");\n";
+    }
+
+    void Uge3(BCValue _result, BCValue lhs, BCValue rhs)
+    {
+        sameLabel = false;
+        result ~= indent ~ "Uge3(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ");\n";
+    }
+
     void Lt3(BCValue _result, BCValue lhs, BCValue rhs)
     {
         sameLabel = false;
