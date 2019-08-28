@@ -1571,6 +1571,11 @@ Expression toExpression(const BCValue value, Type expressionType,
                 {
                     elmVal = imm32(arrayBase + offset);
                 }
+                else if (elemSize == 8)
+                {
+                    elmVal = imm64((*(heapPtr._heap.ptr + arrayBase + offset))
+                        | ulong(*(heapPtr._heap.ptr + arrayBase + offset + 4)) << 32UL);
+                }
                 else
                 {
                     elmVal = imm32(*(heapPtr._heap.ptr + arrayBase + offset));
@@ -8459,9 +8464,13 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 retval = genTemporary(BCType(BCTypeEnum.f52));
                 IToF64(retval, from);
             }
-            else if (toType.type == BCTypeEnum.i32) {} // nop
+            else if (toType.type == BCTypeEnum.i32 || toType.type == BCTypeEnum.u32)
+            {
+                auto from = retval;
+                retval = genTemporary(toType);
+                And3(retval, from, imm32(uint.max));
+            }
             else if (toType.type == BCTypeEnum.i64) {} // nop
-            else if (toType.type == BCTypeEnum.u32) {} // nop
             else if (toType.type == BCTypeEnum.u64) {} // nop
             else if (toType.type.anyOf([BCTypeEnum.c8, BCTypeEnum.i8, BCTypeEnum.u8]))
             {
