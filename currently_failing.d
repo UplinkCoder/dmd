@@ -1,13 +1,14 @@
-double[] ta()
-{
-    return [12.0, 2.0];
-}
-
 double[] f(float d, int s)
 {
-    double v = d * s;
-    double[] da = [v];
+    float a = 2;
+    float b = 5;
+    double c;
+
+    c = a * b;
+
+    float v = d * s;
+    double[] da = [v, b];
     return da;
 }
 
-pragma(msg, f(1, 2));
+pragma(msg, f(2, 24));

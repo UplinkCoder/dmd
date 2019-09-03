@@ -657,6 +657,16 @@ struct Print_BCGen
     {
         result ~= indent ~ "F64ToI(" ~ print(_result) ~ ", " ~ print(value) ~ ");\n";
     }
+
+    void F64ToF32(BCValue _result, BCValue value)
+    {
+        result ~= indent ~ "F64ToF32(" ~ print(_result) ~ ", " ~ print(value) ~ ");\n";
+    }
+
+    void F32ToF64(BCValue _result, BCValue value)
+    {
+        result ~= indent ~ "F32ToF64(" ~ print(_result) ~ ", " ~ print(value) ~ ");\n";
+    }
 }
 
 enum genString = q{

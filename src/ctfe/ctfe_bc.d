@@ -6248,6 +6248,7 @@ static if (is(BCGen))
                 {
                     // todo introduce a bool function passedByPtr(BCType t)
                     // maybe dangerous who knows ...
+                    if (var.u32 != _init.u32)
                     MemCpy(var.u32, _init.u32, imm32(SliceDescriptor.Size));
                 }
                 else if (_init.type.type.anyOf(smallIntegerTypes))
