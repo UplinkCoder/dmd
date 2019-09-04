@@ -4579,24 +4579,32 @@ static if (is(BCGen))
         bailout("We currently can't handle ExecptionHnadling");
     }
 
+    void compileUncompiledCatchs()
+    {
+        foreach(ucc;uncompiledCatches)
+        {        
+            auto e = genParameter(i32Type);
+            beginFunction(fnId);
+            foreach(_catch;*ucc.catches)
+            {
+                BCType catchType = toBCType(_catch.type);
+
+                int castFnIdx = getDynamicCastIndex(toType);
+                if (!castFnIdx)
+                {
+                    addDynamicCast(catchType, &castFnIdx);
+                }
+                auto castedValue = genLocal(catchType, "DynamicCastResult_for_catch" ~ itos(uniqueCounter++));
+                Call(retval.i32, imm32(castFnIdx), [e]);
+        }
+
+        }
+    }
 
     void pushCatches(Catches* catches)
     {
         // this has to be done after vtbl pointers are known.
-        auto e = genParameter()
-        foreach(_catch;*catches)
-        {
-            BCType catchType = toBCType(_catch.type);
-
-            int castFnIdx = getDynamicCastIndex(toType);
-            if (!castFnIdx)
-            {
-                addDynamicCast(catchType, &castFnIdx);
-            }
-            auto castedValue = genLocal(catchType, "DynamicCastResult_for_catch" ~ itos(uniqueCounter++));
-            Call(retval.i32, imm32(castFnIdx), [e]);
-
-        }
+        // so we have to put this into a todo list.
     }
     
     void popCatches()
