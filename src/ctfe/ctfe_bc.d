@@ -65,6 +65,12 @@ struct UnresolvedGoto
     uint jumpCount;
 }
 
+struct UncompiledCatch
+{
+   Catches* catches;
+   uint fnId;
+}
+
 struct UncompiledFunction
 {
     FuncDeclaration fd;
@@ -435,7 +441,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         static if (bailoutMessages) bcv.dumpVtbls();
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledConstructors();
-        bcv.compileCatchStatements();
+        bcv.compileUncompiledCatches();
         bcv.compileUncompiledDynamicCasts();
 
         static if (is(BCGen))
@@ -2071,6 +2077,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     uint uncompiledFunctionCount;
     uint uncompiledConstructorCount;
     uint uncompiledDynamicCastCount;
+    uint uncompiledCatchCount;
     uint scopeCount;
     uint processedArgs;
     uint switchStateCount;
@@ -2158,6 +2165,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     UncompiledConstructor[ubyte.max] uncompiledConstructors = void;
     UncompiledDynamicCast[ubyte.max] uncompiledDynamicCasts = void;
     UncompiledFunction[ubyte.max * 8] uncompiledFunctions = void;
+    UncompiledCatch[ubyte.max] uncompiledCatches = void;
     SwitchState[16] switchStates = void;
 
     alias visit = super.visit;
@@ -4579,24 +4587,24 @@ static if (is(BCGen))
         bailout("We currently can't handle ExecptionHnadling");
     }
 
-    void compileUncompiledCatchs()
+    void compileUncompiledCatches()
     {
-        foreach(ucc;uncompiledCatches)
+        foreach(ucc;uncompiledCatches[0 .. uncompiledCatchCount])
         {        
             auto e = genParameter(i32Type);
-            beginFunction(fnId);
+            beginFunction(ucc.fnId);
             foreach(_catch;*ucc.catches)
             {
                 BCType catchType = toBCType(_catch.type);
 
-                int castFnIdx = getDynamicCastIndex(toType);
+                int castFnIdx = getDynamicCastIndex(catchType);
                 if (!castFnIdx)
                 {
                     addDynamicCast(catchType, &castFnIdx);
                 }
                 auto castedValue = genLocal(catchType, "DynamicCastResult_for_catch" ~ itos(uniqueCounter++));
                 Call(retval.i32, imm32(castFnIdx), [e]);
-        }
+            }
 
         }
     }
