@@ -27,7 +27,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -442,6 +442,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledConstructors();
         bcv.compileUncompiledDynamicCasts();
+        bcv.compileUncompiledFunctions();
 
         static if (is(BCGen))
         {
@@ -2062,7 +2063,7 @@ struct BCScope
 
 debug = nullPtrCheck;
 debug = nullAllocCheck;
-debug = ctfe;
+//debug = ctfe;
 debug = MemCpyLocation;
 //debug = SetLocation;
 //debug = LabelLocation;
@@ -3052,6 +3053,7 @@ public:
     {
         void addUncompiledFunction(FuncDeclaration fd, int* fnIdxP, bool mayFail = false)
         {
+            // printf("Adding uncompiled function \"%s\"\n", fd.toPrettyChars()); // debugline
             assert(*fnIdxP == 0, "addUncompiledFunction has to be called with *fnIdxP == 0");
             if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
             {
@@ -7018,7 +7020,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             () {
                 with(BCTypeEnum)
                 {
-                    return [i8, u8, i32, u32, i64, u64, f23, f52, Function, Delegate, Class];
+                    return [i8, u8, i32, u32, i64, u64, f23, f52, string8, Function, Delegate, Class];
                 }
             } ();
 
@@ -7063,15 +7065,15 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             auto offset = fInfo.offset;
 
             Add3(ptr, lhs.i32, imm32(offset));
+
             immutable size = _sharedCtfeState.size(rhs.type);
-            if (size && size <= 4)
+            if (size && size <= 4 || rhs.type.type == BCTypeEnum.Class)
                 Store32(ptr, rhs);
             else if (size == 8)
                 Store64(ptr, rhs);
             else
                 MemCpy(ptr, rhs.i32, imm32(_sharedCtfeState.size(rhs.type)));
                 //bailout("only sizes [1 .. 4], and 8 are supported. MemberSize: " ~ itos(size));
-
 
             retval = rhs;
         }

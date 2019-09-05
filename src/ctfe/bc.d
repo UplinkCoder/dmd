@@ -3360,7 +3360,8 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 {
 
                     // assert(cpySize, "cpySize == 0");
-                    assert(cpySrc, "cpySrc == 0");
+                    assert(cpySrc, "cpySrc == 0" ~ " inLine: " ~ itos(lastLine));
+
                     assert(cpyDst, "cpyDst == 0" ~ " inLine: " ~ itos(lastLine));
 
                     assert(cpyDst >= cpySrc + cpySize || cpyDst + cpySize <= cpySrc, "Overlapping MemCpy is not supported --- src: " ~ itos(cpySrc)
