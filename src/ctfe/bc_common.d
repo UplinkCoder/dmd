@@ -351,8 +351,9 @@ enum BCValueType : ubyte
 
     HeapValue = 4 << 3,
 
-    LastCond = 0xFC,
-    Bailout = 0xFD,
+    LastCond = 0xFB,
+    Bailout = 0xFC,
+    Execption = 0xFD,
     ErrorWithMessage = 0xFE,
     Error = 0xFF, //Pinned = 0x80,
     /// Pinned values can be returned
@@ -749,7 +750,8 @@ struct BCValue
 
             case BCValueType.Unknown, BCValueType.Bailout:
                 return false;
-            case BCValueType.Error, BCValueType.ErrorWithMessage:
+            case BCValueType.Error, BCValueType.ErrorWithMessage,
+                        BCValueType.Execption:
                 return false;
             case BCValueType.LastCond:
                 return true;

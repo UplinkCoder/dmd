@@ -65,10 +65,10 @@ struct UnresolvedGoto
     uint jumpCount;
 }
 
-struct UncompiledCatch
+struct UncompiledCatches
 {
    Catches* catches;
-   uint fnId;
+   uint fnIdx;
 }
 
 struct UncompiledFunction
@@ -2077,7 +2077,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     uint uncompiledFunctionCount;
     uint uncompiledConstructorCount;
     uint uncompiledDynamicCastCount;
-    uint uncompiledCatchCount;
+    uint uncompiledCatchesCount;
     uint scopeCount;
     uint processedArgs;
     uint switchStateCount;
@@ -2165,7 +2165,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     UncompiledConstructor[ubyte.max] uncompiledConstructors = void;
     UncompiledDynamicCast[ubyte.max] uncompiledDynamicCasts = void;
     UncompiledFunction[ubyte.max * 8] uncompiledFunctions = void;
-    UncompiledCatch[ubyte.max] uncompiledCatches = void;
+    UncompiledCatches[ubyte.max] uncompiledCatches = void;
     SwitchState[16] switchStates = void;
 
     alias visit = super.visit;
@@ -2208,6 +2208,16 @@ extern (C++) final class BCV(BCGenT) : Visitor
     uint current_line;
 
     uint uniqueCounter = 1;
+
+    int getCatchesIndex(Catches* catches)
+    {
+        foreach(ucc; uncompiledCatches[0 .. uncompiledCatchesCount])
+        {
+            return ucc.fnIdx;
+        }
+
+        return 0;
+    }
 
     int getDynamicCastIndex(BCType toType)
     {
@@ -3108,7 +3118,21 @@ public:
             *cIdxP = fnIdx;
         }
 
-
+        void addUncompiledCatches(Catches* catches, int* cIdxP)
+        {
+            if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
+            {
+                bailout("UncompiledFunctions overflowed");
+                return ;
+            }
+            
+            const fnIdx = ++_sharedCtfeState.functionCount;
+            _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) catches);
+            uncompiledCatches[uncompiledDynamicCastCount] =
+                UncompiledCatches(catches, fnIdx);
+            ++uncompiledCatchesCount;
+            *cIdxP = fnIdx;
+        }
     }
     else
     {
@@ -4589,10 +4613,13 @@ static if (is(BCGen))
 
     void compileUncompiledCatches()
     {
-        foreach(ucc;uncompiledCatches[0 .. uncompiledCatchCount])
-        {        
-            auto e = genParameter(i32Type);
-            beginFunction(ucc.fnId);
+        foreach(ucc;uncompiledCatches[0 .. uncompiledCatchesCount])
+        {
+            auto e = genParameter(i32Type, "execption");
+            beginFunction(ucc.fnIdx);
+            Comment("CatchBlock");
+            typeof(beginCndJmp()) CJcastFailed;
+
             foreach(_catch;*ucc.catches)
             {
                 BCType catchType = toBCType(_catch.type);
@@ -4602,10 +4629,15 @@ static if (is(BCGen))
                 {
                     addDynamicCast(catchType, &castFnIdx);
                 }
-                auto castedValue = genLocal(catchType, "DynamicCastResult_for_catch" ~ itos(uniqueCounter++));
-                Call(retval.i32, imm32(castFnIdx), [e]);
+                auto castedValue = genTemporary(catchType);
+                Call(castedValue.i32, imm32(castFnIdx), [e]);
+                CJcastFailed = beginCndJmp(castedValue);
+                {
+                    genBlock(_catch.handler);
+                }
+                endCndJmp(CJcastFailed, genLabel());
             }
-
+            Assert(imm32(0), addError(lastLoc, "none of the catch statments caught ... going up the stack currently unsuppoerted"));
         }
     }
 
@@ -4613,6 +4645,7 @@ static if (is(BCGen))
     {
         // this has to be done after vtbl pointers are known.
         // so we have to put this into a todo list.
+
     }
     
     void popCatches()

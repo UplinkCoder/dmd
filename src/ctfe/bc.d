@@ -3296,7 +3296,11 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 auto cRetval = interpret_(functions[cast(size_t)(fn - 1)].byteCode,
                     callArgs[0 .. call.args.length], heapPtr, functions, calls, ev1, ev2, ev3, ev4, errors, stack, stackMap, stackOffsetCall);
 
-                if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
+                if (cRetval.vType == BCValueType.Execption)
+                {
+                    assert(0, "We should goto the catchBlock here.");
+                }
+                else if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
                 {
                     return cRetval;
                 }
