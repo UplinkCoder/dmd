@@ -237,8 +237,8 @@ ClosureVariableDescriptor* searchInParent(FuncDeclaration fd, VarDeclaration vd)
     return cvd;
 
 }
-
-enum heapStartAddr = 100;
+enum exceptionPointerAddr = 100;
+enum heapStartAddr = exceptionPointerAddr + 4;
 
 __gshared LocType!() lastLoc;
 
@@ -441,7 +441,6 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         static if (bailoutMessages) bcv.dumpVtbls();
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledConstructors();
-        bcv.compileUncompiledCatches();
         bcv.compileUncompiledDynamicCasts();
 
         static if (is(BCGen))
@@ -2063,7 +2062,7 @@ struct BCScope
 
 debug = nullPtrCheck;
 debug = nullAllocCheck;
-//debug = ctfe;
+debug = ctfe;
 debug = MemCpyLocation;
 //debug = SetLocation;
 //debug = LabelLocation;
@@ -2213,7 +2212,10 @@ extern (C++) final class BCV(BCGenT) : Visitor
     {
         foreach(ucc; uncompiledCatches[0 .. uncompiledCatchesCount])
         {
-            return ucc.fnIdx;
+            if (catches == ucc.catches)
+            {
+                return ucc.fnIdx;
+            }
         }
 
         return 0;
@@ -3115,22 +3117,6 @@ public:
             uncompiledDynamicCasts[uncompiledDynamicCastCount] =
                 UncompiledDynamicCast(toType, fnIdx);
             ++uncompiledDynamicCastCount;
-            *cIdxP = fnIdx;
-        }
-
-        void addUncompiledCatches(Catches* catches, int* cIdxP)
-        {
-            if (uncompiledFunctionCount >= uncompiledFunctions.length - 64)
-            {
-                bailout("UncompiledFunctions overflowed");
-                return ;
-            }
-            
-            const fnIdx = ++_sharedCtfeState.functionCount;
-            _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) catches);
-            uncompiledCatches[uncompiledDynamicCastCount] =
-                UncompiledCatches(catches, fnIdx);
-            ++uncompiledCatchesCount;
             *cIdxP = fnIdx;
         }
     }
@@ -4604,52 +4590,54 @@ static if (is(BCGen))
 
     override void visit(TryCatchStatement tc)
     {
-        pushCatches(tc.catches);
         genBlock(tc._body);
-        popCatches();
+        pushCatches(tc.catches);
+//        popCatches();
 
-        bailout("We currently can't handle ExecptionHnadling");
+        // bailout("We currently can't handle ExecptionHnadling");
     }
 
-    void compileUncompiledCatches()
+    override void visit(ThrowStatement s)
     {
-        foreach(ucc;uncompiledCatches[0 .. uncompiledCatchesCount])
-        {
-            auto e = genParameter(i32Type, "execption");
-            beginFunction(ucc.fnIdx);
-            Comment("CatchBlock");
-            typeof(beginCndJmp()) CJcastFailed;
-
-            foreach(_catch;*ucc.catches)
-            {
-                BCType catchType = toBCType(_catch.type);
-
-                int castFnIdx = getDynamicCastIndex(catchType);
-                if (!castFnIdx)
-                {
-                    addDynamicCast(catchType, &castFnIdx);
-                }
-                auto castedValue = genTemporary(catchType);
-                Call(castedValue.i32, imm32(castFnIdx), [e]);
-                CJcastFailed = beginCndJmp(castedValue);
-                {
-                    genBlock(_catch.handler);
-                }
-                endCndJmp(CJcastFailed, genLabel());
-            }
-            Assert(imm32(0), addError(lastLoc, "none of the catch statments caught ... going up the stack currently unsuppoerted"));
-        }
+        auto e = genExpr(s.exp);
+        Store32(imm32(exceptionPointerAddr), e);
+        Ret(e);
     }
 
     void pushCatches(Catches* catches)
     {
+        Comment("CatchBlock");
+        typeof(beginCndJmp()) CJcastFailed;
+
+        auto e_ptr = genTemporary(i32Type);
+        Load32(e_ptr, imm32(exceptionPointerAddr));
+        auto castedValue = genTemporary(i32Type);
+
         // this has to be done after vtbl pointers are known.
         // so we have to put this into a todo list.
+        foreach(_catch;*catches)
+        {
+            BCType catchType = toBCType(_catch.type);
+            vars[cast(void*) _catch.var] = e_ptr;
+            int castFnIdx = getDynamicCastIndex(catchType);
+            if (!castFnIdx)
+            {
 
+                addDynamicCast(catchType, &castFnIdx);
+            }
+            Comment("Calling catch");
+            Call(castedValue.i32, imm32(castFnIdx), [e_ptr]);
+            CJcastFailed = beginCndJmp(castedValue);
+            {
+                genBlock(_catch.handler);
+            }
+            endCndJmp(CJcastFailed, genLabel());
+        }
     }
     
     void popCatches()
     {
+        // for now it seems like we don't need this.
     }
 
     override void visit(Expression e)
@@ -4968,7 +4956,7 @@ static if (is(BCGen))
 
             if (!(isStackValueOrParameter(lhs) || lhs.vType == BCValueType.Temporary))
             {
-                bailout("Unexpected lhs-type: " ~ enumToString(lhs.vType));
+                bailout("Unexpected lhs.vType: " ~ enumToString(lhs.vType) ~ " lhs.type: " ~ _sharedCtfeState.typeToString(lhs.type));
                 return ;
             }
 
