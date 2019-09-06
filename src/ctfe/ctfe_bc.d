@@ -27,7 +27,7 @@ enum bailoutMessages = 1;
 enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -2639,7 +2639,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     {
         assert(_to.type.type == BCTypeEnum.i32, "_to has to be an i32");
         assert(from.type.type == BCTypeEnum.i32, "from has to be an i32");
-        assert(index.type.type == BCTypeEnum.i32, "index has to be an i32");
+        assert(index.type.type == BCTypeEnum.i32 || index.type.type == BCTypeEnum.u32, "index has to be an i32. not: " ~ index.type.type.enumToString);
 
         static if (is(typeof(gen.IndexedScaledLoad32) == function)
                 && is(typeof(gen.IndexedScaledLoad32(
@@ -8501,6 +8501,13 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             retval = genTemporary(toType);
             F32ToF64(retval, from);
         }
+        else if (fromType.type == BCTypeEnum.f23 && (toType.type == BCTypeEnum.i32 || toType.type == BCTypeEnum.u32))
+        {
+                const from = retval;
+                retval = genTemporary(BCType(BCTypeEnum.f23));
+                F32ToI(retval, from);
+                And3(retval, retval, imm32(uint.max));
+        }
         else if (fromType.type == BCTypeEnum.i32 || fromType.type == BCTypeEnum.i64 || fromType.type == BCTypeEnum.u32 || fromType.type == BCTypeEnum.u64)
         {
             if (toType.type == BCTypeEnum.f23)
@@ -8567,9 +8574,12 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 == BCTypeEnum.i8)
         {
             // for the cast(ubyte[])string case
-            // for now make an i8 slice
+            // for now make an u8 slice
+/+
             _sharedCtfeState.sliceTypes[_sharedCtfeState.sliceCount++] = BCSlice(BCType(BCTypeEnum.i8));
             retval.type = BCType(BCTypeEnum.Slice, _sharedCtfeState.sliceCount);
++/
+            retval.type = _sharedCtfeState.sliceOf(BCType(BCTypeEnum.u8));
             //retval.type = toType;
         }
         else if (toType.type == BCTypeEnum.Class && fromType.type == BCTypeEnum.Class)
@@ -8587,7 +8597,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             Call(retval.i32, imm32(castFnIdx), [from]);
 
             Comment("DynamicCastEnd");
-
         }
         else
         {
