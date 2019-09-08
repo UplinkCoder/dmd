@@ -789,7 +789,7 @@ pure:
 
         if (lhs.type.type == BCTypeEnum.f23)
         {
-            if(rhs.type.type == BCTypeEnum.i32)
+            if(rhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.u32)
             {
                 if (rhs.vType == BCValueType.Immediate)
                 () @trusted {
@@ -1259,7 +1259,7 @@ pure:
         if (!isStackValueOrParameter(val))
         {
             auto stackref = BCValue(currSp(), val.type);
-            Set(stackref.i32, val);
+            Set(stackref.u32, val);
 
             sp += align4(basicTypeSize(val.type.type));
             return stackref;

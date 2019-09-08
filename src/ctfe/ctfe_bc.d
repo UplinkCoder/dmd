@@ -24,7 +24,7 @@ import std.string : fromStringz;
 
 enum perf = 1;
 enum bailoutMessages = 1;
-enum printResult = 0;
+enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -1655,7 +1655,7 @@ Expression toExpression(const BCValue value, Type expressionType,
                     imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.imm32 + offset + 4)) << 32;
                     elm = toExpression(imm64, type);
                 }
-                else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))
+                else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Class]))
                 {
                     elm = toExpression(imm32(value.imm32 + offset), type);
                 }
@@ -1686,6 +1686,87 @@ Expression toExpression(const BCValue value, Type expressionType,
             (cast(StructLiteralExp) result).ownedByCtfe = OWNEDctfe;
         }
         break;
+    case Tclass:
+        {
+            import ddmd.ctfeexpr : ClassReferenceExp;
+            auto cd = (cast(TypeClass) expressionType).sym;
+            auto ci = _sharedCtfeState.getClassIndex(cd);
+            assert(ci);
+            BCClass _class = _sharedCtfeState.classTypes[ci - 1];
+            auto classPtr = *(heapPtr._heap.ptr + value.imm32);
+            auto structBegin = heapPtr._heap.ptr + classPtr;
+            Expressions* elmExprs = new Expressions();
+            uint offset = 0;
+
+            bool isNullClass = (classPtr == 0);
+            if (!isNullClass)
+            {
+                debug (abi)
+                {
+                    import std.stdio;
+                    //writeln("class: ", _class);
+                    writeln("ClassHeapRep: ", structBegin[0 .. _class.size]);
+                }
+                foreach (idx, memberType; _class.memberTypes[0 .. _class.memberCount])
+                {
+                    debug (abi)
+                    {
+                        writeln("ClassIdx:", ci, " memberIdx: " ,  idx, " offset: ", offset);
+                    }
+                    auto type = cd.fields[idx].type;
+                    
+                    Expression elm;
+                    
+                    if (memberType.type == BCTypeEnum.i64 || memberType.type == BCTypeEnum.u64)
+                    {
+                        BCValue imm64;
+                        imm64.vType = BCValueType.Immediate;
+                        imm64.type.type = memberType.type;
+                        imm64.imm64 = *(structBegin + offset);
+                        imm64.imm64 |= ulong(*(structBegin + offset + 4)) << 32;
+                        elm = toExpression(imm64, type);
+                    }
+                    else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Class]))
+                    {
+                        elm = toExpression(imm32(classPtr + offset), type);
+                    }
+                    else
+                    {
+                        debug (abi)
+                        {
+                            import std.stdio;
+                            writeln("memberType: ", memberType);
+                        }
+                        elm = toExpression(
+                            imm32(*(structBegin + offset)), type);
+                    }
+                    if (!elm)
+                    {
+                        static if (bailoutMessages)
+                        {
+                            import core.stdc.stdio;
+                            printf("We could not convert the sub-expression of a struct of type %s\n", type.toString.ptr);
+                        }
+                        return null;
+                    }
+                    
+                    elmExprs.insert(idx, elm);
+                    offset += align4(_sharedCtfeState.size(memberType, true));
+                }
+            }
+            if (!isNullClass)
+            {
+                auto se = new StructLiteralExp(lastLoc, cast(StructDeclaration)cd, elmExprs);
+                se.ownedByCtfe = OWNEDctfe;
+                result = new ClassReferenceExp(lastLoc, se, expressionType);
+            }
+            else
+            {
+                result = new NullExp(lastLoc, expressionType);
+            }
+        }
+        break;
+
     case Tsarray:
         {
             auto tsa = cast(TypeSArray) expressionType;
@@ -2060,7 +2141,7 @@ struct BCScope
     //    Identifier[64] identifiers;
     BCBlock[64] blocks;
 }
-
+debug = abi;
 debug = nullPtrCheck;
 debug = nullAllocCheck;
 //debug = ctfe;
@@ -3517,7 +3598,7 @@ public:
                 c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
 
                 c.computeSize();
-                offset += c.size;
+                offset += c.size + ClassMetaData.Size;
                 while(cd)
                 {
                     index += cd.fields.dim;
@@ -6080,6 +6161,12 @@ static if (is(BCGen))
                 Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
                 initStruct(offset, &_sharedCtfeState.structTypes[mt.typeIndex - 1]);
             }
+            else if (mt.type == BCTypeEnum.Class)
+            {
+                auto offset = genTemporary(pointerToMemberType);
+                Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
+                Store32(offset.u32, imm32(0));
+            }
             else if (mt.type == BCTypeEnum.u32 || mt.type == BCTypeEnum.i32 || mt.type == BCTypeEnum.f23)
             {
                 BCValue initValue = type.initializerExps[i] ? genExpr(type.initializerExps[i]) : imm32(0);
@@ -8399,7 +8486,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             () {
                 with (BCTypeEnum)
                 {
-                    enum a = [c8, i8, u8, c16, i16, u16, c32, i32, u32, i64, u64, f23, f52, Slice, Array, Struct, string8, Function, Class];
+                    enum a = [c8, i8, u8, c16, i16, u16, c32, i32, u32, i64, u64, f23, f52, Slice, Array, Struct, string8, Function, Class, Null];
                     return cast(typeof(a[0])[a.length]) a;
                 }
             } ();
@@ -8545,6 +8632,13 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
             retval.type = toType;
         }
+        else if (fromType.type == BCTypeEnum.f52 && (toType.type == BCTypeEnum.u32 || toType.type == BCTypeEnum.i32))
+        {
+                const from = retval;
+                retval = genTemporary(toType);
+                F64ToI(retval, from);
+            
+        }
         else if ((fromType.type == BCTypeEnum.u64 || fromType.type == BCTypeEnum.u32) &&
             (toType.type == BCTypeEnum.u64 || toType.type == BCTypeEnum.u32))
         {
@@ -8561,11 +8655,10 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         else if (fromType.type == BCTypeEnum.string8
                 && toType.type == BCTypeEnum.Slice && toType.typeIndex
                 && _sharedCtfeState.sliceTypes[toType.typeIndex - 1].elementType.type
-                == BCTypeEnum.i8)
+                == BCTypeEnum.u8)
         {
             // for the cast(ubyte[])string case
-            // for now make an i8 slice
-            _sharedCtfeState.sliceTypes[_sharedCtfeState.sliceCount++] = BCSlice(BCType(BCTypeEnum.i8));
+            // for now make an u8 slice
             retval.type = toType;
         }
         else if (toType.type == BCTypeEnum.string8
@@ -8575,10 +8668,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         {
             // for the cast(ubyte[])string case
             // for now make an u8 slice
-/+
-            _sharedCtfeState.sliceTypes[_sharedCtfeState.sliceCount++] = BCSlice(BCType(BCTypeEnum.i8));
-            retval.type = BCType(BCTypeEnum.Slice, _sharedCtfeState.sliceCount);
-+/
             retval.type = _sharedCtfeState.sliceOf(BCType(BCTypeEnum.u8));
             //retval.type = toType;
         }
