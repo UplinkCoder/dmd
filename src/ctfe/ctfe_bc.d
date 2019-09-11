@@ -3598,7 +3598,7 @@ public:
                 c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
 
                 c.computeSize();
-                offset += c.size + ClassMetaData.Size;
+                offset += c.size;
                 while(cd)
                 {
                     index += cd.fields.dim;

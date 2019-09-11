@@ -1,6 +1,6 @@
 
 alias twice = long; alias once = int;
-class B {once more = 0x123; twice the_fun = 0xFFF; double the_trouble = 0x666;}
+class B {once more = 0x123; twice the_fun = 0xFFF; long the_trouble = 0x666;}
 
 class C : B
 {

@@ -39,7 +39,6 @@ int testClassStuff ()
   b1 = new D();
 
   D e = new E();
-  assert(cast(int)e.f() == 2);
   assert(c2 is c2, "Identity is broken ?");
   assert((cast(D)c3), "Dynamic cast not working");
   assert(!(cast(E)c2), "Dynamic cast not working");
