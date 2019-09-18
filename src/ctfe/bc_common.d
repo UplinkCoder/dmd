@@ -120,7 +120,7 @@ string itos64(const ulong val) pure @trusted nothrow
     auto lwString = itos(lw);
     auto hiString = itos(hi);
 
-    return cast(string) "((" ~ hiString ~ "<< 32)" ~ "|" ~ lwString ~ ")";
+    return cast(string) "((" ~ hiString ~ "UL << 32)" ~ "|" ~ lwString ~ ")";
 }
 
 string sitos(const int val) pure @trusted nothrow
@@ -509,6 +509,7 @@ BCValue imm64(ulong value, bool signed = false) pure @trusted
 
     ret.vType = BCValueType.Immediate;
     ret.type.type = signed ? BCTypeEnum.i64 : BCTypeEnum.u64;
+    ret.type.typeIndex = 0;
     ret.type.flags = BCTypeFlags.None;
     ret.imm64 = value;
     return ret;

@@ -329,7 +329,7 @@ bool test(BCGenT)()
     static assert(() {
         BCHeap heap; return testStore64([], &heap);
     }().imm64.imm64 == 0x13371337DEADBEEF);
-/+
+
     static immutable testPassthrough64 = BCGenFunction!(BCGenT, () {
         BCGenT gen;
         with (gen)
@@ -358,6 +358,6 @@ bool test(BCGenT)()
     pragma(msg, () {
         BCHeap heap; return testPassthrough64([], &heap);
     }()/*.imm64.imm64 == ulong.max*/);
-+/
+
     return true;
 }

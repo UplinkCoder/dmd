@@ -1,6 +1,8 @@
 module ddmd.ctfe.bc;
+
 import ddmd.ctfe.bc_common;
 import ddmd.ctfe.bc_limits;
+
 import core.stdc.stdio;
 
 /**

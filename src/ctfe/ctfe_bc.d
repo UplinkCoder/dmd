@@ -438,7 +438,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         asw.stop();
         bcv.compileUncompiledFunctions();
         bcv.buildVtbls();
-        static if (bailoutMessages) bcv.dumpVtbls();
+        // static if (bailoutMessages) bcv.dumpVtbls();
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledConstructors();
         bcv.compileUncompiledDynamicCasts();
@@ -2141,11 +2141,11 @@ struct BCScope
     //    Identifier[64] identifiers;
     BCBlock[64] blocks;
 }
-debug = abi;
+//debug = abi;
 debug = nullPtrCheck;
 debug = nullAllocCheck;
 //debug = ctfe;
-debug = MemCpyLocation;
+//debug = MemCpyLocation;
 //debug = SetLocation;
 //debug = LabelLocation;
 
@@ -6349,7 +6349,7 @@ static if (is(BCGen))
                     // I don't even know why init can be the same as var ... ah well.
                     if (var != _init)
                     {
-                        MemCpy(var.u32, _init.u32, imm32(_sharedCtfeState.size(_init.type)), false);
+                        MemCpy(var.u32, _init.u32, imm32(_sharedCtfeState.size(_init.type)));
                     }
                 }
                 else if (_init.type.type == BCTypeEnum.Class)
