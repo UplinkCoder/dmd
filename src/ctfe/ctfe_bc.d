@@ -31,6 +31,7 @@ enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
+enum state_logging = 0;
 
 private static void clearArray(T)(auto ref T array, uint count)
 {
@@ -671,6 +672,11 @@ struct BeginClassResult
 
     void addField(const BCType bct, bool isVoid)
     {
+        static if (state_logging)
+        {
+            import std.file : append;
+            append("ctfe_state.log", "class[" ~ classCount.itos ~"].members[" ~ memberCount.itos ~ "] = addField(\"" ~ sharedCtfeState.typeToString(bct) ~ "\")\n");
+        }
         memberTypes[memberCount++] = bct;
     }
 }
@@ -809,7 +815,7 @@ struct BCClass
 
     void computeSize()
     {
-        uint size;
+        uint size = 0;
 
         if (parentIdx)
         {
@@ -1153,7 +1159,20 @@ struct SharedCtfeState(BCGenT)
         //register structType
         auto oldClassCount = classCount;
         btv.visit(cd);
-        assert(oldClassCount < classCount);
+        assert(oldClassCount < classCount, "Registering a class failed");
+
+        /// work because of how more complicated types the type we are looking for
+        /// it not nessisarly the last registered one.
+        /// therefore we need to search again
+        /// however it can only be within the last registred ones
+        foreach (i, classDeclPtr; classDeclTypePointers[oldClassCount .. classCount])
+        {
+            if (classDeclPtr == cd)
+            {
+                return cast(uint) i + 1;
+            }
+        }
+
         return classCount;
     }
 
@@ -1223,19 +1242,37 @@ struct SharedCtfeState(BCGenT)
 
     BeginClassResult beginClass(ClassDeclaration cd)
     {
+        static if (state_logging)
+        {
+            import std.file : append;
+            append("ctfe_state.log", "class[" ~ classCount.itos ~"] = beginClass(\"" ~ cd.ident.toString ~ "\")\n");
+        }
         classDeclTypePointers[classCount] = cd;
         return BeginClassResult(classCount, &classTypes[classCount++]);
     }
 
     const(BCType) endClass(BeginClassResult* s, bool died)
     {
+        static if (state_logging)
+        {
+            import std.file : append;
+            append("ctfe_state.log", "endClass(" ~ s.classCount.itos ~")  ");
+        }
         if (died)
         {
+            append("ctfe_state.log", "Died!\n");
             return BCType.init;
         }
         else
         {
-            return BCType(BCTypeEnum.Class, s.classCount);
+            auto type = BCType(BCTypeEnum.Class, s.classCount);
+            static if (state_logging)
+            {
+                import std.file : append;
+                s.computeSize();
+                append("ctfe_state.log", "Size: " ~ s.size.itos ~ " ParentIdx: " ~ s.parentIdx.itos ~ "\n");
+            }
+            return type;
         }
     }
     /*
@@ -2023,12 +2060,13 @@ extern (C++) final class BCTypeVisitor : Visitor
     override void visit(ClassDeclaration cd)
     {
         lastLoc = cd.loc;
-        bool died = true;
+        bool died = false;
 
-        int parentIdx;
+        int parentIdx = 0;
 
         if (cd.baseClass)
         {
+
             parentIdx = _sharedCtfeState.getClassIndex(cd.baseClass);
             assert(parentIdx);
         }
@@ -2042,10 +2080,6 @@ extern (C++) final class BCTypeVisitor : Visitor
             ct.addField(toBCType(f.type), f._init ? !!f._init.isVoidInitializer : false);
         }
 
-        if (parentIdx)
-        {
-            ct.size += _sharedCtfeState.classTypes[parentIdx - 1].size;
-        }
         sharedCtfeState.endClass(&ct, died);
     }
 
@@ -3162,7 +3196,23 @@ public:
             }
             else
             {
-                bailout("Null-Body: probably builtin: " ~ fd.toString);
+                if (fd.isVirtualMethod() && fd.toParent2().isInterfaceDeclaration())
+                {
+                    // If this function is Virtual and the parent is an interface
+                    // then it is valid for this body to be empty
+                    const fnIdx = ++_sharedCtfeState.functionCount;
+                    _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd);
+                    beginFunction(fnIdx - 1, cast(void*)fd);
+                    {
+                        Assert(imm32(0), addError(lastLoc, "Non-overridden abstract interface method"));
+                    }
+                    endFunction();
+                    *fnIdxP = fnIdx;
+                }
+                else
+                {
+                    bailout("Null-Body: probably builtin: " ~ fd.toString);
+                }
             }
         }
 
