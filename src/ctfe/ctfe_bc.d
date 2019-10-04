@@ -27,11 +27,11 @@ enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 0;
+enum UsePrinterBackend = 1;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
-enum state_logging = 0;
+enum state_logging = 1;
 
 private static void clearArray(T)(auto ref T array, uint count)
 {
@@ -1169,7 +1169,7 @@ struct SharedCtfeState(BCGenT)
         {
             if (classDeclPtr == cd)
             {
-                return cast(uint) i + 1;
+                return cast(uint) i + oldClassCount + 1;
             }
         }
 
@@ -1260,7 +1260,10 @@ struct SharedCtfeState(BCGenT)
         }
         if (died)
         {
-            append("ctfe_state.log", "Died!\n");
+            static if (state_logging)
+            {
+                append("ctfe_state.log", "Died!\n");
+            }
             return BCType.init;
         }
         else
