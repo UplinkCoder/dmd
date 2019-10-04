@@ -1140,7 +1140,19 @@ struct SharedCtfeState(BCGenT)
         auto oldStructCount = structCount;
         btv.visit(sd);
         assert(oldStructCount < structCount);
-        return structCount;
+
+        /// work because of how more complicated types the type we are looking for
+        /// it not nessisarly the last registered one.
+        /// therefore we need to search again
+        /// however it can only be within the last registred ones
+        foreach (i, structDeclPtr; structDeclpointerTypes[oldStructCount .. structCount])
+        {
+            if (structDeclPtr == sd)
+            {
+                return cast(uint) i + oldStructCount + 1;
+            }
+        }
+        assert(0, "struct type lookup failed!");
     }
 
     int getClassIndex(ClassDeclaration cd)
@@ -1172,8 +1184,7 @@ struct SharedCtfeState(BCGenT)
                 return cast(uint) i + oldClassCount + 1;
             }
         }
-
-        return classCount;
+        assert(0, "Class type lookup failed!");
     }
 
     int getPointerIndex(TypePointer pt)
