@@ -1,14 +1,33 @@
-double[] f(float d, int s)
+class NoExp : Exception { this() { super("NoExp"); }}
+
+class IntExp : Exception
 {
-    float a = 2;
-    float b = 5;
-    double c;
+  this(int x)
+  {
+    super("");
+    this.value = x;
+  }
 
-    c = a * b;
-
-    float v = d * s;
-    double[] da = [v, b];
-    return da;
+  int value;
 }
 
-pragma(msg, f(2, 24));
+void fthrow(int x)
+{
+    throw new NoExp();
+}
+
+int fn(int x)
+{
+    try
+    {
+        fthrow(x);
+    }
+    catch (IntExp e)
+    {
+        auto xx = e.value;
+        return e.value + 64;
+    }
+    assert(0);
+}
+
+pragma(msg, fn(22));
