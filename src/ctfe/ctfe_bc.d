@@ -3115,7 +3115,7 @@ public:
                 assert(expr);
                 expr.accept(this);
                 processingArguments = true;
-
+                assignTo = BCValue.init;
             }
             else
             {
