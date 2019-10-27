@@ -403,9 +403,11 @@ struct BCHeap
 
         foreach (i; 0 .. SizeOverFour)
         {
-            _heap[heapSize++] = (*(_string + (i * 4))) | (
-                    *(_string + (i * 4) + 1)) << 8 | (
-                    *(_string + (i * 4) + 2)) << 16 | (*(_string + (i * 4) + 3)) << 24;
+            auto i4 =  (i * 4);
+            _heap[heapSize++] = (*(_string + i4)) |
+                    (*(_string + i4 + 1)) << 8 |
+                    (*(_string + i4 + 2)) << 16 | 
+                    (*(_string + i4 + 3)) << 24;
         }
 
         final switch (size - 1 & 3)
@@ -651,7 +653,7 @@ struct BCValue
         void* voidStar;
     }
 
-    //TOTO PERF minor: use a 32bit value for heapRef;
+    //TODO PERF minor: use a 32bit value for heapRef;
     BCHeapRef heapRef;
     string name;
 

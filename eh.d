@@ -1,4 +1,14 @@
-class IntExp : Exception
+class ValueExp : Exception
+{
+    this(string msg) { super(msg); }
+}
+
+class VoidExp : Exception
+{
+    this() { super(""); }
+}
+
+class IntExp : ValueExp
 {
   this(int x)
   {
@@ -8,22 +18,40 @@ class IntExp : Exception
 
   int value;
 }
+
 void fthrow(int x)
 {
     throw new IntExp(x);
 }
 
+
 int fn(int x)
 {
+    int g = 0;
+    void wrap(int x)
+    {
+        try
+        {
+            return fthrow(x);
+        } catch (VoidExp e) { g = 231; }
+          catch (ValueExp e) { g = 89; assert(0); }
+       {
+       }
+    }
+
+
     try
     {
-        fthrow(x);
+    //    fthrow(x);
+          wrap(x);
     }
     catch (IntExp e)
     {
-        return e.value;
+        return e.value + g;
     }
-    assert(0);
+    return g;
+    // assert(0);
 }
 
 pragma(msg, fn(22));
+

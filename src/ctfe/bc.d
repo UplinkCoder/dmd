@@ -79,7 +79,7 @@ struct RetainedCall
 enum LongInst : ushort
 {
     //Former ShortInst
-    Prt,
+    PrintValue,
     RelJmp,
     Ret32,
     Ret64,
@@ -740,12 +740,12 @@ pure:
         }
     }
 
-    void Prt(BCValue value)
+    void Prt(BCValue value, bool isString = false)
     {
         if (value.vType == BCValueType.Immediate)
             value = pushOntoStack(value);
 
-        byteCodeArray[ip] = ShortInst16(LongInst.Prt, value.stackAddr);
+        byteCodeArray[ip] = ShortInst16Ex(LongInst.PrintValue, isString, value.stackAddr);
         byteCodeArray[ip + 1] = 0;
         ip += 2;
     }
@@ -1956,7 +1956,7 @@ string printInstructions(const int* startInstructions, uint length, const string
                 result ~= "RelJmp &" ~ itos(cast(short)(lw >> 16) + (pos - 2)) ~ "\n";
             }
             break;
-        case LongInst.Prt:
+        case LongInst.PrintValue:
             {
                 result ~= "Prt " ~ localName(stackMap, lw >> 16) ~ " \n";
             }
@@ -3153,11 +3153,21 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 ip += (cast(short)(lw >> 16)) - 2;
             }
             break;
-        case LongInst.Prt:
+        case LongInst.PrintValue:
             {
                 if (!__ctfe)
                 {
-                    printf("Addr: %u, Value %p\n", (opRef - stackP) * 4, *opRef);
+                    if ((lw & ushort.max) >> 8)
+                    {
+                        auto offset = *opRef;
+                        auto length = heapPtr._heap[offset];
+                        auto string_start = &heapPtr._heap[offset + 1];
+                        printf("Printing string: '%.*s'\n", length, string_start);
+                    }
+                    else
+                    {
+                        printf("Addr: %u, Value %p\n", (opRef - stackP) * 4, *opRef);
+                    }
                 }
             }
             break;

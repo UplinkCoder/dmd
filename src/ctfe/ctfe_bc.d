@@ -27,7 +27,7 @@ enum bailoutMessages = 1;
 enum printResult = 1;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
-enum UsePrinterBackend = 1;
+enum UsePrinterBackend = 0;
 enum UseCBackend = 0;
 enum UseGCCJITBackend = 0;
 enum abortOnCritical = 1;
@@ -439,7 +439,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         asw.stop();
         bcv.compileUncompiledFunctions();
         bcv.buildVtbls();
-        // static if (bailoutMessages) bcv.dumpVtbls();
+        static if (bailoutMessages) bcv.dumpVtbls();
         // we build the vtbls now let's build the constructors
         bcv.compileUncompiledConstructors();
         bcv.compileUncompiledDynamicCasts();
@@ -2519,6 +2519,25 @@ extern (C++) final class BCV(BCGenT) : Visitor
                 Sub3(ea, addr, imm32(-offset));
             }
             Load32(value, ea, line);
+        }
+    }
+
+    static if (is(BCGen))
+    {
+        extern (D) void PrintString (string message)
+        {
+            // printf("msgLength = %d\n", message.length);
+            auto msgPointer = genTemporary(i32Type);
+            auto msg_imm = imm32(_sharedExecutionState.heap.pushString(message.ptr, cast(uint)message.length).addr);
+            Set(msgPointer, msg_imm);
+            Prt(msgPointer, true);
+        }
+    }
+    else
+    {
+        extern (D) void PrintString (string message)
+        {
+            printf("PrintString not supported with this backend.");
         }
     }
 
@@ -4762,8 +4781,9 @@ static if (is(BCGen))
 
         // this has to be done after vtbl pointers are known.
         // so we have to put this into a todo list.
-        foreach(_catch;*catches)
+        foreach(i, _catch;*catches)
         {
+            PrintString("Catch [" ~ itos(cast(int)i) ~ "] :");
             BCType catchType = toBCType(_catch.type);
             vars[cast(void*) _catch.var] = e_ptr;
             int castFnIdx = getDynamicCastIndex(catchType);
