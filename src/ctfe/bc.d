@@ -769,7 +769,7 @@ pure:
     {
         assert(inst >= LongInst.Add && inst < LongInst.ImmAdd,
             "Instruction is not in Range for Arith Instructions");
-        assert(lhs.vType.StackValue, "only StackValues are supported as lhs");
+        assert(lhs.vType == BCValueType.StackValue, "only StackValues are supported as lhs");
 
         BCTypeEnum commonType = commonTypeEnum(lhs.type.type, rhs.type.type);
 
