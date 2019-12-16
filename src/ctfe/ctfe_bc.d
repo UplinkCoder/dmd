@@ -2524,7 +2524,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
     static if (is(BCGen))
     {
-        extern (D) void PrintString (string message)
+        extern (D) void PrintString (const(char)[] message)
         {
             // printf("msgLength = %d\n", message.length);
             auto msgPointer = genTemporary(i32Type);
@@ -3494,6 +3494,8 @@ public:
                 Store32AtOffset(_this.i32, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
             }
 
+
+            PrintString("Executng: " ~ me.ident.toString());
             me.fbody.accept(this);
 
             static if (is(BCGen))
@@ -4760,14 +4762,14 @@ static if (is(BCGen))
         pushCatches(tc.catches);
 //        popCatches();
 
-        // bailout("We currently can't handle ExecptionHnadling");
+        // bailout("We currently can't handle ExecptionHandling");
     }
 
     override void visit(ThrowStatement s)
     {
         auto e = genExpr(s.exp);
         Store32(imm32(exceptionPointerAddr), e);
-        Ret(e);
+        // Ret(e);
     }
 
     void pushCatches(Catches* catches)
@@ -4777,23 +4779,23 @@ static if (is(BCGen))
 
         auto e_ptr = genTemporary(i32Type);
         Load32(e_ptr, imm32(exceptionPointerAddr));
+        PrintString("Loading ExecptionPtr");
         auto castedValue = genTemporary(i32Type);
 
         // this has to be done after vtbl pointers are known.
         // so we have to put this into a todo list.
         foreach(i, _catch;*catches)
         {
-            PrintString("Catch [" ~ itos(cast(int)i) ~ "] :");
             BCType catchType = toBCType(_catch.type);
             vars[cast(void*) _catch.var] = e_ptr;
             int castFnIdx = getDynamicCastIndex(catchType);
             if (!castFnIdx)
             {
-
                 addDynamicCast(catchType, &castFnIdx);
             }
             Comment("Calling catch");
             Call(castedValue.i32, imm32(castFnIdx), [e_ptr]);
+            PrintString("Catch [" ~ itos(cast(int)i) ~ "] :" ~ _catch.handler.toString);
             CJcastFailed = beginCndJmp(castedValue);
             {
                 genBlock(_catch.handler);

@@ -769,7 +769,6 @@ pure:
     {
         assert(inst >= LongInst.Add && inst < LongInst.ImmAdd,
             "Instruction is not in Range for Arith Instructions");
-        assert(lhs.vType == BCValueType.StackValue, "only StackValues are supported as lhs");
 
         BCTypeEnum commonType = commonTypeEnum(lhs.type.type, rhs.type.type);
 
@@ -785,6 +784,9 @@ pure:
         {
             lhs = pushOntoStack(lhs);
         }
+
+        //TDOD restore this invariant!
+        //assert(lhs.vType == BCValueType.StackValue, "only StackValues are supported as lhs");
 
         if (resultTypeEnum !is null)
             *resultTypeEnum = commonType;

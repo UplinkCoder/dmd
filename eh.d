@@ -34,7 +34,7 @@ int fn(int x)
         {
             return fthrow(x);
         } catch (VoidExp e) { g = 231; }
-          catch (ValueExp e) { g = 89; assert(0); }
+          catch (ValueExp e) { g = 89; }
        {
        }
     }
