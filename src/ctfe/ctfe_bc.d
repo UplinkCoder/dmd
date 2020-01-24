@@ -8677,7 +8677,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         else if (fromType.type == BCTypeEnum.f23 && (toType.type == BCTypeEnum.i32 || toType.type == BCTypeEnum.u32))
         {
                 const from = retval;
-                retval = genTemporary(BCType(BCTypeEnum.f23));
+                retval = genTemporary(toType);
                 F32ToI(retval, from);
                 And3(retval, retval, imm32(uint.max));
         }
