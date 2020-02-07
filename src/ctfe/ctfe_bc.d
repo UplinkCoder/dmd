@@ -3403,6 +3403,7 @@ public:
                     }
                 }
                 Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
+                Store32AtOffset(p1, imm32(forCtor.typeIndex), ClassMetaData.TypeIdIdxOffset);
                 Ret(p1);
             endFunction();
             bcClass.defaultCtorIdx = uc.fnIdx;
@@ -3492,6 +3493,7 @@ public:
                 const bcClass = _sharedCtfeState.classTypes[forCtor.typeIndex - 1];
                 if (!_this) Comment("There's no this here");
                 Store32AtOffset(_this.i32, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
+                Store32AtOffset(_this.i32, imm32(forCtor.typeIndex), ClassMetaData.TypeIdIdxOffset);
             }
 
 
@@ -4765,11 +4767,18 @@ static if (is(BCGen))
         // bailout("We currently can't handle ExecptionHandling");
     }
 
+    override void visit(TryFinallyStatement tcf)
+    {
+        genBlock(tcf._body);
+        auto _finally = genBlock(tcf.finalbody);
+    }
+
+
     override void visit(ThrowStatement s)
     {
         auto e = genExpr(s.exp);
         Store32(imm32(exceptionPointerAddr), e);
-        // Ret(e);
+        Ret(e);
     }
 
     void pushCatches(Catches* catches)
