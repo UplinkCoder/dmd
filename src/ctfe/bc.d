@@ -2,6 +2,7 @@ module ddmd.ctfe.bc;
 
 import ddmd.ctfe.bc_common;
 import ddmd.ctfe.bc_limits;
+import ddmd.ctfe.bc_abi;
 
 import core.stdc.stdio;
 
@@ -95,6 +96,10 @@ enum LongInst : ushort
     JmpTrue,
     JmpZ,
     JmpNZ,
+
+    PushCatch,
+    PopCatch,
+    Throw,
 
     // 2 StackOperands
     Add,
@@ -2074,19 +2079,26 @@ const (int[]) getCodeForId (const int fnId, const BCFunction* functions) pure
     return functions[fnId].byteCode;
 }
 
+struct Catch
+{
+    uint ip;
+    uint stackDepth;
+}
+
 const(BCValue) interpret_(int fnId, const BCValue[] args,
     BCHeap* heapPtr = null, const BCFunction* functions = null,
     const RetainedCall* calls = null,
     BCValue* ev1 = null, BCValue* ev2 = null, BCValue* ev3 = null,
     BCValue* ev4 = null, const RE* errors = null,
-    long[] stackPtr = null, const string[ushort] stackMap = null,
+    long[] stackPtr = null, Catch[]* catchStack = null,
+    const string[ushort] stackMap = null,
     /+    DebugCommand function() reciveCommand = {return DebugCommand(DebugCmdEnum.Nothing);},
     BCValue* debugOutput = null,+/ uint stackOffset = 0)  @trusted
 {
     const code = getCodeForId(fnId, functions);
     return interpret_(code, args, heapPtr, functions, calls,
-        ev1, ev2, ev3, ev4, errors, 
-        stackPtr, stackMap, stackOffset);
+        ev1, ev2, ev3, ev4, errors,
+        stackPtr, catchStack, stackMap, stackOffset);
 }
 
 const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
@@ -2094,11 +2106,13 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     const RetainedCall* calls = null,
     BCValue* ev1 = null, BCValue* ev2 = null, BCValue* ev3 = null,
     BCValue* ev4 = null, const RE* errors = null,
-    long[] stackPtr = null, const string[ushort] stackMap = null,
+    long[] stackPtr = null, Catch[]* catches = null,
+    const string[ushort] stackMap = null,
 /+    DebugCommand function() reciveCommand = {return DebugCommand(DebugCmdEnum.Nothing);},
     BCValue* debugOutput = null,+/ uint stackOffset = 0)  @trusted
 {
-    __gshared static uint callDepth;
+    __gshared static uint callDepth = 0;
+    __gshared static uint inThrow = false;
     import std.stdio;
 
     bool paused; // true if we are in a breakpoint.
@@ -2998,6 +3012,44 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             }
             break;
 
+            case LongInst.PushCatch:
+            {
+                if (!catches)
+                {
+                    auto c = new Catch[](0);
+                    catches = &c;
+                }
+                Catch catch_ = Catch(ip, callDepth);
+                (*catches) ~= catch_;
+            }
+
+            case LongInst.PopCatch:
+            {
+                (*catches) = (*catches)[0 .. $-1];
+            }
+
+            case LongInst.Throw:
+            {
+                uint expP = (stackP[hi] & uint.max);
+                auto expTypeIdx = heapPtr._heap[expP + ClassMetaData.TypeIdIdxOffset];
+                auto expValue = BCValue(HeapAddr(expP), BCType(BCTypeEnum.Class, expTypeIdx));
+                expValue.vType = BCValueType.Execption;
+
+                auto catch_ = catches.length ? &((*catches)[$-1]) : null;
+                auto unrolling = catch_ ? catch_.stackDepth < callDepth : true;
+                if (unrolling)
+                {
+                    return expValue;
+                }
+                else
+                {
+                    // we are at the correct stack level
+                    ip = catch_.ip;
+                    // set the instruction pointer and continue
+                }
+            }
+            break;
+
         case LongInst.Jmp:
             {
                 ip = hi;
@@ -3308,11 +3360,46 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                         return bailoutValue;
                 }
                 auto cRetval = interpret_(functions[cast(size_t)(fn - 1)].byteCode,
-                    callArgs[0 .. call.args.length], heapPtr, functions, calls, ev1, ev2, ev3, ev4, errors, stack, stackMap, stackOffsetCall);
+                    callArgs[0 .. call.args.length], heapPtr, functions, calls, ev1, ev2, ev3, ev4, errors, stack, catches, stackMap, stackOffsetCall);
 
                 if (cRetval.vType == BCValueType.Execption)
                 {
-                    assert(0, "We should goto the catchBlock here.");
+                    // we return to unroll
+                    // lets first handle the case in which there are catches on the catch stack
+                    if (catches && (*catches).length)
+                    {
+                        const catch_ = (*catches)[$-1];
+                        // in case we are above at the callDepth of the next catch
+                        // we need to pass this return value on
+                        if (catch_.stackDepth < callDepth)
+                        {
+                            --callDepth;
+                            return cRetval;
+                        }
+                        // In case we are at the callDepth we need to go to the right catch
+                        else if (catch_.stackDepth == callDepth)
+                        {
+                            ip = catch_.ip;
+                            // resume execution at execption handler block
+                            continue;
+                        }
+                        // in case we end up here there is a catch handler but we skipped it
+                        // this should never happen!
+                        else
+                        {
+                            assert(0, "Seems like we forgot to pop a catch or something");
+                        }
+                    }
+                    // if we go here it means there are no catches anymore to catch this.
+                    // we will go on returning this out of the callstack until we hit the end
+                    else
+                    {
+                        --callDepth;
+                        return cRetval;
+                    }
+
+                    // in case we are at the depth we need to jump to Throw
+                    assert(!catches.length, "We should goto the catchBlock here.");
                 }
                 else if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
                 {
