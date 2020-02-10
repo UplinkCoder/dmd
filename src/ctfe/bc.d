@@ -388,9 +388,16 @@ struct BCGen
 
     RetainedCall[ubyte.max * 6] calls;
     uint callCount;
-    auto interpret(BCValue[] args, BCHeap* heapPtr = null) const
+    auto interpret(BCValue[] args, BCHeap* heapPtr = null) const @trusted
     {
-        return interpret_(cast(const) byteCodeArray[0 .. ip], args, heapPtr, null);
+        BCFunction f = BCFunction(cast(void*)fd,
+            1,
+            BCFunctionTypeEnum.Bytecode,
+            parameterCount,
+            cast(ushort)(temporaryCount + localCount + parameterCount),
+            cast(int[])byteCodeArray[0 .. ip]
+        );
+        return interpret_(0, args, heapPtr, &f);
     }
 
 @safe:
@@ -2112,9 +2119,9 @@ struct DebugCommand
     uint v1;
 }
 
-const (int[]) getCodeForId (const int fnId, const BCFunction* functions) pure
+const (int[])* getCodeForId (const int fnId, const BCFunction* functions) pure
 {
-    return functions[fnId].byteCode;
+    return &functions[fnId].byteCode;
 }
 
 struct Catch
@@ -2123,42 +2130,34 @@ struct Catch
     uint stackDepth;
 }
 
-const(BCValue) interpret_(int fnId, const BCValue[] args,
-    BCHeap* heapPtr = null, const BCFunction* functions = null,
-    const RetainedCall* calls = null,
-    BCValue* ev1 = null, BCValue* ev2 = null, BCValue* ev3 = null,
-    BCValue* ev4 = null, const RE* errors = null,
-    long[] stackPtr = null, Catch[]* catchStack = null,
-    const string[ushort] stackMap = null,
-    /+    DebugCommand function() reciveCommand = {return DebugCommand(DebugCmdEnum.Nothing);},
-    BCValue* debugOutput = null,+/ uint stackOffset = 0)  @trusted
+struct ReturnAddr
 {
-    const code = getCodeForId(fnId, functions);
-    return interpret_(code, args, heapPtr, functions, calls,
-        ev1, ev2, ev3, ev4, errors,
-        stackPtr, catchStack, stackMap, stackOffset);
+    uint ip;
+    uint fnId;
 }
 
-const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
+const(BCValue) interpret_(int fnId, const BCValue[] args,
     BCHeap* heapPtr = null, const BCFunction* functions = null,
     const RetainedCall* calls = null,
     BCValue* ev1 = null, BCValue* ev2 = null, BCValue* ev3 = null,
     BCValue* ev4 = null, const RE* errors = null,
     long[] stackPtr = null, Catch[]* catches = null,
     const string[ushort] stackMap = null,
-/+    DebugCommand function() reciveCommand = {return DebugCommand(DebugCmdEnum.Nothing);},
+    /+    DebugCommand function() reciveCommand = {return DebugCommand(DebugCmdEnum.Nothing);},
     BCValue* debugOutput = null,+/ uint stackOffset = 0)  @trusted
 {
+    const (int[])* byteCode = getCodeForId(fnId, functions);
+
     __gshared static uint callDepth = 0;
     __gshared static uint inThrow = false;
     import std.stdio;
 
-    bool paused; // true if we are in a breakpoint.
+    bool paused; /// true if we are in a breakpoint.
 
 
     uint[] breakLines = [];
     uint lastLine;
-
+    ReturnAddr[] returnAddrs;
     if (!__ctfe)
     {
         debug writeln("Args: ", args, "BC:", byteCode.printInstructions(stackMap));
@@ -2235,11 +2234,11 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
     BCValue returnValue;
 
     // debug(bc) { import std.stdio; writeln("BC.len = ", byteCode.length); }
-    if (byteCode.length < 6 || byteCode.length <= ip)
+    if ((*byteCode).length < 6 || (*byteCode).length <= ip)
         return typeof(return).init;
 
     if (!__ctfe) debug printf("Interpreter started\n");
-    while (true && ip <= byteCode.length - 1)
+    while (true && ip <= (*byteCode).length - 1)
     {
 /+
         DebugCommand command = reciveCommand();
@@ -2302,8 +2301,8 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 }
             }
         // debug if (!__ctfe) writeln("ip: ", ip);
-        const lw = byteCode[ip];
-        const hi = byteCode[ip + 1];
+        const lw = (*byteCode)[ip];
+        const hi = (*byteCode)[ip + 1];
         ip += 2;
 
         // consider splitting the stackPointer in stackHigh and stackLow
@@ -3354,8 +3353,10 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
 
         case LongInst.Call:
             {
+
                 assert(functions, "When calling functions you need functions to call");
                 auto call = calls[uint((*rhs & uint.max)) - 1];
+                auto returnAddr = ReturnAddr(ip, fnId);
 
                 auto fn = (call.fn.vType == BCValueType.Immediate ?
                     call.fn.imm32 :
@@ -3403,7 +3404,12 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                         bailoutValue.imm32 = 2000;
                         return bailoutValue;
                 }
-                auto cRetval = interpret_(functions[cast(size_t)(fn - 1)].byteCode,
+
+                returnAddrs ~= returnAddr;
+
+                byteCode = getCodeForId(fnId, functions);
+/+
+                auto cRetval = interpret_(fn - 1,
                     callArgs[0 .. call.args.length], heapPtr, functions, calls, ev1, ev2, ev3, ev4, errors, stack, catches, stackMap, stackOffsetCall);
 
                 if (cRetval.vType == BCValueType.Execption)
@@ -3457,9 +3463,11 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 {
                     *lhsRef = cRetval.imm32;
                 }
+                +/
                 callDepth--;
             }
             break;
+
         case LongInst.Alloc:
             {
                 const allocSize = *rhs;
@@ -3616,7 +3624,7 @@ auto testRelJmp()
 }
 
 static assert(testRelJmp().interpret([]) == imm32(12));
-
+//pragma(msg, testRelJmp().interpret([]));
 import ddmd.ctfe.bc_test;
 
 static assert(test!BCGen());
