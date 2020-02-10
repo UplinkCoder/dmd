@@ -488,7 +488,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
             auto retval = interpret_(0, bc_args,
                 &_sharedExecutionState.heap, &_sharedCtfeState.functions[0], &bcv.calls[0],
                 &errorValues[0], &errorValues[1], &errorValues[2], &errorValues[3],
-                &_sharedCtfeState.errors[0], _sharedExecutionState.stack[], bcv.stackMap());
+                &_sharedCtfeState.errors[0], _sharedExecutionState.stack[], null, bcv.stackMap());
 /*            if (fd.ident == Identifier.idPool("extractAttribFlags"))
             {
                 import ddmd.hdrgen;
@@ -3403,7 +3403,7 @@ public:
                     }
                 }
                 Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
-                Store32AtOffset(p1, imm32(forCtor.typeIndex), ClassMetaData.TypeIdIdxOffset);
+                Store32AtOffset(p1, imm32(uc.type.typeIndex), ClassMetaData.TypeIdIdxOffset);
                 Ret(p1);
             endFunction();
             bcClass.defaultCtorIdx = uc.fnIdx;
@@ -4760,9 +4760,37 @@ static if (is(BCGen))
 
     override void visit(TryCatchStatement tc)
     {
-        genBlock(tc._body);
-        pushCatches(tc.catches);
-//        popCatches();
+        // here we need to do a little trickery
+        // since we only know the content of the try block after generating it
+        // and reference those in the catch handlers
+        // we need to generate that first.
+        // however at the same time we need to push the catches before
+        // we can advance executing the try block
+        // we will do this by Jumping to the PushCatch instruction before executing the try Block
+        // @Broken: catches don't seem to be pushed!
+        BCBlock try_body;
+        auto try_block_executed = genTemporary(i32Type);
+        Set(try_block_executed, imm32(0));
+        auto CJpush_catches = beginCndJmp(try_block_executed);
+        {
+            try_body = genBlock(tc._body);
+            Set(try_block_executed, imm32(1));
+        }
+
+
+
+        // then we will Jump back to the beginning of the Block
+        auto CJ_JumpBack = beginCndJmp(try_block_executed, true);
+        {
+            Jmp(try_body.begin);
+            endCndJmp(CJpush_catches, genLabel());
+            PushCatch();
+            pushCatches(tc.catches);
+        }
+        endCndJmp(CJ_JumpBack, genLabel());
+
+
+        PopCatch();
 
         // bailout("We currently can't handle ExecptionHandling");
     }
@@ -4778,7 +4806,7 @@ static if (is(BCGen))
     {
         auto e = genExpr(s.exp);
         Store32(imm32(exceptionPointerAddr), e);
-        Ret(e);
+        Throw(e);
     }
 
     void pushCatches(Catches* catches)
@@ -4813,11 +4841,6 @@ static if (is(BCGen))
         }
     }
     
-    void popCatches()
-    {
-        // for now it seems like we don't need this.
-    }
-
     override void visit(Expression e)
     {
         lastLoc = e.loc;

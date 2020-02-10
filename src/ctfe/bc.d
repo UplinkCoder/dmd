@@ -1279,6 +1279,28 @@ pure:
         }
     }
 
+    void Throw(BCValue e)
+    {
+        assert(isStackValueOrParameter(e));
+        byteCodeArray[ip] = ShortInst16(LongInst.Throw, e.stackAddr);
+        byteCodeArray[ip + 1] = 0;
+        ip += 2;
+    }
+
+    void PushCatch()
+    {
+        byteCodeArray[ip] = ShortInst16(LongInst.PushCatch, 0);
+        byteCodeArray[ip + 1] = 0;
+        ip += 2;
+    }
+
+    void PopCatch()
+    {
+        byteCodeArray[ip] = ShortInst16(LongInst.PopCatch, 0);
+        byteCodeArray[ip + 1] = 0;
+        ip += 2;
+    }
+
     void Ret(BCValue val)
     {
         LongInst inst = basicTypeSize(val.type.type) == 8 ? LongInst.Ret64 : LongInst.Ret32;
@@ -1918,6 +1940,22 @@ string printInstructions(const int* startInstructions, uint length, const string
             }
             break;
 
+        case LongInst.PopCatch:
+            {
+                result ~= "PopCatch\n";
+            }
+            break;
+
+        case LongInst.PushCatch:
+            {
+                result ~= "PushCatch\n";
+            }
+            break;
+        case LongInst.Throw:
+            {
+                result ~= "Throw " ~ localName(stackMap,  lw >> 16) ~ "\n";
+            }
+            break;
         case LongInst.HeapLoad32:
             {
                 result ~= "HeapLoad32 " ~ localName(stackMap, hi & 0xFFFF) ~ ", HEAP[" ~ localName(stackMap, hi >> 16) ~  "]\n";
@@ -3012,8 +3050,12 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
             }
             break;
 
-            case LongInst.PushCatch:
+        case LongInst.PushCatch:
             {
+                debug
+                {
+                    printf("PushCatch is executing\n");
+                }
                 if (!catches)
                 {
                     auto c = new Catch[](0);
@@ -3022,15 +3064,17 @@ const(BCValue) interpret_(const int[] byteCode, const BCValue[] args,
                 Catch catch_ = Catch(ip, callDepth);
                 (*catches) ~= catch_;
             }
+            break;
 
             case LongInst.PopCatch:
             {
                 (*catches) = (*catches)[0 .. $-1];
             }
+            break;
 
             case LongInst.Throw:
             {
-                uint expP = (stackP[hi] & uint.max);
+                uint expP = ((*opRef) & uint.max);
                 auto expTypeIdx = heapPtr._heap[expP + ClassMetaData.TypeIdIdxOffset];
                 auto expValue = BCValue(HeapAddr(expP), BCType(BCTypeEnum.Class, expTypeIdx));
                 expValue.vType = BCValueType.Execption;
