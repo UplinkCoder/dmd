@@ -2161,7 +2161,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
     ReturnAddr[] returnAddrs;
     if (!__ctfe)
     {
-        debug writeln("Args: ", args, "BC:", byteCode.printInstructions(stackMap));
+        debug writeln("Args: ", args, "BC:", (*byteCode).printInstructions(stackMap));
     }
     auto stack = stackPtr ? stackPtr : new long[](ushort.max / 4);
 
@@ -2234,14 +2234,19 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
     BCValue returnValue;
 
-    void Return()
+    bool Return()
     {
         if (returnAddrs.length)
         {
             auto returnAddr = returnAddrs[$-1];
             returnAddrs = returnAddrs[0 .. $-1];
-            byteCode = getCodeForId(returnAddr.fnId, functions);
+            byteCode = getCodeForId(returnAddr.fnId - 1, functions);
             ip = returnAddr.ip;
+            return false;
+        }
+        else
+        {
+            return true;
         }
     }
 
@@ -2896,7 +2901,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
             {
                 debug
                 {
-	            writeln(byteCode.printInstructions(stackMap));
+	            writeln((*byteCode).printInstructions(stackMap));
 
                     writeln("ip:", ip, "Assert(&", opRefOffset, " *",  *opRef, ")");
                 }
@@ -3228,8 +3233,9 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                         writeln("Ret32 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
                 cRetval = imm32(*opRef & uint.max);
-                goto LreturnTo;
+                if (Return()) return cRetval;
             }
+            break;
         case LongInst.RetS32:
             {
                 debug (bc)
@@ -3240,13 +3246,15 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     writeln("Ret32 SP[", lhsOffset, "] (", *opRef, ")\n");
                 }
                 cRetval = imm32(*opRef & uint.max, true);
-                goto LreturnTo;
+                if (Return()) return cRetval;
             }
+            break;
         case LongInst.RetS64:
             {
                 cRetval = BCValue(Imm64(*opRef, true));
-                goto LreturnTo;
+                if (Return()) return cRetval;
             }
+            break;
 
         case LongInst.Ret64:
             {
@@ -3258,9 +3266,9 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                         writeln("Ret64 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
                 cRetval = BCValue(Imm64(*opRef, false));
-                goto LreturnTo;
+                if (Return()) return cRetval;
             }
-
+            break;
         case LongInst.RelJmp:
             {
                 ip += (cast(short)(lw >> 16)) - 2;
@@ -3379,10 +3387,12 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     (stackP[call.fn.stackAddr.addr / 4] & uint.max)
                 );
 
+                auto stackOffsetCall = stackOffset + call.callerSp;
+                auto newStack = stackP + (stackOffsetCall / 4);
+
                 if (fn == skipFn)
                     continue;
 
-                auto stackOffsetCall = stackOffset + call.callerSp;
                 if (!__ctfe)
                 {
                     debug writeln("call.fn = ", call.fn);
@@ -3392,21 +3402,17 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     debug writeln("call.args = ", call.args);
                 }
 
-                BCValue[32] callArgs = void;
 
                 foreach(int i,ref arg;call.args)
                 {
+                    const argOffset_ = (i * 4);
                     if(isStackValueOrParameter(arg))
                     {
-                        bool signed = stackP[arg.stackAddr.addr / 4] < 0 ? 1 : 0; 
-                        if(cast(ulong)(stackP[arg.stackAddr.addr / 4]) <= uint.max)
-                            callArgs[i] = imm32(stackP[arg.stackAddr.addr / 4] & uint.max, signed);
-                        else
-                            callArgs[i] = BCValue(Imm64(stackP[arg.stackAddr.addr / 4]));
+                            newStack[argOffset_] = stackP[arg.stackAddr.addr / 4];
                     }
                     else if (arg.vType == BCValueType.Immediate)
                     {
-                        callArgs[i] = arg;
+                        newStack[argOffset_] = arg.imm64;
                     }
                     else
                     {
@@ -3483,8 +3489,10 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     *lhsRef = cRetval.imm32;
                 }
 
-                callDepth--;
-                Return();
+                if (callDepth-- == 0)
+                {
+                    return cRetval;
+                }
             }
             break;
 
