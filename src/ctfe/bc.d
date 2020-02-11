@@ -2157,6 +2157,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
     uint[] breakLines = [];
     uint lastLine;
+    BCValue cRetval;
     ReturnAddr[] returnAddrs;
     if (!__ctfe)
     {
@@ -2232,6 +2233,17 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
     bool cond;
 
     BCValue returnValue;
+
+    void Return()
+    {
+        if (returnAddrs.length)
+        {
+            auto returnAddr = returnAddrs[$-1];
+            returnAddrs = returnAddrs[0 .. $-1];
+            byteCode = getCodeForId(returnAddr.fnId, functions);
+            ip = returnAddr.ip;
+        }
+    }
 
     // debug(bc) { import std.stdio; writeln("BC.len = ", byteCode.length); }
     if ((*byteCode).length < 6 || (*byteCode).length <= ip)
@@ -3215,7 +3227,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
                         writeln("Ret32 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
-                return imm32(*opRef & uint.max);
+                cRetval = imm32(*opRef & uint.max);
+                goto LreturnTo;
             }
         case LongInst.RetS32:
             {
@@ -3226,11 +3239,13 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     
                     writeln("Ret32 SP[", lhsOffset, "] (", *opRef, ")\n");
                 }
-                return imm32(*opRef & uint.max, true);
+                cRetval = imm32(*opRef & uint.max, true);
+                goto LreturnTo;
             }
         case LongInst.RetS64:
             {
-                return BCValue(Imm64(*opRef, true));
+                cRetval = BCValue(Imm64(*opRef, true));
+                goto LreturnTo;
             }
 
         case LongInst.Ret64:
@@ -3242,7 +3257,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
                         writeln("Ret64 SP[", lhsOffset, "] (", *opRef, ")\n");
                     }
-                return BCValue(Imm64(*opRef, false));
+                cRetval = BCValue(Imm64(*opRef, false));
+                goto LreturnTo;
             }
 
         case LongInst.RelJmp:
@@ -3408,10 +3424,13 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 returnAddrs ~= returnAddr;
 
                 byteCode = getCodeForId(fnId, functions);
+                ip = 4;
+                continue;
 /+
                 auto cRetval = interpret_(fn - 1,
                     callArgs[0 .. call.args.length], heapPtr, functions, calls, ev1, ev2, ev3, ev4, errors, stack, catches, stackMap, stackOffsetCall);
-
++/
+        LreturnTo:
                 if (cRetval.vType == BCValueType.Execption)
                 {
                     // we return to unroll
@@ -3424,7 +3443,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                         if (catch_.stackDepth < callDepth)
                         {
                             --callDepth;
-                            return cRetval;
+                            Return();
                         }
                         // In case we are at the callDepth we need to go to the right catch
                         else if (catch_.stackDepth == callDepth)
@@ -3445,7 +3464,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     else
                     {
                         --callDepth;
-                        return cRetval;
+                        Return();
                     }
 
                     // in case we are at the depth we need to jump to Throw
@@ -3463,8 +3482,9 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 {
                     *lhsRef = cRetval.imm32;
                 }
-                +/
+
                 callDepth--;
+                Return();
             }
             break;
 
