@@ -2240,8 +2240,60 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
         {
             auto returnAddr = returnAddrs[$-1];
             returnAddrs = returnAddrs[0 .. $-1];
-            byteCode = getCodeForId(returnAddr.fnId - 1, functions);
+            byteCode = getCodeForId(returnAddr.fnId, functions);
             ip = returnAddr.ip;
+
+            if (cRetval.vType == BCValueType.Execption)
+                {
+                    // we return to unroll
+                    // lets first handle the case in which there are catches on the catch stack
+                    if (catches && (*catches).length)
+                    {
+                        const catch_ = (*catches)[$-1];
+                        // in case we are above at the callDepth of the next catch
+                        // we need to pass this return value on
+                        if (catch_.stackDepth < callDepth)
+                        {
+                            Return();
+                        }
+                        // In case we are at the callDepth we need to go to the right catch
+                        else if (catch_.stackDepth == callDepth)
+                        {
+                            ip = catch_.ip;
+                            // resume execution at execption handler block
+                            continue;
+                        }
+                        // in case we end up here there is a catch handler but we skipped it
+                        // this should never happen!
+                        else
+                        {
+                            assert(0, "Seems like we forgot to pop a catch or something");
+                        }
+                    }
+                    // if we go here it means there are no catches anymore to catch this.
+                    // we will go on returning this out of the callstack until we hit the end
+                    else
+                    {
+                        Return();
+                    }
+
+                    // in case we are at the depth we need to jump to Throw
+                    assert(!catches.length, "We should goto the catchBlock here.");
+                }
+                else if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
+                {
+                    return true;
+                }
+                if (cRetval.type.type == BCTypeEnum.i64 || cRetval.type.type == BCTypeEnum.u64 || cRetval.type.type == BCTypeEnum.f52)
+                {
+                    *lhsRef = cRetval.imm64;
+                }
+                else
+                {
+                    *lhsRef = cRetval.imm32;
+                }
+
+
             return false;
         }
         else
@@ -3382,10 +3434,10 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 auto call = calls[uint((*rhs & uint.max)) - 1];
                 auto returnAddr = ReturnAddr(ip, fnId);
 
-                auto fn = (call.fn.vType == BCValueType.Immediate ?
+                uint fn = (call.fn.vType == BCValueType.Immediate ?
                     call.fn.imm32 :
-                    (stackP[call.fn.stackAddr.addr / 4] & uint.max)
-                );
+                    stackP[call.fn.stackAddr.addr / 4]
+                ) & uint.max;
 
                 auto stackOffsetCall = stackOffset + call.callerSp;
                 auto newStack = stackP + (stackOffsetCall / 4);
@@ -3405,7 +3457,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
                 foreach(int i,ref arg;call.args)
                 {
-                    const argOffset_ = (i * 4);
+                    const argOffset_ = i + 1;
                     if(isStackValueOrParameter(arg))
                     {
                             newStack[argOffset_] = stackP[arg.stackAddr.addr / 4];
@@ -3426,73 +3478,16 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                         bailoutValue.imm32 = 2000;
                         return bailoutValue;
                 }
-
-                returnAddrs ~= returnAddr;
-
-                byteCode = getCodeForId(fnId, functions);
-                ip = 4;
-                continue;
+                {
+                    returnAddrs ~= returnAddr;
+                    byteCode = getCodeForId(cast(int)(fn - 1), functions);
+                    ip = 4;
+                }
 /+
                 auto cRetval = interpret_(fn - 1,
                     callArgs[0 .. call.args.length], heapPtr, functions, calls, ev1, ev2, ev3, ev4, errors, stack, catches, stackMap, stackOffsetCall);
 +/
         LreturnTo:
-                if (cRetval.vType == BCValueType.Execption)
-                {
-                    // we return to unroll
-                    // lets first handle the case in which there are catches on the catch stack
-                    if (catches && (*catches).length)
-                    {
-                        const catch_ = (*catches)[$-1];
-                        // in case we are above at the callDepth of the next catch
-                        // we need to pass this return value on
-                        if (catch_.stackDepth < callDepth)
-                        {
-                            --callDepth;
-                            Return();
-                        }
-                        // In case we are at the callDepth we need to go to the right catch
-                        else if (catch_.stackDepth == callDepth)
-                        {
-                            ip = catch_.ip;
-                            // resume execution at execption handler block
-                            continue;
-                        }
-                        // in case we end up here there is a catch handler but we skipped it
-                        // this should never happen!
-                        else
-                        {
-                            assert(0, "Seems like we forgot to pop a catch or something");
-                        }
-                    }
-                    // if we go here it means there are no catches anymore to catch this.
-                    // we will go on returning this out of the callstack until we hit the end
-                    else
-                    {
-                        --callDepth;
-                        Return();
-                    }
-
-                    // in case we are at the depth we need to jump to Throw
-                    assert(!catches.length, "We should goto the catchBlock here.");
-                }
-                else if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
-                {
-                    return cRetval;
-                }
-                if (cRetval.type.type == BCTypeEnum.i64 || cRetval.type.type == BCTypeEnum.u64 || cRetval.type.type == BCTypeEnum.f52)
-                {
-                    *lhsRef = cRetval.imm64;
-                }
-                else
-                {
-                    *lhsRef = cRetval.imm32;
-                }
-
-                if (callDepth-- == 0)
-                {
-                    return cRetval;
-                }
             }
             break;
 
