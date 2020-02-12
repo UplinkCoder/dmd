@@ -2247,7 +2247,12 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
         {
             auto returnAddr = returnAddrs[--n_return_addrs];
             byteCode = getCodeForId(returnAddr.fnId, functions);
+            fnId = returnAddr.fnId;
             ip = returnAddr.ip;
+
+            debug { if (!__ctfe) writeln("Setting ip to = ", ip, "  Bytecode size = ", byteCode.length); }
+            debug { if (!__ctfe) writeln("returnAddrs: ", returnAddrs[0 .. n_return_addrs + 1]); }
+
             stackP = stackP - (returnAddr.stackSize / 4);
             callDepth--;
 
@@ -3434,7 +3439,6 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
         case LongInst.Call:
             {
-
                 assert(functions, "When calling functions you need functions to call");
                 auto call = calls[uint((*rhs & uint.max)) - 1];
                 auto returnAddr = ReturnAddr(ip, fnId, call.callerSp, lhsRef);
@@ -3443,6 +3447,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     call.fn.imm32 :
                     stackP[call.fn.stackAddr.addr / 4]
                 ) & uint.max;
+
+                fnId = fn - 1;
 
                 auto stackOffsetCall = stackOffset + call.callerSp;
                 auto newStack = stackP + (call.callerSp / 4);
