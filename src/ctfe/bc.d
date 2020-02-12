@@ -1061,6 +1061,8 @@ pure:
             Set(result, lhs);
         }
 
+        // Prt(result); Prt(lhs); Prt(rhs);
+
         emitArithInstruction(LongInst.Mul, result, rhs, &result.type.type);
     }
 
@@ -1158,8 +1160,9 @@ pure:
 
     void Call(BCValue result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
+        auto call_id = pushOntoStack(imm32(callCount + 1)).stackAddr;
         calls[callCount++] = RetainedCall(fn, args, functionId, ip, sp, l);
-        emitLongInst(LongInst.Call, result.stackAddr, pushOntoStack(imm32(callCount)).stackAddr);
+        emitLongInst(LongInst.Call, result.stackAddr, call_id);
     }
 
     void Load32(BCValue _to, BCValue from)
@@ -2244,7 +2247,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
             returnAddrs = returnAddrs[0 .. $-1];
             byteCode = getCodeForId(returnAddr.fnId, functions);
             ip = returnAddr.ip;
-            stackOffset -= returnAddr.stackSize;
+            stackP = stackP - (returnAddr.stackSize / 4);
+            callDepth--;
 
             if (cRetval.vType == BCValueType.Execption)
             {
@@ -3457,7 +3461,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
                 foreach(int i,ref arg;call.args)
                 {
-                    const argOffset_ = i + 1;
+                    const argOffset_ = (i * 1) + 1;
                     if(isStackValueOrParameter(arg))
                     {
                             newStack[argOffset_] = stackP[arg.stackAddr.addr / 4];
@@ -3471,6 +3475,9 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                         assert(0, "Argument " ~ itos(i) ~" ValueType unhandeled: " ~ enumToString(arg.vType));
                     }
                 }
+
+                debug { if (!__ctfe) writeln("Stack after pushing: ", newStack[0 .. 64]); }
+
                 if (callDepth++ == 2000)
                 {
                         BCValue bailoutValue;
@@ -3480,7 +3487,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 }
                 {
                     returnAddrs ~= returnAddr;
-                    stackP = stackP + call.callerSp;
+                    stackP = stackP + (call.callerSp / 4);
                     byteCode = getCodeForId(cast(int)(fn - 1), functions);
                     ip = 4;
                 }
