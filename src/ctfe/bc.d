@@ -370,6 +370,7 @@ struct BCFunction
     //
 }
 
+enum max_call_depth = 2000;
 struct BCGen
 {
     int[ushort.max] byteCodeArray;
@@ -2163,7 +2164,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
     uint[] breakLines = [];
     uint lastLine;
     BCValue cRetval;
-    ReturnAddr[] returnAddrs;
+    ReturnAddr[max_call_depth] returnAddrs;
+    uint n_return_addrs;
     if (!__ctfe)
     {
         debug writeln("Args: ", args, "BC:", (*byteCode).printInstructions(stackMap));
@@ -2241,10 +2243,9 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
     bool Return()
     {
-        if (returnAddrs.length)
+        if (n_return_addrs)
         {
-            auto returnAddr = returnAddrs[$-1];
-            returnAddrs = returnAddrs[0 .. $-1];
+            auto returnAddr = returnAddrs[--n_return_addrs];
             byteCode = getCodeForId(returnAddr.fnId, functions);
             ip = returnAddr.ip;
             stackP = stackP - (returnAddr.stackSize / 4);
@@ -3478,7 +3479,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
                 debug { if (!__ctfe) writeln("Stack after pushing: ", newStack[0 .. 64]); }
 
-                if (callDepth++ == 2000)
+                if (callDepth++ == max_call_depth)
                 {
                         BCValue bailoutValue;
                         bailoutValue.vType = BCValueType.Bailout;
@@ -3486,7 +3487,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                         return bailoutValue;
                 }
                 {
-                    returnAddrs ~= returnAddr;
+                    returnAddrs[n_return_addrs++] = returnAddr;
                     stackP = stackP + (call.callerSp / 4);
                     byteCode = getCodeForId(cast(int)(fn - 1), functions);
                     ip = 4;
