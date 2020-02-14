@@ -2275,15 +2275,18 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     // In case we are at the callDepth we need to go to the right catch
                     else if (catch_.stackDepth == callDepth)
                     {
-                       debug { if (!__ctfe) writeln("stackdepth == Calldepth. Executing catch ... hopefully"); }
+                        debug { if (!__ctfe) writeln("stackdepth == Calldepth. Executing catch ... hopefully"); }
                         ip = catch_.ip;
                         // resume execution at execption handler block
                     }
                     // in case we end up here there is a catch handler but we skipped it
-                    // this should never happen!
+                    // this can happen if non of the handlers matched we return the execption
+                    // out of the function .. we can ignore the state of the stack and such
                     else
                     {
-                        assert(0, "Seems like we forgot to pop a catch or something");
+                       
+                        debug { if (!__ctfe) writeln("we have not been able to catch the expection returning."); }
+                        return true;
                     }
                 }
                 // if we go here it means there are no catches anymore to catch this.
@@ -3164,21 +3167,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 expValue.vType = BCValueType.Exception;
 
                 cRetval = expValue;
-                Return();
-/+
-                auto catch_ = catches.length ? &((*catches)[$-1]) : null;
-                auto unrolling = catch_ ? catch_.stackDepth < callDepth : true;
-                if (unrolling)
-                {
-                    return expValue;
-                }
-                else
-                {
-                    // we are at the correct stack level
-                    ip = catch_.ip;
-                    // set the instruction pointer and continue
-                }
-+/
+                if (Return())
+                    return cRetval;
             }
             break;
 
