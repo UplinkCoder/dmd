@@ -2256,8 +2256,10 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
             stackP = stackP - (returnAddr.stackSize / 4);
             callDepth--;
 
-            if (cRetval.vType == BCValueType.Execption)
+            if (cRetval.vType == BCValueType.Exception)
             {
+                debug { if (!__ctfe) writeln("Exception in flight ... length of catches: ", catches ? catches.length : -1) ; }
+
                 // we return to unroll
                 // lets first handle the case in which there are catches on the catch stack
                 if (catches && (*catches).length)
@@ -2267,11 +2269,13 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     // we need to pass this return value on
                     if (catch_.stackDepth < callDepth)
                     {
+                        debug { if (!__ctfe) writefln("CatchDepth:(%d) lower than current callStack:(%d) Depth. Returning", catch_.stackDepth, callDepth); }
                         Return();
                     }
                     // In case we are at the callDepth we need to go to the right catch
                     else if (catch_.stackDepth == callDepth)
                     {
+                       debug { if (!__ctfe) writeln("stackdepth == Calldepth. Executing catch ... hopefully"); }
                         ip = catch_.ip;
                         // resume execution at execption handler block
                     }
@@ -2290,7 +2294,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 }
 
                 // in case we are at the depth we need to jump to Throw
-                assert(!catches.length, "We should goto the catchBlock here.");
+                // assert(!catches.length, "We should goto the catchBlock here.");
             }
             else if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
             {
@@ -3146,6 +3150,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
             case LongInst.PopCatch:
             {
+                debug { if (!__ctfe) writeln("Poping a Catch"); }
                 (*catches) = (*catches)[0 .. $-1];
             }
             break;
@@ -3153,10 +3158,14 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
             case LongInst.Throw:
             {
                 uint expP = ((*opRef) & uint.max);
+                debug { if (!__ctfe) writeln("*opRef: ", expP); } 
                 auto expTypeIdx = heapPtr._heap[expP + ClassMetaData.TypeIdIdxOffset];
                 auto expValue = BCValue(HeapAddr(expP), BCType(BCTypeEnum.Class, expTypeIdx));
-                expValue.vType = BCValueType.Execption;
+                expValue.vType = BCValueType.Exception;
 
+                cRetval = expValue;
+                Return();
+/+
                 auto catch_ = catches.length ? &((*catches)[$-1]) : null;
                 auto unrolling = catch_ ? catch_.stackDepth < callDepth : true;
                 if (unrolling)
@@ -3169,6 +3178,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     ip = catch_.ip;
                     // set the instruction pointer and continue
                 }
++/
             }
             break;
 

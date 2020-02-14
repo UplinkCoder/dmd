@@ -2190,8 +2190,8 @@ struct BCScope
     BCBlock[64] blocks;
 }
 //debug = abi;
-debug = nullPtrCheck;
-debug = nullAllocCheck;
+// debug = nullPtrCheck;
+ debug = nullAllocCheck;
 //debug = ctfe;
 //debug = MemCpyLocation;
 //debug = SetLocation;
@@ -2478,7 +2478,14 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
         if (!offset)
         {
-            Store32(addr, value, line);
+            debug (nullPtrCheck)
+            {
+                Store32(addr, value, line);
+            }
+            else
+            {
+                Store32(addr, value);
+            }
         }
         else
         {
@@ -2491,7 +2498,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             {
                 Sub3(ea, addr, imm32(-offset));
             }
-            Store32(ea, value, line);
+            Store32(ea, value);
         }
     }
 
@@ -2503,9 +2510,11 @@ extern (C++) final class BCV(BCGenT) : Visitor
         if (value.type.type != BCTypeEnum.i32)
             value = value.i32;
 
+        Comment("LoadFromOffset called form: " ~ itos(line));
+
         if (!offset)
         {
-            Load32(value, addr, line);
+            Load32(value, addr);
         }
         else
         {
@@ -2518,7 +2527,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
             {
                 Sub3(ea, addr, imm32(-offset));
             }
-            Load32(value, ea, line);
+            Load32(value, ea);
         }
     }
 
@@ -4760,36 +4769,9 @@ static if (is(BCGen))
 
     override void visit(TryCatchStatement tc)
     {
-        // here we need to do a little trickery
-        // since we only know the content of the try block after generating it
-        // and reference those in the catch handlers
-        // we need to generate that first.
-        // however at the same time we need to push the catches before
-        // we can advance executing the try block
-        // we will do this by Jumping to the PushCatch instruction before executing the try Block
-        // @Broken: catches don't seem to be pushed!
-        BCBlock try_body;
-        auto try_block_executed = genTemporary(i32Type);
-        Set(try_block_executed, imm32(0));
-        auto CJpush_catches = beginCndJmp(try_block_executed);
-        {
-            try_body = genBlock(tc._body);
-            Set(try_block_executed, imm32(1));
-        }
-
-
-
-        // then we will Jump back to the beginning of the Block
-        auto CJ_JumpBack = beginCndJmp(try_block_executed, true);
-        {
-            Jmp(try_body.begin);
-            endCndJmp(CJpush_catches, genLabel());
-            PushCatch();
-            pushCatches(tc.catches);
-        }
-        endCndJmp(CJ_JumpBack, genLabel());
-
-
+        PushCatch();
+        pushCatches(tc.catches);
+        genBlock(tc._body);
         PopCatch();
 
         // bailout("We currently can't handle ExecptionHandling");
@@ -4821,6 +4803,10 @@ static if (is(BCGen))
 
         // this has to be done after vtbl pointers are known.
         // so we have to put this into a todo list.
+
+        // @FIXME Don't assume we are only going to have 128 catches :)
+        typeof(beginJmp())[128] break_catch_jmps;
+        int n_break_catch_jmps = 0;
         foreach(i, _catch;*catches)
         {
             BCType catchType = toBCType(_catch.type);
@@ -4833,11 +4819,18 @@ static if (is(BCGen))
             Comment("Calling catch");
             Call(castedValue.i32, imm32(castFnIdx), [e_ptr]);
             PrintString("Catch [" ~ itos(cast(int)i) ~ "] :" ~ _catch.handler.toString);
-            CJcastFailed = beginCndJmp(castedValue);
+            Comment("CJcastFailed");
+            CJcastFailed = beginCndJmp(castedValue, false);
             {
                 genBlock(_catch.handler);
+                break_catch_jmps[n_break_catch_jmps++] = beginJmp();
             }
             endCndJmp(CJcastFailed, genLabel());
+        }
+        auto Lbreak =  genLabel();
+        foreach(j;break_catch_jmps[0 .. n_break_catch_jmps])
+        {
+            endJmp(j, Lbreak);
         }
     }
     

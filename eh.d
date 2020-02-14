@@ -19,6 +19,7 @@ class IntExp : ValueExp
   int value;
 }
 
+
 void fthrow(int x)
 {
     throw new IntExp(x);
@@ -27,27 +28,34 @@ void fthrow(int x)
 
 int fn(int x)
 {
-    int g = 0;
-    void wrap(int x)
+    int g = 12;
+
+    int wrap(int x)
     {
         try
         {
-            return fthrow(x);
-        } catch (VoidExp e) { g = 231; }
-          catch (ValueExp e) { g = 89; }
-       {
-       }
+            throw new VoidExp();
+        }
+        catch(IntExp e)
+        {
+            g = -44;
+        }
+        return 99;
     }
-
 
     try
     {
-    //    fthrow(x);
-          wrap(x);
+//         fthrow(x);
+              wrap(x);
+//        throw new IntExp(2);
     }
     catch (IntExp e)
     {
         return e.value + g;
+    }
+    catch (ValueExp e)
+    {
+        g = 8;
     }
     return g;
     // assert(0);
