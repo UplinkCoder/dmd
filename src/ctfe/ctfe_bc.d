@@ -1433,6 +1433,7 @@ Expression toExpression(const BCValue value, Type expressionType,
     const BCHeap* heapPtr = &_sharedExecutionState.heap,
     const BCValue[4]* errorValues = null, const RetainedError* errors = null)
 {
+    import ddmd.ctfeexpr : ThrownExceptionExp, ClassReferenceExp;
     debug (abi)
     {
             import std.stdio;
@@ -1457,6 +1458,16 @@ Expression toExpression(const BCValue value, Type expressionType,
         }
 
         return null;
+    }
+
+    if (value.vType == BCValueType.Exception)
+    {
+        BCType cType = value.type;
+        assert(cType.type == BCTypeEnum.Class && cType.typeIndex);
+
+        expressionType =
+            _sharedCtfeState.classDeclTypePointers[cType.typeIndex - 1].type;
+         
     }
 
     StringExp makeString(BCValue value)
@@ -1739,7 +1750,6 @@ Expression toExpression(const BCValue value, Type expressionType,
         break;
     case Tclass:
         {
-            import ddmd.ctfeexpr : ClassReferenceExp;
             auto cd = (cast(TypeClass) expressionType).sym;
             auto ci = _sharedCtfeState.getClassIndex(cd);
             assert(ci);
@@ -1891,7 +1901,12 @@ Expression toExpression(const BCValue value, Type expressionType,
             printf("could not create expression of type: %s\n", enumToString(cast(ENUMTY)expressionType.ty).ptr);
         }
     }
-
+    if (value.vType == BCValueType.Exception)
+    {
+        auto thrown_exp =  new ThrownExceptionExp(lastLoc, cast(ClassReferenceExp)result);
+        result = thrown_exp;
+        thrown_exp.generateUncaughtError();
+    }
     return result;
 }
 
