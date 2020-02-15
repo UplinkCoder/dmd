@@ -2602,8 +2602,13 @@ extern (C++) final class BCV(BCGenT) : Visitor
     }
     else
     {
-        extern (D) void PrintString (string message)
+        extern (D) void PrintString (const(char)[] message)
         {
+            static if (is(typeof(gen.PrintString(message))))
+            {
+                gen.PrintString(message);
+            }
+            else
             printf("PrintString not supported with this backend.");
         }
     }

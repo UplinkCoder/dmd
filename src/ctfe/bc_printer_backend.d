@@ -284,6 +284,11 @@ struct Print_BCGen
         result ~= indent ~ "Finalize(" ~ ");\n";
     }
 
+    void PrintString (const(char)[] message)
+    {
+        result ~= indent ~ `PrintString("` ~ message ~ "\");\n";
+    }
+
     void beginFunction(uint f = 0, void* fnDecl = null)
     {
         sameLabel = false;
@@ -394,6 +399,21 @@ struct Print_BCGen
     {
         sameLabel = false;
         result ~= indent ~ "emitFlg(" ~ print(lhs) ~ ");\n";
+    }
+
+    void Throw(BCValue e)
+    {
+        result ~= indent ~ "Throw (" ~ print(e) ~ ");\n";
+    }
+
+    void PushCatch()
+    {
+        result ~= indent ~ "PushCatch ();\n";
+    }
+
+    void PopCatch()
+    {
+        result ~= indent ~ "PopCatch ();\n";
     }
 
     void Set(BCValue lhs, BCValue rhs)
