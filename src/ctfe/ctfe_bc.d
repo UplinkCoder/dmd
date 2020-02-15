@@ -1433,7 +1433,7 @@ Expression toExpression(const BCValue value, Type expressionType,
     const BCHeap* heapPtr = &_sharedExecutionState.heap,
     const BCValue[4]* errorValues = null, const RetainedError* errors = null)
 {
-    import ddmd.ctfeexpr : ThrownExceptionExp, ClassReferenceExp;
+    import ddmd.ctfeexpr : ThrownExceptionExp, ClassReferenceExp, CTFEExp;
     debug (abi)
     {
             import std.stdio;
@@ -1844,13 +1844,9 @@ Expression toExpression(const BCValue value, Type expressionType,
                     offset += align4(_sharedCtfeState.size(memberType, true));
                 }
             }
+
             if (!isNullClass)
             {
-                foreach(e;*elmExprs)
-                {
-                    writeln(e.toChars());
-                }
-
                 auto se = new StructLiteralExp(lastLoc, cast(StructDeclaration)cd, elmExprs);
                 se.ownedByCtfe = OWNEDctfe;
                 result = new ClassReferenceExp(lastLoc, se, expressionType);
@@ -1938,8 +1934,8 @@ Expression toExpression(const BCValue value, Type expressionType,
     if (value.vType == BCValueType.Exception)
     {
         auto thrown_exp =  new ThrownExceptionExp(lastLoc, cast(ClassReferenceExp)result);
-        result = thrown_exp;
         thrown_exp.generateUncaughtError();
+        result = CTFEExp.cantexp;
     }
     return result;
 }
