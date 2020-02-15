@@ -1502,7 +1502,6 @@ Expression toExpression(const BCValue value, Type expressionType,
         foreach (i; 0 .. length)
             resultString[i] = cast(char) heapPtr._heap[offset + i];
         resultString[length] = '\0';
-
         StringExp se = new StringExp(lastLoc, cast(void*)resultString, length);
         se.type = Type.tstring;
         se.ownedByCtfe = OWNEDctfe;
@@ -1754,13 +1753,16 @@ Expression toExpression(const BCValue value, Type expressionType,
             auto ci = _sharedCtfeState.getClassIndex(cd);
             assert(ci);
             BCClass _class = _sharedCtfeState.classTypes[ci - 1];
-            auto classPtr = *(heapPtr._heap.ptr + value.imm32);
+            auto classPtr = (value.imm32.imm32);
+
             auto structBegin = heapPtr._heap.ptr + classPtr;
             Expressions* elmExprs = new Expressions();
-            uint offset = 0;
+            uint offset = ClassMetaData.Size;
 
             bool isNullClass = (classPtr == 0);
 
+            //FIXME: we should not use a slice here
+            //find a better way to get at the memberTypes
             Type[] memberTypeArray;
             // we need to reconsruct the class layout ... again
             // what a pain!
@@ -1778,7 +1780,6 @@ Expression toExpression(const BCValue value, Type expressionType,
                     memberTypeArray ~= f.type;
                 }
             }
-            
 
             if (!isNullClass)
             {
@@ -1787,7 +1788,7 @@ Expression toExpression(const BCValue value, Type expressionType,
                 debug (abi)
                 {
                     import std.stdio;
-                    //writeln("class: ", _class);
+                    writeln("class: ", _class.size);
                     writeln("ClassHeapRep: ", structBegin[0 .. _class.size]);
                 }
                 foreach (idx, memberType; _class.memberTypes[0 .. _class.memberCount])
@@ -1810,9 +1811,14 @@ Expression toExpression(const BCValue value, Type expressionType,
                         imm64.imm64 |= ulong(*(structBegin + offset + 4)) << 32;
                         elm = toExpression(imm64, type);
                     }
-                    else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Class]))
+                    else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))
                     {
-                        elm = toExpression(imm32(classPtr + offset), type);
+                        writeln("while converting class or struct or string offset: ", offset);
+                        elm = toExpression(imm32((classPtr + offset)), type);
+                    }
+                    else if (memberType.type == BCTypeEnum.Class)
+                    {
+                        elm = toExpression(imm32(heapPtr._heap[classPtr + offset]), type);
                     }
                     else
                     {
@@ -1835,7 +1841,6 @@ Expression toExpression(const BCValue value, Type expressionType,
                     }
                     
                     elmExprs.insert(idx, elm);
-                    writeln("inserting: ", elm.toString);
                     offset += align4(_sharedCtfeState.size(memberType, true));
                 }
             }
@@ -2132,7 +2137,11 @@ extern (C++) final class BCTypeVisitor : Visitor
         auto ct = sharedCtfeState.beginClass(cd);
 
         ct.parentIdx = parentIdx;
+
         // add parent fields before the current ones.
+        // FIXME this this really needed
+        // and if it is do we have to rewrite computeSize?
+
         if (ct.parentIdx)
         {
             auto pc = _sharedCtfeState.classTypes[ct.parentIdx - 1];
@@ -2141,7 +2150,6 @@ extern (C++) final class BCTypeVisitor : Visitor
                 ct.addField(f, false);
             }
         }
-
 
         foreach(VarDeclaration f;cd.fields)
         {
@@ -2243,9 +2251,9 @@ struct BCScope
     //    Identifier[64] identifiers;
     BCBlock[64] blocks;
 }
-debug = abi;
-// debug = nullPtrCheck;
- debug = nullAllocCheck;
+//debug = abi;
+debug = nullPtrCheck;
+debug = nullAllocCheck;
 //debug = ctfe;
 //debug = MemCpyLocation;
 //debug = SetLocation;
@@ -6304,6 +6312,16 @@ static if (is(BCGen))
                 }
 
                 Comment("Array intialisation End");
+            }
+            else if (mt.type == BCTypeEnum.string8)
+            {
+                auto initExp = type.initializerExps[i];
+                auto initValue = initExp ? genExpr(type.initializerExps[i]) : BCValue.init;
+                import std.stdio : writeln;
+                writeln(initExp.toString());
+                auto offset = genTemporary(pointerToMemberType);
+                Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
+                Store32(offset.u32, initValue);
             }
             else if (mt.type == BCTypeEnum.Slice)
             {

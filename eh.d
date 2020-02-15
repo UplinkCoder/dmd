@@ -5,7 +5,7 @@ class ValueExp : Exception
 
 class VoidExp : Exception
 {
-    this() { super(""); }
+    this() { super("VoidExp message"); }
 }
 
 class IntExp : ValueExp
@@ -63,3 +63,4 @@ int fn(int x)
 
 pragma(msg, fn(22));
 
+// pragma(msg, () { static class C { int y; this(int y) { this.y = y; }} static class S { int i = 73; string x = "x"; C c = new C(64); } S s = new S(); s.x = "Hello"; s.c = new C(32); return s; } ());
