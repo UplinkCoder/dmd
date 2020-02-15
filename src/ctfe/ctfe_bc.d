@@ -1760,8 +1760,30 @@ Expression toExpression(const BCValue value, Type expressionType,
             uint offset = 0;
 
             bool isNullClass = (classPtr == 0);
+
+            Type[] memberTypeArray;
+            // we need to reconsruct the class layout ... again
+            // what a pain!
+
+            int n_base_classes;
+            ClassDeclaration[64] base_classes;
+            for(ClassDeclaration _cd = cd; _cd; _cd = _cd.baseClass)
+            {
+                base_classes[n_base_classes++] = _cd;
+            }
+            foreach_reverse(i; 0 .. n_base_classes)
+            {
+                foreach(f;base_classes[i].fields)
+                {
+                    memberTypeArray ~= f.type;
+                }
+            }
+            
+
             if (!isNullClass)
             {
+                writeln("memberTypes:", _class.memberTypes[0 .. _class.memberCount]);
+                writeln(_class.vtblPtr);
                 debug (abi)
                 {
                     import std.stdio;
@@ -1774,7 +1796,8 @@ Expression toExpression(const BCValue value, Type expressionType,
                     {
                         writeln("ClassIdx:", ci, " memberIdx: " ,  idx, " offset: ", offset);
                     }
-                    auto type = cd.fields[idx].type;
+                    auto type = memberTypeArray[idx];
+                    // auto type = cd.fields[idx].type;
                     
                     Expression elm;
                     
@@ -1812,11 +1835,17 @@ Expression toExpression(const BCValue value, Type expressionType,
                     }
                     
                     elmExprs.insert(idx, elm);
+                    writeln("inserting: ", elm.toString);
                     offset += align4(_sharedCtfeState.size(memberType, true));
                 }
             }
             if (!isNullClass)
             {
+                foreach(e;*elmExprs)
+                {
+                    writeln(e.toChars());
+                }
+
                 auto se = new StructLiteralExp(lastLoc, cast(StructDeclaration)cd, elmExprs);
                 se.ownedByCtfe = OWNEDctfe;
                 result = new ClassReferenceExp(lastLoc, se, expressionType);
@@ -2103,6 +2132,16 @@ extern (C++) final class BCTypeVisitor : Visitor
         auto ct = sharedCtfeState.beginClass(cd);
 
         ct.parentIdx = parentIdx;
+        // add parent fields before the current ones.
+        if (ct.parentIdx)
+        {
+            auto pc = _sharedCtfeState.classTypes[ct.parentIdx - 1];
+            foreach(f;pc.memberTypes[0 .. pc.memberCount])
+            {
+                ct.addField(f, false);
+            }
+        }
+
 
         foreach(VarDeclaration f;cd.fields)
         {
@@ -2204,7 +2243,7 @@ struct BCScope
     //    Identifier[64] identifiers;
     BCBlock[64] blocks;
 }
-//debug = abi;
+debug = abi;
 // debug = nullPtrCheck;
  debug = nullAllocCheck;
 //debug = ctfe;
