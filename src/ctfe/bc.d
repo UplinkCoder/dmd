@@ -3044,7 +3044,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
             break;
         case LongInst.Ugt:
             {
-                if ((*lhsRef) > *rhs)
+                if (cast(ulong)(*lhsRef) > cast(ulong)*rhs)
                 {
                     cond = true;
                 }
