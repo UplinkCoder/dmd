@@ -6,8 +6,8 @@ static if (!is(typeof ({ import gccjit.c; })))
 else
 {
 
-//    extern (C) void lang_register_spec_functions () {}
-    extern (C) void _Z28lang_register_spec_functionsv() {}
+    extern (C++) void lang_register_spec_functions () {}
+    // extern (C) void _Z28lang_register_spec_functionsv() {}
     import gccjit.c;
 
     alias jctx = gcc_jit_context*;
@@ -857,6 +857,43 @@ else
         gcc_jit_block_add_assignment(block, currentLoc, lvalue(lhs), rvalue(flag));
     }
 
+    void Throw(BCValue e)
+    {
+        assert(0, "Not Implemented");
+    }
+
+    void PushCatch()
+    {
+        assert(0, "Not Implemented");
+    }
+
+    void PopCatch()
+    {
+        assert(0, "Not Implemented");
+    }
+
+    void F64ToF32(BCValue to_, BCValue from)
+    {
+        auto _from = rvalue(from);
+        auto _to = lvalue(to_);
+        gcc_jit_block_add_assignment(block, currentLoc,
+            _to, gcc_jit_context_new_cast(ctx, currentLoc,
+                _from, f23type
+             )
+        );
+    }
+
+    void F32ToF64(BCValue to_, BCValue from)
+    {
+        auto _from = rvalue(from);
+        auto _to = lvalue(to_);
+        gcc_jit_block_add_assignment(block, currentLoc,
+            _to, gcc_jit_context_new_cast(ctx, currentLoc,
+                _from, f52type
+            )
+        );
+    }
+
     void Alloc(BCValue heapPtr, BCValue size)
     {
         auto _size = rvalue(size);
@@ -927,6 +964,12 @@ else
         gcc_jit_block_add_assignment(block, currentLoc, lvalue(lhs), rvalue(rhs));
     }
 
+    auto castUnsigned(BCValue v)
+    {
+        return 
+            gcc_jit_context_new_cast(ctx, currentLoc, rvalue(v), u64type);
+    }
+
     void Lt3(BCValue result, BCValue lhs, BCValue rhs)
     {
         auto cmp =
@@ -951,6 +994,30 @@ else
         gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);
     }
 
+    void Ult3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        auto cmp =
+            gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_LT, castUnsigned(lhs), castUnsigned(rhs));
+        
+        auto _result = result ? lvalue(result) : flag;
+        if (result)
+            cmp = gcc_jit_context_new_cast(ctx, currentLoc, cmp, i64type);
+        
+        gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);
+    }
+    
+    void Ule3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        auto cmp =
+            gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_LE, castUnsigned(lhs), castUnsigned(rhs));
+        
+        auto _result = result ? lvalue(result) : flag;
+        if (result)
+            cmp = gcc_jit_context_new_cast(ctx, currentLoc, cmp, i64type);
+        
+        gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);
+    }
+
     void Gt3(BCValue result, BCValue lhs, BCValue rhs)
     {
         auto cmp =
@@ -972,6 +1039,30 @@ else
         if (result)
             cmp = gcc_jit_context_new_cast(ctx, currentLoc, cmp, i64type);
 
+        gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);
+    }
+
+    void Ugt3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        auto cmp =
+            gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_GT, castUnsigned(lhs), castUnsigned(rhs));
+        
+        auto _result = result ? lvalue(result) : flag;
+        if (result)
+            cmp = gcc_jit_context_new_cast(ctx, currentLoc, cmp, i64type);
+        
+        gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);
+    }
+    
+    void Uge3(BCValue result, BCValue lhs, BCValue rhs)
+    {
+        auto cmp =
+            gcc_jit_context_new_comparison(ctx, currentLoc, GCC_JIT_COMPARISON_GE, castUnsigned(lhs), castUnsigned(rhs));
+        
+        auto _result = result ? lvalue(result) : flag;
+        if (result)
+            cmp = gcc_jit_context_new_cast(ctx, currentLoc, cmp, i64type);
+        
         gcc_jit_block_add_assignment(block, currentLoc, _result, cmp);
     }
 
