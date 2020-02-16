@@ -364,7 +364,7 @@ dmd: $(DMD_SRCS) $(ROOT_SRCS) $G/newdelete.o $(GLUE_OBJS) $(BACK_OBJS) $(STRING_
 	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -J$G -J../res -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
 else
 dmd: $(DMD_SRCS) $(ROOT_SRCS) newdelete.o backend.a $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)
-	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -J$G -J../res -L-L/usr/lib/gcc/x86_64-linux-gnu/8 -L-lgccjit -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
+	CC=$(HOST_CXX) $(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -J$G -J../res -L-L/usr/lib/gcc/x86_64-linux-gnu/9 -L-lgccjit -L-lstdc++ $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^)
 endif
 
 

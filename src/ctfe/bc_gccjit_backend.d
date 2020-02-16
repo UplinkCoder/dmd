@@ -5,6 +5,9 @@ static if (!is(typeof ({ import gccjit.c; })))
 }
 else
 {
+
+//    extern (C) void lang_register_spec_functions () {}
+    extern (C) void _Z28lang_register_spec_functionsv() {}
     import gccjit.c;
 
     alias jctx = gcc_jit_context*;
@@ -1392,7 +1395,7 @@ else
     {
         if (blockCount)
         {
-            gcc_jit_block_add_comment(block, gcc_jit_context_new_location(ctx, __FILE__, callerLine, 0), ("Line " ~ itos(line)).toStringz);
+            // gcc_jit_block_add_comment(block, gcc_jit_context_new_location(ctx, __FILE__, callerLine, 0), ("Line " ~ itos(line)).toStringz);
         }
         source_location = gcc_jit_context_new_location(ctx, source_filename, line, 0);
     }
