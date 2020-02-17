@@ -1059,6 +1059,7 @@ struct SharedCtfeState(BCGenT)
 
     import ddmd.globals : Loc;
 
+
     BCValue addErrorWithMessage(Loc loc, BCValue errorMessage)
     {
         auto sa1 = TypedStackAddr(errorMessage.type, errorMessage.stackAddr);
@@ -2633,7 +2634,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
 
     debug (nullPtrCheck)
     {
-        import ddmd.lexer : Loc;
+        static if (!is(Loc)) import ddmd.lexer : Loc;
 
         void Load32(BCValue _to, BCValue from, uint line = __LINE__)
         {
@@ -3709,25 +3710,31 @@ public:
         // when sharedCTfeState is acutally shared as some point
         //we should avoid querying for the class type and pass it as
         //an argument to this function
-        auto ti = _sharedCtfeState.getClassIndex(cd);
-        auto c = _sharedCtfeState.classTypes[ti - 1];
-        auto n_fields = c.memberCount;
         int result = -1;
-        size_t fieldsSoFar = 0;
+        int fieldsBefore = 0;
+        int relativeFieldIndex = -1;
 
-        foreach (size_t j;0 .. n_fields)
+        while(cd)
         {
-            while (j - fieldsSoFar >= cd.fields.dim)
+            foreach(i, f; cd.fields)
             {
-                fieldsSoFar += cd.fields.dim;
-                cd = cd.baseClass;
+                if (v == f)
+                {
+                    relativeFieldIndex = cast(int)i;
+                    break;
+                }
             }
-            VarDeclaration v2 = cd.fields[j - fieldsSoFar];
-            if (v == v2)
+
+            if (relativeFieldIndex >= 0)
             {
-                result = cast(int)(n_fields - fieldsSoFar - cd.fields.dim + (j - fieldsSoFar));
+                for(cd = cd.baseClass;cd;cd = cd.baseClass)
+                {
+                    fieldsBefore += cd.fields.dim;
+                }
+                result = fieldsBefore + relativeFieldIndex;
                 break;
             }
+            cd = cd.baseClass;
         }
 
         return result;
