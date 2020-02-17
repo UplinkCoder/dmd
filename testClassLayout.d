@@ -2,6 +2,7 @@
 alias twice = long; alias once = int;
 class B {once more = 0x123; twice the_fun = 0xFFF; long the_trouble = 0x666;}
 
+
 class C : B
 {
   int a = 12; int b = 13; int c = 14;
@@ -25,7 +26,7 @@ auto testLayout()
     c.a = 12; c.b = 13; c.c = 14;
     c.more = 0x123; c.the_fun = 0xFFF; c.the_trouble = 0x666;
 
-    return c.toArray;
+    return c.toArray();
 }
 static immutable returnValue = testLayout();
 pragma(msg, testLayout());

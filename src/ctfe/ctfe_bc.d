@@ -815,8 +815,8 @@ struct BCClass
 
     void computeSize()
     {
-        uint size = 0;
-
+        uint size = align4(ClassMetaData.Size);
+/+
         if (parentIdx)
         {
             auto pct = _sharedCtfeState.classTypes[parentIdx - 1];
@@ -828,7 +828,7 @@ struct BCClass
         {
             size = align4(ClassMetaData.Size);
         }
-
++/
 
         foreach (t; memberTypes[0 .. memberCount])
         {
@@ -840,7 +840,7 @@ struct BCClass
 
     const int offset(const int idx)
     {
-        int _offset = 0;
+        int _offset = align4(ClassMetaData.Size);
         if (idx == -1)
             return -1;
 
@@ -1716,9 +1716,13 @@ Expression toExpression(const BCValue value, Type expressionType,
                     imm64.imm64 |= ulong(*(heapPtr._heap.ptr + value.imm32 + offset + 4)) << 32;
                     elm = toExpression(imm64, type);
                 }
-                else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8, BCTypeEnum.Class]))
+                else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))
                 {
                     elm = toExpression(imm32(value.imm32 + offset), type);
+                }
+                else if (memberType.type == BCTypeEnum.Class)
+                {
+                    elm = toExpression(imm32(heapPtr._heap[*(structBegin + offset)]), type);
                 }
                 else
                 {
@@ -1768,11 +1772,13 @@ Expression toExpression(const BCValue value, Type expressionType,
             // what a pain!
 
             int n_base_classes;
+    
             ClassDeclaration[64] base_classes;
             for(ClassDeclaration _cd = cd; _cd; _cd = _cd.baseClass)
             {
                 base_classes[n_base_classes++] = _cd;
             }
+
             foreach_reverse(i; 0 .. n_base_classes)
             {
                 foreach(f;base_classes[i].fields)
@@ -1784,6 +1790,9 @@ Expression toExpression(const BCValue value, Type expressionType,
             if (!isNullClass)
             {
                 writeln("memberTypes:", _class.memberTypes[0 .. _class.memberCount]);
+                import core.stdc.string : strlen;
+                import std.algorithm : map;
+                writeln("memberTypeArray:", memberTypeArray.map!(e => e.toChars()[0 .. strlen(e.toChars())]));
                 writeln(_class.vtblPtr);
                 debug (abi)
                 {
@@ -2247,7 +2256,7 @@ struct BCScope
     //    Identifier[64] identifiers;
     BCBlock[64] blocks;
 }
-//debug = abi;
+// debug = abi;
 debug = nullPtrCheck;
 debug = nullAllocCheck;
 //debug = ctfe;
@@ -2434,7 +2443,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         }
         return 0;
     }
-
+    import ddmd.globals : Loc;
     BCValue addErrorWithMessage(Loc loc, BCValue errorMessage)
     {
         alias add_error_value_prototype = uint delegate (BCValue);
@@ -3694,6 +3703,36 @@ public:
         uncompiledDynamicCastCount = 0;
     }
 
+    static int findFieldIndexByName(ClassDeclaration cd, VarDeclaration v)
+    {
+        //FIXME performance:
+        // when sharedCTfeState is acutally shared as some point
+        //we should avoid querying for the class type and pass it as
+        //an argument to this function
+        auto ti = _sharedCtfeState.getClassIndex(cd);
+        auto c = _sharedCtfeState.classTypes[ti - 1];
+        auto n_fields = c.memberCount;
+        int result = -1;
+        size_t fieldsSoFar = 0;
+
+        foreach (size_t j;0 .. n_fields)
+        {
+            while (j - fieldsSoFar >= cd.fields.dim)
+            {
+                fieldsSoFar += cd.fields.dim;
+                cd = cd.baseClass;
+            }
+            VarDeclaration v2 = cd.fields[j - fieldsSoFar];
+            if (v == v2)
+            {
+                result = cast(int)(n_fields - fieldsSoFar - cd.fields.dim + (j - fieldsSoFar));
+                break;
+            }
+        }
+
+        return result;
+    }
+
     FieldInfo getFieldInfo(BCType t, VarDeclaration vd)
     {
         FieldInfo fInfo;
@@ -3711,11 +3750,13 @@ public:
             auto idx = findFieldIndexByName(sd, vd);
             if (idx != -1)
             {
-                auto _struct = &_sharedCtfeState.structTypes[ti - 1];
+                auto _struct = _sharedCtfeState.structTypes[ti - 1];
                 fInfo.index = idx;
                 fInfo.offset = _struct.offset(idx);
                 fInfo.type = _struct.memberTypes[idx];
             }
+            else
+                assert(0, "Field could not be found");
         }
         else if (t.type == BCTypeEnum.Class)
         {
@@ -3725,49 +3766,21 @@ public:
                 bailout("can't get class-type ti: " ~ itos(ti) ~ " classCount: " ~ itos(_sharedCtfeState.classCount));
                 return fInfo;
             }
-
             auto cd = _sharedCtfeState.classDeclTypePointers[ti - 1];
-            BCClass* c = &_sharedCtfeState.classTypes[ti - 1];
-            int offset = -1;
-            int index = -1;
-
-            FindField: while(cd)
+            auto idx  = findFieldIndexByName(cd, vd);
+            if (idx != -1)
             {
-                foreach(int i,f;cd.fields)
-                {
-                    if (vd == f)
-                    {
-                        index = i;
-                        offset = c.offset(i);
-                        fInfo.type = c.memberTypes[i];
-                        break FindField;
-                    }
-                }
-                cd = cd.baseClass;
-                c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
+                auto _class = _sharedCtfeState.classTypes[ti - 1];
+                fInfo.index = idx;
+                fInfo.offset = _class.offset(idx);
+                fInfo.type = _class.memberTypes[idx];
             }
+            else
+                assert(0, "Field could not be found");
 
-            // we either found a field and have to add the size of the parent
-            // (if there is one) or we could not find it, in which case cd will
-            // be null wich will cause to return the invalid Value {BCType.init, -1}
-
-            if (cd && cd.baseClass)
-            {
-                cd = cd.baseClass;
-                c = &_sharedCtfeState.classTypes[c.parentIdx - 1];
-
-                c.computeSize();
-                offset += c.size;
-                while(cd)
-                {
-                    index += cd.fields.dim;
-                    cd = cd.baseClass;
-                }
-            }
-
-            fInfo.offset = offset;
-            fInfo.index = index;
         }
+
+        // import std.stdio : writeln; debug { if (!__ctfe) {writeln("fInfo: ", fInfo, "vd: ", vd.toString()); } } //DEBUGLINE 
         return fInfo;
     }
 
@@ -4931,7 +4944,7 @@ static if (is(BCGen))
 
         BCValue context;
         auto contextType = toBCType(de.e1.type);
-        printf("ContextType: %s\n", de.e1.type.toPrettyChars(true)); //DEBUGLINE
+        // printf("ContextType: %s\n", de.e1.type.toPrettyChars(true)); //DEBUGLINE
 
         if (contextType.type == BCTypeEnum.Function)
         {
