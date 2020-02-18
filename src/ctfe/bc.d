@@ -2277,6 +2277,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     {
                         debug { if (!__ctfe) writeln("stackdepth == Calldepth. Executing catch ... hopefully"); }
                         ip = catch_.ip;
+                        // we need to also remove the catches so we don't end up here next time
+                        (*catches) = (*catches)[0 .. $-1];
                         // resume execution at execption handler block
                     }
                     // in case we end up here there is a catch handler but we skipped it
