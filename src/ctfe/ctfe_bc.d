@@ -1790,11 +1790,8 @@ Expression toExpression(const BCValue value, Type expressionType,
 
             if (!isNullClass)
             {
-                writeln("memberTypes:", _class.memberTypes[0 .. _class.memberCount]);
                 import core.stdc.string : strlen;
                 import std.algorithm : map;
-                writeln("memberTypeArray:", memberTypeArray.map!(e => e.toChars()[0 .. strlen(e.toChars())]));
-                writeln(_class.vtblPtr);
                 debug (abi)
                 {
                     import std.stdio;
