@@ -180,6 +180,7 @@ struct BlackList
     void defaultBlackList()
     {
         initialize([
+                "grisu2", // because it does not work yet ... 
                 "modify14304", //because of fail_compilation/fail14304.d; We should not be required to check for this.
                 "bug2931", //temporarily to pass a test for multi-dimensional arrays
                 "bug2931_2", //temporarily to pass a test for multi-dimensional arrays
@@ -1820,7 +1821,6 @@ Expression toExpression(const BCValue value, Type expressionType,
                     }
                     else if (memberType.type.anyOf([BCTypeEnum.Slice, BCTypeEnum.Array, BCTypeEnum.Struct, BCTypeEnum.string8]))
                     {
-                        writeln("while converting class or struct or string offset: ", offset);
                         elm = toExpression(imm32((classPtr + offset)), type);
                     }
                     else if (memberType.type == BCTypeEnum.Class)
@@ -2891,8 +2891,8 @@ extern (C++) final class BCV(BCGenT) : Visitor
     void IndexedScaledStore32(BCValue _to, BCValue from, BCValue index, const int scale, int line = __LINE__)
     {
         assert(_to.type.type == BCTypeEnum.i32, "_to has to be an i32");
-        assert(from.type.type == BCTypeEnum.i32, "from has to be an i32");
-        assert(index.type.type == BCTypeEnum.i32, "index has to be an i32");
+        assert(from.type.type == BCTypeEnum.u32 || from.type.type == BCTypeEnum.i32, "from has to be an i32");
+        assert(index.type.type == BCTypeEnum.u32, "index has to be an i32");
 
         static if (is(typeof(gen.IndexedScaledStore32) == function)
             && is(typeof(gen.IndexedScaledStore32(
@@ -4935,6 +4935,8 @@ static if (is(BCGen))
     {
         auto dgType = toBCType(de.type);
         auto dg = genTemporary(dgType);
+        if (!dg) { bailout("could not generate DelegateExp"); return ; }
+
         Alloc(dg.i32, imm32(DelegateDescriptor.Size), dgType);
         Comment("Store FunctionPtr");
 
