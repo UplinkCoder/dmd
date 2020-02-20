@@ -2242,21 +2242,8 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
     BCValue returnValue;
 
-    bool Return()
+    bool HandleExp()
     {
-        if (n_return_addrs)
-        {
-            auto returnAddr = returnAddrs[--n_return_addrs];
-            byteCode = getCodeForId(returnAddr.fnId, functions);
-            fnId = returnAddr.fnId;
-            ip = returnAddr.ip;
-
-            debug { if (!__ctfe) writeln("Setting ip to = ", ip, "  Bytecode size = ", byteCode.length); }
-            debug { if (!__ctfe) writeln("returnAddrs: ", returnAddrs[0 .. n_return_addrs + 1]); }
-
-            stackP = stackP - (returnAddr.stackSize / 4);
-            callDepth--;
-
             if (cRetval.vType == BCValueType.Exception)
             {
                 debug { if (!__ctfe) writeln("Exception in flight ... length of catches: ", catches ? catches.length : -1) ; }
@@ -2267,21 +2254,29 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 if (catches.length)
                 {
                     const catch_ = catches[$-1];
+                    debug { if (!__ctfe) writefln("CallDepth:(%d) Catches (%s)", callDepth, catches); }
+
                     // in case we are above at the callDepth of the next catch
                     // we need to pass this return value on
                     if (catch_.stackDepth < callDepth)
                     {
-                        debug { if (!__ctfe) writefln("CatchDepth:(%d) lower than current callStack:(%d) Depth. Returning", catch_.stackDepth, callDepth); }
-                        Return();
+                        auto returnAddr = returnAddrs[--n_return_addrs];
+                        ip = returnAddr.ip;
+                        debug { if (!__ctfe) writefln("CatchDepth:(%d) lower than current callStack:(%d) Depth. Returning to ip = %d", catch_.stackDepth, callDepth, ip); }
+                        byteCode = getCodeForId(returnAddr.fnId, functions);
+                        fnId = returnAddr.fnId;
+                        --callDepth;
+                        return false;
                     }
                     // In case we are at the callDepth we need to go to the right catch
                     else if (catch_.stackDepth == callDepth)
                     {
-                        debug { if (!__ctfe) writeln("stackdepth == Calldepth. Executing catch ... hopefully"); }
+                        debug { if (!__ctfe) writeln("stackdepth == Calldepth. Executing catch at: ip=", ip, " byteCode.length="); }
                         ip = catch_.ip;
                         // we need to also remove the catches so we don't end up here next time
                         catches = catches[0 .. $-1];
                         // resume execution at execption handler block
+                        return false;
                     }
                     // in case we end up here there is a catch handler but we skipped it
                     // this can happen if non of the handlers matched we return the execption
@@ -2303,7 +2298,30 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 // in case we are at the depth we need to jump to Throw
                 // assert(!catches.length, "We should goto the catchBlock here.");
             }
-            else if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
+            else
+                assert(0);
+    }
+     
+
+    bool Return()
+    {
+        if (n_return_addrs)
+        {
+            auto returnAddr = returnAddrs[--n_return_addrs];
+            byteCode = getCodeForId(returnAddr.fnId, functions);
+            fnId = returnAddr.fnId;
+            ip = returnAddr.ip;
+
+            debug { if (!__ctfe) writeln("Setting ip to = ", ip, "  Bytecode size = ", byteCode.length); }
+            debug { if (!__ctfe) writeln("returnAddrs: ", returnAddrs[0 .. n_return_addrs + 1]); }
+
+            stackP = stackP - (returnAddr.stackSize / 4);
+            callDepth--;
+            if (cRetval.vType == BCValueType.Exception)
+            {
+                return HandleExp();
+            }
+            if (cRetval.vType == BCValueType.Error || cRetval.vType == BCValueType.Bailout)
             {
                 return true;
             }
@@ -3166,7 +3184,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 expValue.vType = BCValueType.Exception;
 
                 cRetval = expValue;
-                if (Return())
+                if (HandleExp())
                     return cRetval;
             }
             break;

@@ -487,9 +487,8 @@ struct Imm32
 
 BCValue imm32(uint value, bool signed = false) pure @trusted
 {
-    BCValue ret = void;
-    if (__ctfe)
-        ret = BCValue.init;
+    BCValue ret;
+
     ret.vType = BCValueType.Immediate;
     ret.type.type = signed ? BCTypeEnum.i32 : BCTypeEnum.u32;
     ret.type.typeIndex = 0;
@@ -504,10 +503,7 @@ BCValue imm32(uint value, bool signed = false) pure @trusted
 
 BCValue imm64(ulong value, bool signed = false) pure @trusted
 {
-    BCValue ret = void;
-
-    if (__ctfe)
-        ret = BCValue.init;
+    BCValue ret;
 
     ret.vType = BCValueType.Immediate;
     ret.type.type = signed ? BCTypeEnum.i64 : BCTypeEnum.u64;

@@ -3,11 +3,6 @@ class ValueExp : Exception
     this(string msg) { super(msg); }
 }
 
-class VoidExp : Exception
-{
-    this() { super("VoidExp message"); }
-}
-
 class IntExp : ValueExp
 {
   this(int x)
@@ -34,28 +29,23 @@ int fn(int x)
     {
         try
         {
-            throw new VoidExp();
+            throw new IntExp(x);
         }
         catch(IntExp e)
         {
-            g = -44;
+            g += -44;
+//            throw e;
         }
         return 99;
     }
 
     try
     {
-//         fthrow(x);
               wrap(x);
-//        throw new IntExp(2);
     }
     catch (IntExp e)
     {
         return e.value + g;
-    }
-    catch (ValueExp e)
-    {
-        g = 8;
     }
     return g;
     // assert(0);
