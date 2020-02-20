@@ -489,7 +489,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
             auto retval = interpret_(0, bc_args,
                 &_sharedExecutionState.heap, &_sharedCtfeState.functions[0], &bcv.calls[0],
                 &errorValues[0], &errorValues[1], &errorValues[2], &errorValues[3],
-                &_sharedCtfeState.errors[0], _sharedExecutionState.stack[], null, bcv.stackMap());
+                &_sharedCtfeState.errors[0], _sharedExecutionState.stack[], bcv.stackMap());
 /*            if (fd.ident == Identifier.idPool("extractAttribFlags"))
             {
                 import ddmd.hdrgen;

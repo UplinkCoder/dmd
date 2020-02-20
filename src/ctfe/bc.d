@@ -2147,7 +2147,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
     const RetainedCall* calls = null,
     BCValue* ev1 = null, BCValue* ev2 = null, BCValue* ev3 = null,
     BCValue* ev4 = null, const RE* errors = null,
-    long[] stackPtr = null, Catch[]* catches = null,
+    long[] stackPtr = null,
     const string[ushort] stackMap = null,
     /+    DebugCommand function() reciveCommand = {return DebugCommand(DebugCmdEnum.Nothing);},
     BCValue* debugOutput = null,+/ uint stackOffset = 0)  @trusted
@@ -2165,6 +2165,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
     uint lastLine;
     BCValue cRetval;
     ReturnAddr[max_call_depth] returnAddrs;
+    Catch[] catches;
     uint n_return_addrs;
     if (!__ctfe)
     {
@@ -2259,12 +2260,13 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
             if (cRetval.vType == BCValueType.Exception)
             {
                 debug { if (!__ctfe) writeln("Exception in flight ... length of catches: ", catches ? catches.length : -1) ; }
+                debug { if (!__ctfe) writeln("catches: ", catches);  }
 
                 // we return to unroll
                 // lets first handle the case in which there are catches on the catch stack
-                if (catches && (*catches).length)
+                if (catches.length)
                 {
-                    const catch_ = (*catches)[$-1];
+                    const catch_ = catches[$-1];
                     // in case we are above at the callDepth of the next catch
                     // we need to pass this return value on
                     if (catch_.stackDepth < callDepth)
@@ -2278,7 +2280,7 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                         debug { if (!__ctfe) writeln("stackdepth == Calldepth. Executing catch ... hopefully"); }
                         ip = catch_.ip;
                         // we need to also remove the catches so we don't end up here next time
-                        (*catches) = (*catches)[0 .. $-1];
+                        catches = catches[0 .. $-1];
                         // resume execution at execption handler block
                     }
                     // in case we end up here there is a catch handler but we skipped it
@@ -3143,20 +3145,15 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                 {
                     printf("PushCatch is executing\n");
                 }
-                if (!catches)
-                {
-                    auto c = new Catch[](0);
-                    catches = &c;
-                }
                 Catch catch_ = Catch(ip, callDepth);
-                (*catches) ~= catch_;
+                catches ~= catch_;
             }
             break;
 
             case LongInst.PopCatch:
             {
                 debug { if (!__ctfe) writeln("Poping a Catch"); }
-                (*catches) = (*catches)[0 .. $-1];
+                catches = catches[0 .. $-1];
             }
             break;
 
