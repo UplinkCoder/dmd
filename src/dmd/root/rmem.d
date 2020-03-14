@@ -41,7 +41,7 @@ extern (C++) struct Mem
         return s ? cast(char*)check(.strdup(s)) : null;
     }
 
-    static void xfree(void* p) pure nothrow
+    static void xfree(void* p) nothrow
     {
         version (GC)
             if (isGCEnabled)
@@ -50,7 +50,7 @@ extern (C++) struct Mem
         pureFree(p);
     }
 
-    static void* xmalloc(size_t size) pure nothrow
+    static void* xmalloc(size_t size) nothrow
     {
         allocated += size;
         version (GC)
@@ -60,7 +60,7 @@ extern (C++) struct Mem
         return size ? check(pureMalloc(size)) : null;
     }
 
-    static void* xmalloc_noscan(size_t size) pure nothrow
+    static void* xmalloc_noscan(size_t size) nothrow
     {
         allocated += size;
         version (GC)
@@ -70,7 +70,7 @@ extern (C++) struct Mem
         return size ? check(pureMalloc(size)) : null;
     }
 
-    static void* xcalloc(size_t size, size_t n) pure nothrow
+    static void* xcalloc(size_t size, size_t n) nothrow
     {
         allocated += (size * n);
         version (GC)
@@ -80,7 +80,7 @@ extern (C++) struct Mem
         return (size && n) ? check(pureCalloc(size, n)) : null;
     }
 
-    static void* xcalloc_noscan(size_t size, size_t n) pure nothrow
+    static void* xcalloc_noscan(size_t size, size_t n) nothrow
     {
         allocated += (size * n);
         version (GC)
@@ -90,7 +90,7 @@ extern (C++) struct Mem
         return (size && n) ? check(pureCalloc(size, n)) : null;
     }
 
-    static void* xrealloc(void* p, size_t size) pure nothrow
+    static void* xrealloc(void* p, size_t size) nothrow
     {
         allocated += size;
         version (GC)
@@ -106,7 +106,7 @@ extern (C++) struct Mem
         return check(pureRealloc(p, size));
     }
 
-    static void* xrealloc_noscan(void* p, size_t size) pure nothrow
+    static void* xrealloc_noscan(void* p, size_t size) nothrow
     {
         allocated += size;
         version (GC)
@@ -122,7 +122,7 @@ extern (C++) struct Mem
         return check(pureRealloc(p, size));
     }
 
-    static void* error() pure nothrow @nogc
+    static void* error() nothrow @nogc
     {
         onOutOfMemoryError();
         assert(0);
@@ -136,7 +136,7 @@ extern (C++) struct Mem
      * Returns:
      *  p if not null
      */
-    static void* check(void* p) pure nothrow @nogc
+    static void* check(void* p) nothrow @nogc
     {
         return p ? p : error();
     }
@@ -181,7 +181,7 @@ __gshared void* heapp;
 
 extern (C) void* allocmemory(size_t m_size) nothrow @nogc
 {
-    Mem.allocated += size;
+    Mem.allocated += m_size;
     // 16 byte alignment is better (and sometimes needed) for doubles
     m_size = (m_size + 15) & ~15;
 
@@ -360,7 +360,7 @@ Params:
 
 Returns: A null-terminated copy of the input array.
 */
-extern (D) char[] xarraydup(const(char)[] s) pure nothrow
+extern (D) char[] xarraydup(const(char)[] s) nothrow
 {
     if (!s)
         return null;
@@ -393,7 +393,7 @@ Params:
 
 Returns: A copy of the input array.
 */
-extern (D) T[] arraydup(T)(const scope T[] s) pure nothrow
+extern (D) T[] arraydup(T)(const scope T[] s) nothrow
 {
     if (!s)
         return null;

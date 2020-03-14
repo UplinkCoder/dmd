@@ -544,7 +544,7 @@ nothrow:
 
     extern (C++) const(char)* toChars(
         bool showColumns = global.params.showColumns,
-        ubyte messageStyle = global.params.messageStyle) const pure nothrow
+        ubyte messageStyle = global.params.messageStyle) const nothrow
     {
         OutBuffer buf;
         if (filename)
