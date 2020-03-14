@@ -30,11 +30,14 @@ else
 
 extern (C++) struct Mem
 {
+    __gshared ulong allocated = 0;
+
     static char* xstrdup(const(char)* s) nothrow
     {
         if (!s)
             return null;
 
+        allocated += strlen(s) + 1;
         version (GC)
             if (isGCEnabled)
                 return s[0 .. strlen(s) + 1].dup.ptr;
@@ -62,6 +65,17 @@ extern (C++) struct Mem
         if (!size)
             return null;
 
+        allocated += size;
+        version (GC)
+            if (isGCEnabled)
+                return size ? GC.malloc(size) : null;
+
+        return size ? check(pureMalloc(size)) : null;
+    }
+
+    static void* xmalloc_noscan(size_t size) pure nothrow
+    {
+        allocated += size;
         version (GC)
             if (isGCEnabled)
                 return GC.malloc(size);
@@ -78,6 +92,17 @@ extern (C++) struct Mem
         if (!totalSize)
             return null;
 
+        allocated += (size * n);
+        version (GC)
+            if (isGCEnabled)
+                return size * n ? GC.calloc(size * n) : null;
+
+        return (size && n) ? check(pureCalloc(size, n)) : null;
+    }
+
+    static void* xcalloc_noscan(size_t size, size_t n) pure nothrow
+    {
+        allocated += (size * n);
         version (GC)
             if (isGCEnabled)
                 return GC.calloc(totalSize);
@@ -90,6 +115,7 @@ extern (C++) struct Mem
 
     static void* xrealloc(void* p, size_t size) pure nothrow
     {
+        allocated += size;
         version (GC)
             if (isGCEnabled)
                 return GC.realloc(p, size);
@@ -101,7 +127,17 @@ extern (C++) struct Mem
             return null;
         }
 
-        if (!p)
+        return check(pureRealloc(p, size));
+    }
+
+    static void* xrealloc_noscan(void* p, size_t size) pure nothrow
+    {
+        allocated += size;
+        version (GC)
+            if (isGCEnabled)
+                return GC.realloc(p, size, GC.BlkAttr.NO_SCAN);
+
+        if (!size)
         {
             p = pureMalloc(size);
             if (!p)
@@ -159,6 +195,7 @@ __gshared void* heapp;
 
 extern (C) void* allocmemory(size_t m_size) nothrow @nogc
 {
+    Mem.allocated += size;
     // 16 byte alignment is better (and sometimes needed) for doubles
     m_size = (m_size + 15) & ~15;
 
