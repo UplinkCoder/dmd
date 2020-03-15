@@ -184,6 +184,8 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     // Set default values
     params.argv0 = arguments[0].toDString;
 
+    import dmd.trace; initTraceMemory();
+
     // Temporary: Use 32 bits OMF as the default on Windows, for config parsing
     static if (TARGET.Windows)
     {
@@ -690,8 +692,12 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     if (global.params.doCxxHdrGeneration)
         genCppHdrFiles(modules);
 
+    import dmd.trace;
+    writeTrace(null);
+
     if (global.errors)
         fatal();
+
 
     if (!params.obj)
     {
