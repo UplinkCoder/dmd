@@ -61,10 +61,10 @@ string traceString(string vname, string fn = null)
     static if (SYMBOL_TRACE)
 return q{
     import queryperf : QueryPerformanceCounter;
-    import dmd.root.rmem : allocated;
+    import dmd.root.rmem;
     ulong begin_sema_ticks;
     ulong end_sema_ticks;
-    ulong begin_sema_mem = allocated;
+    ulong begin_sema_mem = Mem.allocated;
 
     auto insert_pos = dsymbol_profile_array_count++;
     assert(dsymbol_profile_array_count < dsymbol_profile_array_size,
@@ -80,7 +80,7 @@ return q{
             dsymbol_profile_array[insert_pos] =
                 SymbolProfileEntry(` ~ vname ~ `,
             begin_sema_ticks, end_sema_ticks,
-            begin_sema_mem, allocated,
+            begin_sema_mem, Mem.allocated,
             v_type.stringof, ` ~ (fn
                 ? `"` ~ fn ~ `"` : "__FUNCTION__") ~ `);
         } else static if (is(v_type : Expression))
@@ -88,7 +88,7 @@ return q{
             dsymbol_profile_array[insert_pos] =
                 SymbolProfileEntry(null,
             begin_sema_ticks, end_sema_ticks,
-            begin_sema_mem, allocated,
+            begin_sema_mem, Mem.allocated,
             v_type.stringof, ` ~ (fn
                 ? `"` ~ fn ~ `"` : "__FUNCTION__") ~ ", " ~ vname ~ `);
         }
