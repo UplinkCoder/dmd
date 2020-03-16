@@ -4574,8 +4574,6 @@ extern (C++) final class TypeFunction : TypeNext
             }
         }
 
-        stc |= STC.scope_;
-
         /* Inferring STC.return_ here has false positives
          * for pure functions, producing spurious error messages
          * about escaping references.
@@ -4583,6 +4581,8 @@ extern (C++) final class TypeFunction : TypeNext
          */
         version (none)
         {
+            stc |= STC.scope_;
+
             Type tret = nextOf().toBasetype();
             if (isref || tret.hasPointers())
             {
@@ -4591,6 +4591,17 @@ extern (C++) final class TypeFunction : TypeNext
                  */
                 stc |= STC.return_;
             }
+        }
+        else
+        {
+            // Check escaping through return value
+            Type tret = nextOf().toBasetype();
+            if (isref || tret.hasPointers())
+            {
+                return stc;
+            }
+
+            stc |= STC.scope_;
         }
 
         return stc;
