@@ -393,7 +393,7 @@ alias dmdExe = makeRuleWithArgs!((MethodInitializer!BuildRule builder, BuildRule
 
     builder
         // include lexer.o and backend.o
-        .sources(dmdSources.chain(lexer.targets, backend.targets).array)
+        .sources(dmdSources.chain(lexer.targets, backend.targets, ["../TracyClientNoExit.o"]).array)
         .target(env["DMD_PATH"] ~ targetSuffix)
         .msg("(DC) DMD" ~ targetSuffix)
         .deps([versionFile, sysconfDirFile, lexer, backend])
@@ -402,6 +402,7 @@ alias dmdExe = makeRuleWithArgs!((MethodInitializer!BuildRule builder, BuildRule
             "-of" ~ rule.target,
             "-vtls",
             "-J" ~ env["RES"],
+            "-L-lpthread", "-L-lstdc++", "",
             ].chain(extraFlags, platformArgs, flags["DFLAGS"],
                 // source files need to have relative paths in order for the code coverage
                 // .lst files to be named properly for CodeCov to find them
@@ -1188,6 +1189,7 @@ auto sourceFiles()
             scanmscoff.d scanomf.d semantic2.d semantic3.d sideeffect.d statement.d statement_rewrite_walker.d
             statementsem.d staticassert.d staticcond.d target.d templateparamsem.d trace.d traits.d
             transitivevisitor.d typesem.d typinf.d utils.d visitor.d vsoptions.d foreachvar.d
+            TracyC.d
         "),
         backendHeaders: fileArray(env["C"], "
             cc.d cdef.d cgcv.d code.d cv4.d dt.d el.d global.d

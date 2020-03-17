@@ -2435,6 +2435,8 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
      */
     extern (D) TemplateInstance findExistingInstance(TemplateInstance tithis, Expressions* fargs)
     {
+        import dmd.trace;
+        mixin(traceString("tithis"));
         //printf("findExistingInstance(%p)\n", tithis);
         tithis.fargs = fargs;
         auto tibox = TemplateInstanceBox(tithis);
