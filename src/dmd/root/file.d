@@ -30,7 +30,7 @@ struct FileBuffer
 
     this(this) @disable;
 
-    ~this() pure nothrow
+    ~this() nothrow
     {
         mem.xfree(data.ptr);
     }

@@ -48,7 +48,7 @@ extern (C++) struct Mem
         return p;
     }
 
-    static void xfree(void* p) pure nothrow
+    static void xfree(void* p)  nothrow
     {
         if (!p)
             return;
@@ -57,10 +57,10 @@ extern (C++) struct Mem
             if (isGCEnabled)
                 return GC.free(p);
 
-        pureFree(p);
+        Free(p);
     }
 
-    static void* xmalloc(size_t size) pure nothrow
+    static void* xmalloc(size_t size)  nothrow
     {
         if (!size)
             return null;
@@ -70,23 +70,26 @@ extern (C++) struct Mem
             if (isGCEnabled)
                 return size ? GC.malloc(size) : null;
 
-        return size ? check(pureMalloc(size)) : null;
+        return Malloc(size);
     }
 
-    static void* xmalloc_noscan(size_t size) pure nothrow
+    static void* xmalloc_noscan(size_t size)  nothrow
     {
         allocated += size;
+        if (!size)
+            return null;
+
         version (GC)
             if (isGCEnabled)
                 return GC.malloc(size);
 
-        auto p = pureMalloc(size);
+        auto p = Malloc(size);
         if (!p)
             error();
         return p;
     }
 
-    static void* xcalloc(size_t size, size_t n) pure nothrow
+    static void* xcalloc(size_t size, size_t n)  nothrow
     {
         const totalSize = size * n;
         if (!totalSize)
@@ -97,23 +100,23 @@ extern (C++) struct Mem
             if (isGCEnabled)
                 return size * n ? GC.calloc(size * n) : null;
 
-        return (size && n) ? check(pureCalloc(size, n)) : null;
+        return (size && n) ? Calloc(size, n) : null;
     }
 
-    static void* xcalloc_noscan(size_t size, size_t n) pure nothrow
+    static void* xcalloc_noscan(size_t size, size_t n)  nothrow
     {
         allocated += (size * n);
         version (GC)
             if (isGCEnabled)
-                return GC.calloc(totalSize);
+                return GC.calloc(size * n);
 
-        auto p = pureCalloc(size, n);
+        auto p = Calloc(size, n);
         if (!p)
             error();
         return p;
     }
 
-    static void* xrealloc(void* p, size_t size) pure nothrow
+    static void* xrealloc(void* p, size_t size)  nothrow
     {
         allocated += size;
         version (GC)
@@ -123,14 +126,14 @@ extern (C++) struct Mem
         if (!size)
         {
             if (p)
-                pureFree(p);
+                Free(p);
             return null;
         }
 
-        return check(pureRealloc(p, size));
+        return Realloc(p, size);
     }
 
-    static void* xrealloc_noscan(void* p, size_t size) pure nothrow
+    static void* xrealloc_noscan(void* p, size_t size)  nothrow
     {
         allocated += size;
         version (GC)
@@ -139,19 +142,19 @@ extern (C++) struct Mem
 
         if (!size)
         {
-            p = pureMalloc(size);
+            p = Malloc(size);
             if (!p)
                 error();
             return p;
         }
 
-        p = pureRealloc(p, size);
+        p = Realloc(p, size);
         if (!p)
             error();
         return p;
     }
 
-    static void error() pure nothrow @nogc
+    static void error()  nothrow @nogc
     {
         onOutOfMemoryError();
     }
@@ -160,7 +163,7 @@ extern (C++) struct Mem
     {
         __gshared bool _isGCEnabled = true;
 
-        static bool isGCEnabled() pure nothrow @nogc
+        static bool isGCEnabled()  nothrow @nogc
         {
             // fake purity by making global variable immutable (_isGCEnabled only modified before startup)
             enum _pIsGCEnabled = cast(immutable bool*) &_isGCEnabled;
@@ -195,7 +198,7 @@ __gshared void* heapp;
 
 extern (C) void* allocmemory(size_t m_size) nothrow @nogc
 {
-    Mem.allocated += size;
+    Mem.allocated += m_size;
     // 16 byte alignment is better (and sometimes needed) for doubles
     m_size = (m_size + 15) & ~15;
 
@@ -263,7 +266,7 @@ static if (OVERRIDE_MEMALLOC)
 
     version (GC)
     {
-        private void* allocClass(const ClassInfo ci) nothrow pure
+        private void* allocClass(const ClassInfo ci) nothrow 
         {
             alias BlkAttr = GC.BlkAttr;
 
@@ -332,7 +335,7 @@ static if (OVERRIDE_MEMALLOC)
     // TypeInfo.initializer for compilers older than 2.070
     static if(!__traits(hasMember, TypeInfo, "initializer"))
     private const(void[]) initializer(T : TypeInfo)(const T t)
-    nothrow pure @safe @nogc
+    nothrow  @safe @nogc
     {
         return t.init;
     }
@@ -340,13 +343,13 @@ static if (OVERRIDE_MEMALLOC)
 
 // Copied from druntime. Remove these when GDC and LDC LTS is at a version
 // corresponding to 2.074.0 or later.
-static if (!is(typeof(pureMalloc)))
+static if (!is(typeof(Malloc)))
 {
 private:
     static import core.stdc.errno;
 
     /**
-     * Pure variants of C's memory allocation functions `malloc`, `calloc`, and
+     *  variants of C's memory allocation functions `malloc`, `calloc`, and
      * `realloc` and deallocation function `free`.
      *
      * UNIX 98 requires that errno be set to ENOMEM upon failure.
@@ -354,76 +357,76 @@ private:
      * behaving as if it were never changed.
      *
      * See_Also:
-     *     $(LINK2 https://dlang.org/spec/function.html#pure-functions, D's rules for purity),
+     *     $(LINK2 https://dlang.org/spec/function.html#-functions, D's rules for purity),
      *     which allow for memory allocation under specific circumstances.
      */
-    void* pureMalloc()(size_t size) @trusted pure @nogc nothrow
+    void* Malloc()(size_t size) @trusted  @nogc nothrow
     {
-        const errnosave = fakePureErrno;
-        void* ret = fakePureMalloc(size);
-        fakePureErrno = errnosave;
+        const errnosave = fakeErrno;
+        void* ret = fakeMalloc(size);
+        fakeErrno = errnosave;
         return ret;
     }
     /// ditto
-    void* pureCalloc()(size_t nmemb, size_t size) @trusted pure @nogc nothrow
+    void* Calloc()(size_t nmemb, size_t size) @trusted  @nogc nothrow
     {
-        const errnosave = fakePureErrno;
-        void* ret = fakePureCalloc(nmemb, size);
-        fakePureErrno = errnosave;
+        const errnosave = fakeErrno;
+        void* ret = fakeCalloc(nmemb, size);
+        fakeErrno = errnosave;
         return ret;
     }
     /// ditto
-    void* pureRealloc()(void* ptr, size_t size) @system pure @nogc nothrow
+    void* Realloc()(void* ptr, size_t size) @system  @nogc nothrow
     {
-        const errnosave = fakePureErrno;
-        void* ret = fakePureRealloc(ptr, size);
-        fakePureErrno = errnosave;
+        const errnosave = fakeErrno;
+        void* ret = fakeRealloc(ptr, size);
+        fakeErrno = errnosave;
         return ret;
     }
     /// ditto
-    void pureFree()(void* ptr) @system pure @nogc nothrow
+    void Free()(void* ptr) @system  @nogc nothrow
     {
-        const errnosave = fakePureErrno;
-        fakePureFree(ptr);
-        fakePureErrno = errnosave;
+        const errnosave = fakeErrno;
+        fakeFree(ptr);
+        fakeErrno = errnosave;
     }
 
-    extern (C) private pure @system @nogc nothrow
+    extern (C) private  @system @nogc nothrow
     {
         static import core.stdc.errno;
 
-        pragma(mangle, "malloc") void* fakePureMalloc(size_t);
-        pragma(mangle, "calloc") void* fakePureCalloc(size_t nmemb, size_t size);
-        pragma(mangle, "realloc") void* fakePureRealloc(void* ptr, size_t size);
+        pragma(mangle, "malloc") void* fakeMalloc(size_t);
+        pragma(mangle, "calloc") void* fakeCalloc(size_t nmemb, size_t size);
+        pragma(mangle, "realloc") void* fakeRealloc(void* ptr, size_t size);
 
-        pragma(mangle, "free") void fakePureFree(void* ptr);
+        pragma(mangle, "free") void fakeFree(void* ptr);
     }
 
     static if (__traits(getOverloads, core.stdc.errno, "errno").length == 1
         && __traits(getLinkage, core.stdc.errno.errno) == "C")
     {
         extern(C) pragma(mangle, __traits(identifier, core.stdc.errno.errno))
-        private ref int fakePureErrno() @nogc nothrow pure @system;
+        private ref int fakeErrno() @nogc nothrow  @system;
     }
     else
     {
-        extern(C) private @nogc nothrow pure @system
+        extern(C) private @nogc nothrow  @system
         {
             pragma(mangle, "getErrno")
-            private int fakePureGetErrno();
+            private int fakeGetErrno();
 
             pragma(mangle, "setErrno")
-            private int fakePureSetErrno(int);
+            private int fakeSetErrno(int);
         }
 
-        private @property int fakePureErrno()() @nogc nothrow pure @system
+        private @property int fakeErrno()() @nogc nothrow  @system
         {
-            return fakePureGetErrno();
+            return fakeGetErrno();
         }
 
-        private @property void fakePureErrno()(int newValue) @nogc nothrow pure @system
+        private @property void fakeErrno()(int newValue) @nogc nothrow  @system
         {
-            cast(void) fakePureSetErrno(newValue);
+            cast(void) fakeSetErrno(newValue);
         }
     }
 }
@@ -438,7 +441,7 @@ Params:
 
 Returns: A null-terminated copy of the input array.
 */
-extern (D) char[] xarraydup(const(char)[] s) pure nothrow
+extern (D) char[] xarraydup(const(char)[] s)  nothrow
 {
     if (!s)
         return null;
@@ -451,7 +454,7 @@ extern (D) char[] xarraydup(const(char)[] s) pure nothrow
 }
 
 ///
-pure nothrow unittest
+ nothrow unittest
 {
     auto s1 = "foo";
     auto s2 = s1.xarraydup;
@@ -471,7 +474,7 @@ Params:
 
 Returns: A copy of the input array.
 */
-extern (D) T[] arraydup(T)(const scope T[] s) pure nothrow
+extern (D) T[] arraydup(T)(const scope T[] s)  nothrow
 {
     if (!s)
         return null;
@@ -483,7 +486,7 @@ extern (D) T[] arraydup(T)(const scope T[] s) pure nothrow
 }
 
 ///
-pure nothrow unittest
+ nothrow unittest
 {
     auto s1 = [0, 1, 2];
     auto s2 = s1.arraydup;

@@ -31,7 +31,7 @@ public:
      * Params:
      *  dim = initial length of array
      */
-    this(size_t dim) pure nothrow
+    this(size_t dim)  nothrow
     {
         reserve(dim);
         this.length = dim;
@@ -39,7 +39,7 @@ public:
 
     @disable this(this);
 
-    ~this() pure nothrow
+    ~this()  nothrow
     {
         if (data != &smallarray[0])
             mem.xfree(data);
@@ -84,14 +84,14 @@ public:
         return toString.ptr;
     }
 
-    ref Array push(T ptr) return pure nothrow
+    ref Array push(T ptr) return  nothrow
     {
         reserve(1);
         data[length++] = ptr;
         return this;
     }
 
-    extern (D) ref Array pushSlice(T[] a) return pure nothrow
+    extern (D) ref Array pushSlice(T[] a) return  nothrow
     {
         const oldLength = length;
         setDim(oldLength + a.length);
@@ -99,13 +99,13 @@ public:
         return this;
     }
 
-    ref Array append(typeof(this)* a) return pure nothrow
+    ref Array append(typeof(this)* a) return  nothrow
     {
         insert(length, a);
         return this;
     }
 
-    void reserve(size_t nentries) pure nothrow
+    void reserve(size_t nentries)  nothrow
     {
         //printf("Array::reserve: length = %d, allocdim = %d, nentries = %d\n", (int)length, (int)allocdim, (int)nentries);
         if (allocdim - length < nentries)
@@ -143,14 +143,14 @@ public:
         }
     }
 
-    void remove(size_t i) pure nothrow @nogc
+    void remove(size_t i)  nothrow @nogc
     {
         if (length - i - 1)
             memmove(data + i, data + i + 1, (length - i - 1) * (data[0]).sizeof);
         length--;
     }
 
-    void insert(size_t index, typeof(this)* a) pure nothrow
+    void insert(size_t index, typeof(this)* a)  nothrow
     {
         if (a)
         {
@@ -163,7 +163,7 @@ public:
         }
     }
 
-    void insert(size_t index, T ptr) pure nothrow
+    void insert(size_t index, T ptr)  nothrow
     {
         reserve(1);
         memmove(data + index + 1, data + index, (length - index) * (*data).sizeof);
@@ -171,7 +171,7 @@ public:
         length++;
     }
 
-    void setDim(size_t newdim) pure nothrow
+    void setDim(size_t newdim)  nothrow
     {
         if (length < newdim)
         {
@@ -180,17 +180,17 @@ public:
         length = newdim;
     }
 
-    ref inout(T) opIndex(size_t i) inout nothrow pure
+    ref inout(T) opIndex(size_t i) inout nothrow 
     {
         return data[i];
     }
 
-    inout(T)* tdata() inout pure nothrow @nogc @safe
+    inout(T)* tdata() inout  nothrow @nogc @safe
     {
         return data;
     }
 
-    Array!T* copy() const pure nothrow
+    Array!T* copy() const  nothrow
     {
         auto a = new Array!T();
         a.setDim(length);
@@ -198,7 +198,7 @@ public:
         return a;
     }
 
-    void shift(T ptr) pure nothrow
+    void shift(T ptr)  nothrow
     {
         reserve(1);
         memmove(data + 1, data, length * (*data).sizeof);
@@ -206,22 +206,22 @@ public:
         length++;
     }
 
-    void zero() nothrow pure @nogc
+    void zero() nothrow  @nogc
     {
         data[0 .. length] = T.init;
     }
 
-    T pop() nothrow pure @nogc
+    T pop() nothrow  @nogc
     {
         return data[--length];
     }
 
-    extern (D) inout(T)[] opSlice() inout nothrow pure @nogc
+    extern (D) inout(T)[] opSlice() inout nothrow  @nogc
     {
         return data[0 .. length];
     }
 
-    extern (D) inout(T)[] opSlice(size_t a, size_t b) inout nothrow pure @nogc
+    extern (D) inout(T)[] opSlice(size_t a, size_t b) inout nothrow  @nogc
     {
         assert(a <= b && b <= length);
         return data[a .. b];
@@ -234,12 +234,12 @@ public:
 struct BitArray
 {
 nothrow:
-    size_t length() const pure nothrow @nogc @safe
+    size_t length() const  nothrow @nogc @safe
     {
         return len;
     }
 
-    void length(size_t nlen) pure nothrow
+    void length(size_t nlen)  nothrow
     {
         immutable obytes = (len + 7) / 8;
         immutable nbytes = (nlen + 7) / 8;
@@ -251,7 +251,7 @@ nothrow:
         len = nlen;
     }
 
-    bool opIndex(size_t idx) const pure nothrow @nogc
+    bool opIndex(size_t idx) const  nothrow @nogc
     {
         import core.bitop : bt;
 
@@ -259,7 +259,7 @@ nothrow:
         return !!bt(ptr, idx);
     }
 
-    void opIndexAssign(bool val, size_t idx) pure nothrow @nogc
+    void opIndexAssign(bool val, size_t idx)  nothrow @nogc
     {
         import core.bitop : btc, bts;
 
@@ -272,7 +272,7 @@ nothrow:
 
     @disable this(this);
 
-    ~this() pure nothrow
+    ~this()  nothrow
     {
         mem.xfree(ptr);
     }
@@ -289,7 +289,7 @@ private:
  * Returns:
  *  The given array exposed to a standard D array.
  */
-@property inout(T)[] peekSlice(T)(inout(Array!T)* array) pure nothrow @nogc
+@property inout(T)[] peekSlice(T)(inout(Array!T)* array)  nothrow @nogc
 {
     return array ? (*array)[] : null;
 }
@@ -302,7 +302,7 @@ private:
  *  index = the index to split the array from.
  *  length = the number of elements to make room for starting at $(D index).
  */
-void split(T)(ref Array!T array, size_t index, size_t length) pure nothrow
+void split(T)(ref Array!T array, size_t index, size_t length)  nothrow
 {
     if (length > 0)
     {
@@ -348,7 +348,7 @@ unittest
  * Returns:
  *      reversed a[]
  */
-T[] reverse(T)(T[] a) pure nothrow @nogc @safe
+T[] reverse(T)(T[] a)  nothrow @nogc @safe
 {
     if (a.length > 1)
     {

@@ -263,7 +263,7 @@ struct Param
     const(char)[] mapfile;
 
     // generate code for POSIX
-    @property bool isPOSIX() scope const pure nothrow @nogc @safe
+    @property bool isPOSIX() scope const  nothrow @nogc @safe
     out(result) { assert(result || isWindows); }
     do
     {
@@ -510,14 +510,14 @@ struct Loc
     static immutable Loc initial;       /// use for default initialization of const ref Loc's
 
 nothrow:
-    extern (D) this(const(char)* filename, uint linnum, uint charnum) pure
+    extern (D) this(const(char)* filename, uint linnum, uint charnum) 
     {
         this.linnum = linnum;
         this.charnum = charnum;
         this.filename = filename;
     }
 
-    extern (C++) const(char)* toChars(bool showColumns = global.params.showColumns) const pure nothrow
+    extern (C++) const(char)* toChars(bool showColumns = global.params.showColumns) const  nothrow
     {
         OutBuffer buf;
         if (filename)
@@ -557,7 +557,7 @@ nothrow:
      * may lead to multiple equivalent filenames (`foo.d-mixin-<line>`),
      * e.g., for test/runnable/test18880.d.
      */
-    extern (D) bool opEquals(ref const(Loc) loc) const @trusted pure nothrow @nogc
+    extern (D) bool opEquals(ref const(Loc) loc) const @trusted  nothrow @nogc
     {
         import core.stdc.string : strcmp;
 
@@ -567,7 +567,7 @@ nothrow:
                 (filename && loc.filename && strcmp(filename, loc.filename) == 0));
     }
 
-    extern (D) size_t toHash() const @trusted pure nothrow
+    extern (D) size_t toHash() const @trusted  nothrow
     {
         import dmd.utils : toDString;
 
@@ -581,7 +581,7 @@ nothrow:
      * Returns:
      *   true if Loc has been set to other than the default initialization
      */
-    bool isValid() const pure
+    bool isValid() const 
     {
         return filename !is null;
     }

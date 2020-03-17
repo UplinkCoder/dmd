@@ -18,7 +18,7 @@ import dmd.root.rmem, dmd.root.hash;
 enum POOL_BITS = 12;
 enum POOL_SIZE = (1U << POOL_BITS);
 
-private size_t nextpow2(size_t val) pure nothrow @nogc @safe
+private size_t nextpow2(size_t val)  nothrow @nogc @safe
 {
     size_t res = 1;
     while (res < val)
@@ -43,7 +43,7 @@ struct StringValue
     size_t length;
 
 nothrow:
-pure:
+
 @nogc:
     char* lstring() return
     {
@@ -80,7 +80,7 @@ private:
 
 nothrow:
 public:
-    void _init(size_t size = 0) nothrow pure
+    void _init(size_t size = 0) nothrow 
     {
         size = nextpow2((size * loadFactorDenominator) / loadFactorNumerator);
         if (size < 32)
@@ -93,7 +93,7 @@ public:
         count = 0;
     }
 
-    void reset(size_t size = 0) nothrow pure
+    void reset(size_t size = 0) nothrow 
     {
         for (size_t i = 0; i < npools; ++i)
             mem.xfree(pools[i]);
@@ -104,7 +104,7 @@ public:
         _init(size);
     }
 
-    ~this() nothrow pure
+    ~this() nothrow 
     {
         for (size_t i = 0; i < npools; ++i)
             mem.xfree(pools[i]);
@@ -126,7 +126,7 @@ public:
     Returns: the string's associated value, or `null` if the string doesn't
      exist in the string table
     */
-    inout(StringValue)* lookup(const(char)[] str) inout nothrow pure @nogc
+    inout(StringValue)* lookup(const(char)[] str) inout nothrow  @nogc
     {
         const(hash_t) hash = calcHash(str.ptr, str.length);
         const(size_t) i = findSlot(hash, str);
@@ -135,7 +135,7 @@ public:
     }
 
     /// ditto
-    inout(StringValue)* lookup(const(char)* s, size_t length) inout nothrow pure @nogc
+    inout(StringValue)* lookup(const(char)* s, size_t length) inout nothrow  @nogc
     {
         return lookup(s[0 .. length]);
     }
@@ -257,7 +257,7 @@ nothrow:
         return vptr;
     }
 
-    inout(StringValue)* getValue(uint vptr) inout pure @nogc
+    inout(StringValue)* getValue(uint vptr) inout  @nogc
     {
         if (!vptr)
             return null;
@@ -266,7 +266,7 @@ nothrow:
         return cast(inout(StringValue)*)&pools[idx][off];
     }
 
-    size_t findSlot(hash_t hash, const(char)[] str) const pure @nogc
+    size_t findSlot(hash_t hash, const(char)[] str) const  @nogc
     {
         // quadratic probing using triangular numbers
         // http://stackoverflow.com/questions/2348187/moving-from-linear-probing-to-quadratic-probing-hash-collisons/2349774#2349774

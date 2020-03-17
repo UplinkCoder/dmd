@@ -554,6 +554,7 @@ private uint setMangleOverride(Dsymbol s, const(char)[] sym)
  */
 extern(C++) void dsymbolSemantic(Dsymbol dsym, Scope* sc)
 {
+    import dmd.trace; mixin(traceString("dsym"));
     scope v = new DsymbolSemanticVisitor(sc);
     dsym.accept(v);
 }
