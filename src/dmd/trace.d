@@ -31,8 +31,8 @@ struct SymbolProfileEntry
     ulong begin_mem;
     ulong end_mem;
 
-    string kind;
-    string fn;
+    string kind; // asttypename
+    string fn; // which function is being traced
 
     union
     {
@@ -41,6 +41,7 @@ struct SymbolProfileEntry
         Expression exp;
         Statement stmt;
         Type type;
+        void* vp;
     }
 }
 
@@ -138,6 +139,26 @@ string traceString(string vname, string fn = null)
         return "";
 }
 
+__gshared ulong numInvalidProfileNodes = 0;
+
+static if (COMPRESSED_TRACE)
+{
+    static struct SymInfo
+    {
+        void* sym;
+        ulong id;
+        
+        const (char)* name;
+        const (char)* loc;
+        const (char)* typename;
+    }
+
+    SymInfo[Expression] expArray;
+    SymInfo[Dsymbol] symArray;
+    SymInfo[Statement] stmtArray;
+    SymInfo[Type] typeArray;
+}
+
 void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 {
     import core.stdc.stdio;
@@ -147,60 +168,76 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
     {
         static running_id = 1;
 
-        import dmd.root.aav;
-
-        static struct SymInfo
-        {
-            void* sym;
-            ulong id;
-
-            const (char)* name;
-            const (char)* loc;
-        }
-
-        SymInfo[Expression] expArray;
-        SymInfo[Dsymbol] symArray;
-        SymInfo[Statement] stmtArray;
-        SymInfo[Type] typeArray;
-
         ulong id;
+        SymInfo info;
 
-        if (dp.sym !is null)
+        final switch(dp.nodeType)
         {
-            if (auto symInfo = dp.sym in symArray)
-            {
-                id = symInfo.id;
-            }
-            else
-            {
-                id = running_id++;
-                SymInfo symInfo = SymInfo(cast(void*)dp.sym, id);
+            case ProfileNodeType.Dsymbol :
+                if (auto symInfo = dp.sym in symArray)
+                {
+                    id = symInfo.id;
+                }
+                break;
+            case ProfileNodeType.Expression :
+                if (auto symInfo = dp.exp in expArray)
+                {
+                    id = symInfo.id;
+                }
+                break;             
+            case ProfileNodeType.Statement :
+                if (auto symInfo = dp.stmt in stmtArray)
+                {
+                    id = symInfo.id;
+                }
+                break;             
+            case ProfileNodeType.Type :
+                if (auto symInfo = dp.exp in expArray)
+                {
+                    id = symInfo.id;
+                }
+                break;             
+                // we should probably assert here.
+            case ProfileNodeType.Invalid:
+                numInvalidProfileNodes++;
+                return ;
+                
+        }
 
-                symInfo.name = dp.sym.toChars();
-                symInfo.loc = dp.sym.loc.toChars();
+        if (!id) // we haven't haven't seen this symbol before
+        {
+            id = running_id++;
+            SymInfo symInfo = SymInfo(dp.vp, id);
 
-                symArray[dp.sym] = symInfo;
+            final switch(dp.nodeType)
+            {
+                case ProfileNodeType.Dsymbol :
+                    symInfo.name = dp.sym.toChars();
+                    symInfo.loc = dp.sym.loc.toChars();
+                    
+                    symArray[dp.sym] = symInfo;
+                break;
+                case ProfileNodeType.Expression :
+                    symInfo.name = dp.exp.toChars();
+                    symInfo.loc = dp.exp.loc.toChars();
+                    
+                    expArray[dp.exp] = symInfo;
+                break;
+                case ProfileNodeType.Statement:
+                    symInfo.name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement()) ? 
+                        "toChars() for statement not implemented" :
+                        dp.stmt.toChars());
+                    symInfo.loc = dp.stmt.loc;
+
+                    stmtArray[dp.stmt] = symInfo;
+                break;
+                case ProfileNodeType.Type :
+                    name = dp.type.toChars();
+
+                    typeArray[dp.type] = symInfo;
+                break;
             }
         }
-        else if (dp.exp !is null)
-        {
-            if (auto symInfo = dp.exp in expArray)
-            {
-                id = symInfo.id;
-            }
-            else
-            {
-                id = running_id++;
-                SymInfo symInfo = SymInfo(cast(void*)dp.exp, id);
-
-                symInfo.name = dp.exp.toChars();
-                symInfo.loc = dp.exp.loc.toChars();
-
-                expArray[dp.exp] = symInfo;
-            }
-        } else
-            // we should assert here I guess
-            return ;
     }
     else
     {
@@ -253,8 +290,42 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
     }
 
 }
+struct SymbolProfileRecord
+{
+    ulong begin_ticks;
+    ulong end_ticks;
+    
+    ulong begin_mem;
+    ulong end_mem;
 
-void writeTrace(char*[] arguments)
+    uint symbol_id;
+    uint kind_id;
+    uint phase_id;
+}
+
+struct TraceFile
+{
+    uint n_phases;
+    uint n_kinds;
+    uint n_symbols;
+    uint n_records;
+
+    uint offset_phases;
+    uint offset_kinds;
+    uint offset_symbol_names;
+    uint offset_symbol_locations;
+    uint offset_records;
+
+    SymbolProfileRecord[] records;
+
+    string[] phases;
+    string[] kinds;
+    string[] symbol_names;
+    string[] symbol_locations;
+}
+ 
+
+void writeTrace(char*[] arguments, char* traceFileName = null)
 {
     static if (SYMBOL_TRACE)
     {
@@ -296,7 +367,7 @@ void writeTrace(char*[] arguments)
         }
 
         auto fileNameLength = 
-            sprintf(&fileNameBuffer[0], "symbol-%s.1.csv".ptr, timeString);
+            sprintf(&fileNameBuffer[0], "symbol-%s.1.csv".ptr, traceFileName ? traceFileName : timeString);
 
         printf("traced_symbols: %d\n", dsymbol_profile_array_count);
 
@@ -337,7 +408,7 @@ void writeTrace(char*[] arguments)
         auto data = fileBuffer[0 .. bufferPos - fileBuffer];
         auto errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
 
-        fileNameLength = sprintf(&fileNameBuffer[0], "symbol-%s.2.csv".ptr, timeString);
+        fileNameLength = sprintf(&fileNameBuffer[0], "symbol-%s.2.csv".ptr, traceFileName ? traceFileName : timeString);
 
         auto f2 = File();
         bufferPos = fileBuffer;
@@ -350,6 +421,12 @@ void writeTrace(char*[] arguments)
 
         data = fileBuffer[0 .. bufferPos - fileBuffer];
         errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
+
+        static if (COMPRESSED_TRACE)
+        {
+            bufferPos = fileBuffer;
+            writeMetadata(bufferPos);
+        }
 
 
         free(fileBuffer);
