@@ -36,7 +36,7 @@ struct SymbolProfileEntry
 
     union
     {
-        RootObject ro;
+        // RootObject ro;
         Dsymbol sym;
         Expression exp;
         Statement stmt;
@@ -159,10 +159,13 @@ static if (COMPRESSED_TRACE)
 	uint[string] phaseArray;
 	uint phaseArrayNextId = 1;
 
-    SymInfo[Expression] expArray;
-    SymInfo[Dsymbol] symArray;
-    SymInfo[Statement] stmtArray;
-    SymInfo[Type] typeArray;
+    SymInfo*[void*/*Expression*/] expArray;
+    SymInfo*[void*/*Dsymbol*/] symArray;
+    SymInfo*[void*/*Statement*/] stmtArray;
+    SymInfo*[void*/*Type*/] typeArray;
+
+    SymInfo[] symInfos;
+    uint n_symInfos;
 }
 
 void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
@@ -221,27 +224,27 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
         final switch(dp.nodeType)
         {
             case ProfileNodeType.Dsymbol :
-                if (auto symInfo = dp.sym in symArray)
+                if (auto symInfo = (cast(void*)dp.sym) in symArray)
                 {
-                    id = symInfo.id;
+                    id = (**symInfo).id;
                 }
                 break;
             case ProfileNodeType.Expression :
-                if (auto symInfo = dp.exp in expArray)
+                if (auto symInfo = (cast(void*)dp.exp) in expArray)
                 {
-                    id = symInfo.id;
+                    id = (**symInfo).id;
                 }
                 break;             
             case ProfileNodeType.Statement :
-                if (auto symInfo = dp.stmt in stmtArray)
+                if (auto symInfo = (cast(void*)dp.stmt) in stmtArray)
                 {
-                    id = symInfo.id;
+                    id = (**symInfo).id;
                 }
                 break;             
             case ProfileNodeType.Type :
-                if (auto symInfo = dp.exp in expArray)
+                if (auto symInfo = (cast(void*)dp.type) in typeArray)
                 {
-                    id = symInfo.id;
+                    id = (**symInfo).id;
                 }
                 break;             
                 // we should probably assert here.
@@ -253,7 +256,11 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
         if (!id) // we haven't haven't seen this symbol before
         {
             id = running_id++;
-            SymInfo symInfo = SymInfo(dp.vp, id);
+            // TODO ~= is too slow ... replace by manual memory allocation;
+
+            symInfos ~= SymInfo(dp.vp, id);
+
+            SymInfo *symInfo = &symInfos[n_symInfos++];
 
             final switch(dp.nodeType)
             {
@@ -261,13 +268,13 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
                     symInfo.name = dp.sym.toChars();
                     symInfo.loc = dp.sym.loc.toChars();
                     
-                    symArray[dp.sym] = symInfo;
+                    symArray[cast(void*)dp.sym] = symInfo;
                 break;
                 case ProfileNodeType.Expression :
                     symInfo.name = dp.exp.toChars();
                     symInfo.loc = dp.exp.loc.toChars();
                     
-                    expArray[dp.exp] = symInfo;
+                    expArray[cast(void*)dp.exp] = symInfo;
                 break;
                 case ProfileNodeType.Statement:
                     symInfo.name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement()) ? 
@@ -275,12 +282,12 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
                         dp.stmt.toChars());
                     symInfo.loc = dp.stmt.loc.toChars();
 
-                    stmtArray[dp.stmt] = symInfo;
+                    stmtArray[cast(void*)dp.stmt] = symInfo;
                 break;
                 case ProfileNodeType.Type :
                     symInfo.name = dp.type.toChars();
 
-                    typeArray[dp.type] = symInfo;
+                    typeArray[cast(void*)dp.type] = symInfo;
                 break;
 
                  case ProfileNodeType.Invalid:
@@ -344,6 +351,16 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
     }
 
 }
+
+void writeSymInfos(ref char* bufferPos)
+{
+    foreach(symInfo; symInfos[0 .. n_symInfos])
+    {
+
+    }
+    assert(0, "Finish implementation of " ~ __FUNCTION__);
+}
+
 struct SymbolProfileRecord
 {
     ulong begin_ticks;
@@ -357,19 +374,21 @@ struct SymbolProfileRecord
     uint phase_id;
 }
 
-struct TraceFile
+struct TraceFileHeader
 {
+    uint n_records;
     uint n_phases;
     uint n_kinds;
     uint n_symbols;
-    uint n_records;
 
+    uint offset_records;
     uint offset_phases;
     uint offset_kinds;
-    uint offset_symbol_names;
-    uint offset_symbol_locations;
-    uint offset_records;
+    uint offset_symbol_info_descriptors;
+}
 
+struct TraceFileTail
+{
     SymbolProfileRecord[] records;
 
     string[] phases;
@@ -420,7 +439,7 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
             }
         }
 
-        auto fileNameLength = 
+        auto fileNameLength =
             sprintf(&fileNameBuffer[0], "symbol-%s.1.csv".ptr, traceFileName ? traceFileName : timeString);
 
         printf("traced_symbols: %d\n", dsymbol_profile_array_count);
@@ -430,6 +449,29 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
 			// we don't write the args ... will need to be fixed at some point
 			// no schema information is written for the compressed trance,
 			// since it's known by the reader
+            // advance buffer by 4*uint.sizeof to keep space for the number of symbols and so on
+            TraceFileHeader* header = cast(TraceFileHeader*)bufferPos;
+            bufferPos += TraceFileHeader.sizeof;
+            header.offset_records = cast(uint) (bufferPos - fileBuffer);
+            header.n_records = dsymbol_profile_array_count;
+
+            // then we write all the recods which should be small enough to fit into 2GB
+            foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count])
+            {
+                writeRecord(dp, bufferPos);
+            }
+            // print out size
+            printf("profile_records size: %dk\n ", (bufferPos - fileBuffer) / 1024);
+
+            header.offset_symbol_descriptors = cast(uint)(bufferPos - fileBuffer);
+
+            // after writing the recoreds we know how many symbol infos we have
+
+            // now attach the metadata
+            writeSymInfos(bufferPos);
+            //
+            auto data = fileBuffer[0 .. bufferPos - fileBuffer];
+            auto errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
         }
         else
         {
@@ -447,37 +489,31 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
                 "location".ptr, "begin_ticks".ptr, "end_ticks".ptr,
                 "begin_mem".ptr, "end_mem".ptr
             );
-        }
 
+            foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count / 2])
+            {
+                writeRecord(dp, bufferPos);
+            }
 
-        foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count / 2])
-        {
-            writeRecord(dp, bufferPos);
-        }
+            printf("trace_file_size: %dk\n ", (bufferPos - fileBuffer) / 1024);
+            auto data = fileBuffer[0 .. bufferPos - fileBuffer];
+            auto errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
 
-        printf("trace_file_size: %dk\n ", (bufferPos - fileBuffer) / 1024);
-        auto data = fileBuffer[0 .. bufferPos - fileBuffer];
-        auto errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
+            fileNameLength = sprintf(&fileNameBuffer[0], "symbol-%s.2.csv".ptr, traceFileName ? traceFileName : timeString);
 
-        fileNameLength = sprintf(&fileNameBuffer[0], "symbol-%s.2.csv".ptr, traceFileName ? traceFileName : timeString);
-
-        auto f2 = File();
-        bufferPos = fileBuffer;
-
-        foreach(dp;dsymbol_profile_array[dsymbol_profile_array_count / 2
-            .. dsymbol_profile_array_count])
-        {
-            writeRecord(dp, bufferPos);
-        }
-
-        data = fileBuffer[0 .. bufferPos - fileBuffer];
-        errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
-
-        static if (COMPRESSED_TRACE)
-        {
+            auto f2 = File();
             bufferPos = fileBuffer;
-            writeMetadata(bufferPos);
+
+            foreach(dp;dsymbol_profile_array[dsymbol_profile_array_count / 2
+                .. dsymbol_profile_array_count])
+            {
+                writeRecord(dp, bufferPos);
+            }
+
+            data = fileBuffer[0 .. bufferPos - fileBuffer];
+            errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
         }
+
 
 
         free(fileBuffer);
