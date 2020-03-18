@@ -5749,6 +5749,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
 void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions* fargs)
 {
+    import dmd.trace; mixin(traceString("tempinst"));
     //printf("[%s] TemplateInstance.dsymbolSemantic('%s', this=%p, gag = %d, sc = %p)\n", tempinst.loc.toChars(), tempinst.toChars(), tempinst, global.gag, sc);
     version (none)
     {

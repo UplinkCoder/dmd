@@ -369,6 +369,7 @@ extern (C++) abstract class Statement : ASTNode
     inout(BreakStatement)       isBreakStatement()       inout { return null; }
     inout(DtorExpStatement)     isDtorExpStatement()     inout { return null; }
     inout(ForwardingStatement)  isForwardingStatement()  inout { return null; }
+    inout(PeelStatement)        isPeelStatement()        inout { return null; }
 }
 
 /***********************************************************
@@ -409,6 +410,11 @@ extern (C++) final class PeelStatement : Statement
     {
         super(s.loc);
         this.s = s;
+    }
+
+    override inout(PeelStatement) isPeelStatement() inout pure nothrow
+    {
+        return this;
     }
 
     override void accept(Visitor v)

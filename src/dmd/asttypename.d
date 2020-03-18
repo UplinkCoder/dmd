@@ -13,6 +13,7 @@ module dmd.asttypename;
 import dmd.attrib;
 import dmd.aliasthis;
 import dmd.aggregate;
+import dmd.ast_node;
 import dmd.complex;
 import dmd.cond;
 import dmd.ctfeexpr;
@@ -80,7 +81,7 @@ mixin
     {
         static if (is(typeof(ov) P == function))
         {
-            static if (is(P[0] S == super) && is(S[0] == RootObject))
+            static if (is(P[0] S == super) && is(S[0] == ASTNode))
             {
                 astTypeNameFunctions ~= `
 string astTypeName(` ~ P[0].stringof ~ ` node)

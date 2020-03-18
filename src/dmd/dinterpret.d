@@ -763,7 +763,7 @@ private void ctfeCompile(FuncDeclaration fd)
  */
 private Expression interpretFunction(UnionExp* pue, FuncDeclaration fd, InterState* istate, Expressions* arguments, Expression thisarg)
 {
-    import dmd.trace; mixin(traceString("fd")); pragma(msg, traceString("fd"));
+    import dmd.trace; mixin(traceString("fd"));
 
     debug (LOG)
     {

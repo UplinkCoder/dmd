@@ -13,6 +13,9 @@
 module dmd.trace;
 import dmd.dsymbol;
 import dmd.expression;
+import dmd.mtype;
+import dmd.statement;
+import dmd.root.rootobject;
 
 enum SYMBOL_TRACE = true;
 enum COMPRESSED_TRACE = false;
@@ -20,7 +23,7 @@ enum COMPRESSED_TRACE = false;
 
 struct SymbolProfileEntry
 {
-    Dsymbol sym;
+    ProfileNodeType nodeType;
 
     ulong begin_ticks;
     ulong end_ticks;
@@ -31,13 +34,23 @@ struct SymbolProfileEntry
     string kind;
     string fn;
 
-    Expression exp;
+    union
+    {
+        RootObject ro;
+        Dsymbol sym;
+        Expression exp;
+        Statement stmt;
+        Type type;
+    }
 }
 
 enum ProfileNodeType
 {
-    exp,
-    sym
+    Invalid,
+    Dsymbol,
+    Expression,
+    Statement,
+    Type,
 }
 
 extern (C) __gshared uint dsymbol_profile_array_count;
@@ -60,12 +73,12 @@ void initTraceMemory()
 
 string traceString(string vname, string fn = null)
 {
-    import TracyC;
     static if (SYMBOL_TRACE)
 {
-    return "import TracyC;\nmixin(zoneMixin(\"" ~ vname ~ "\"));" ~ q{
+    return q{
     import queryperf : QueryPerformanceCounter;
     import dmd.root.rmem;
+    import dmd.asttypename;
     ulong begin_sema_ticks;
     ulong end_sema_ticks;
     ulong begin_sema_mem = Mem.allocated;
@@ -77,24 +90,45 @@ string traceString(string vname, string fn = null)
 } ~ `
     scope(exit)
     {
-        alias v_type = typeof(` ~ vname ~ `);
+        auto v = ` ~ vname ~ `;
+        alias v_type = typeof(v);
         QueryPerformanceCounter(&end_sema_ticks);
         static if (is(v_type : Dsymbol))
         {
             dsymbol_profile_array[insert_pos] =
-                SymbolProfileEntry(` ~ vname ~ `,
-            begin_sema_ticks, end_sema_ticks,
-            begin_sema_mem, Mem.allocated,
-            v_type.stringof, ` ~ (fn
-                ? `"` ~ fn ~ `"` : "__FUNCTION__") ~ `);
+                SymbolProfileEntry(ProfileNodeType.Dsymbol,
+                begin_sema_ticks, end_sema_ticks,
+                begin_sema_mem, Mem.allocated,
+                astTypeName(v), ` ~ (fn
+                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+            dsymbol_profile_array[insert_pos].sym = v; 
         } else static if (is(v_type : Expression))
         {
             dsymbol_profile_array[insert_pos] =
-                SymbolProfileEntry(null,
-            begin_sema_ticks, end_sema_ticks,
-            begin_sema_mem, Mem.allocated,
-            v_type.stringof, ` ~ (fn
-                ? `"` ~ fn ~ `"` : "__FUNCTION__") ~ ", " ~ vname ~ `);
+                SymbolProfileEntry(ProfileNodeType.Expression,
+                begin_sema_ticks, end_sema_ticks,
+                begin_sema_mem, Mem.allocated,
+                astTypeName(v), ` ~ (fn
+                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+            dsymbol_profile_array[insert_pos].exp = v; 
+        } else static if (is(v_type : Statement))
+        {
+            dsymbol_profile_array[insert_pos] =
+                SymbolProfileEntry(ProfileNodeType.Statement,
+                begin_sema_ticks, end_sema_ticks,
+                begin_sema_mem, Mem.allocated,
+                astTypeName(v), ` ~ (fn
+                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+            dsymbol_profile_array[insert_pos].stmt = v; 
+        } else static if (is(v_type : Type))
+        {
+            dsymbol_profile_array[insert_pos] =
+                SymbolProfileEntry(ProfileNodeType.Type,
+                begin_sema_ticks, end_sema_ticks,
+                begin_sema_mem, Mem.allocated,
+                astTypeName(v), ` ~ (fn
+                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+            dsymbol_profile_array[insert_pos].type = v; 
         }
         else static assert(0, "we dont know how to deal with: " ~ v_type.stringof);
     }
@@ -126,6 +160,8 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 
         SymInfo[Expression] expArray;
         SymInfo[Dsymbol] symArray;
+        SymInfo[Statement] stmtArray;
+        SymInfo[Type] typeArray;
 
         ulong id;
 
@@ -171,19 +207,28 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
         Loc loc;
         const (char)* name;
 
-        if (dp.sym !is null)
+        final switch(dp.nodeType)
         {
-            loc = dp.sym.loc;
-            name = dp.sym.toChars();
+            case ProfileNodeType.Dsymbol :
+                loc = dp.sym.loc;
+                name = dp.sym.toChars();
+            break;
+            case ProfileNodeType.Expression :
+                loc = dp.exp.loc;
+                name = dp.exp.toChars();
+            break;             
+            case ProfileNodeType.Statement :
+                loc = dp.stmt.loc;
+                name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement) ? "toChars() for statement not implemented" : dp.stmt.toChars());
+            break;
+            case ProfileNodeType.Type :
+                name = dp.type.toChars();
+            break;
+            // we should probably assert here.
+            case ProfileNodeType.Invalid:
+                return ;
+    
         }
-        else if (dp.exp !is null)
-        {
-            loc = dp.exp.loc;
-            name = dp.exp.toChars();
-        }
-        else
-            // we probably should assert here, but whaverever.
-            return ;
     }
     // Identifier id = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
     static if (COMPRESSED_TRACE)

@@ -310,7 +310,7 @@ endif
 ######## DMD frontend source files
 
 FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argtypes argtypes_sysv_x64 arrayop	\
-	arraytypes astcodegen ast_node attrib builtin canthrow cli clone compiler complex cond constfold	\
+	arraytypes astcodegen ast_node asttypename attrib builtin canthrow cli clone compiler complex cond constfold	\
 	cppmangle cppmanglewin ctfeexpr ctorflow dcast dclass declaration delegatize denum dimport	\
 	dinifile dinterpret dmacro dmangle dmodule doc dscope dstruct dsymbol dsymbolsem	\
 	dtemplate dversion escape expression expressionsem func			\
@@ -318,7 +318,7 @@ FRONT_SRCS=$(addsuffix .d, $(addprefix $D/,access aggregate aliasthis apply argt
 	json lambdacomp lib libelf libmach link mars mtype nogc nspace objc opover optimize parse permissivevisitor sapply templateparamsem	\
 	sideeffect statement staticassert target typesem traits transitivevisitor parsetimevisitor visitor	\
 	typinf utils scanelf scanmach statement_rewrite_walker statementsem staticcond safe blockexit printast \
-	semantic2 semantic3 trace queryperf TracyC))
+	semantic2 semantic3 trace queryperf))
 
 LEXER_SRCS=$(addsuffix .d, $(addprefix $D/, console entity errors filecache globals id identifier lexer tokens utf ))
 
@@ -443,10 +443,10 @@ $G/dmd_frontend: $(FRONT_SRCS) $D/gluelayer.d $(ROOT_SRCS) $G/lexer.a $(STRING_I
 
 ifdef ENABLE_LTO
 $G/dmd: $(DMD_SRCS) $(ROOT_SRCS) $G/lexer.a $(G_OBJS) $(G_DOBJS) $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)
-	$(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -vtls -J$G -J$(RES) $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^) ../TracyClientNoExit.o -L-lstdc++ -L-lpthread
+	$(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -vtls -J$G -J$(RES) $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH),$^) -L-lstdc++ -L-lpthread
 else
 $G/dmd: $(DMD_SRCS) $(ROOT_SRCS) $G/backend.a $G/lexer.a $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)
-	$(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -vtls -J$G -J$(RES) $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH) $(LEXER_ROOT),$^) ../TracyClientNoExit.o -L-lstdc++ -L-lpthread
+	$(HOST_DMD_RUN) -of$@ $(MODEL_FLAG) -vtls -J$G -J$(RES) $(DFLAGS) $(filter-out $(STRING_IMPORT_FILES) $(HOST_DMD_PATH) $(LEXER_ROOT),$^) -L-lstdc++ -L-lpthread
 endif
 
 $G/dmd-unittest: $(DMD_SRCS) $(ROOT_SRCS) $(LEXER_SRCS) $(G_OBJS) $(G_DOBJS) $(STRING_IMPORT_FILES) $(HOST_DMD_PATH)

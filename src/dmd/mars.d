@@ -137,6 +137,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     Strings files;
     Strings libmodules;
     global._init();
+    import dmd.trace; initTraceMemory();
     debug
     {
         printf("DMD %.*s DEBUG\n", cast(int) global._version.length - 1, global._version.ptr);
@@ -691,6 +692,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             File.write(cgFilename.ptr, buf.peekSlice());
         }
     }
+    writeTrace(null);
     if (!params.obj)
     {
     }
