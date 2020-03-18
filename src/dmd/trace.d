@@ -18,7 +18,7 @@ import dmd.statement;
 import dmd.root.rootobject;
 
 enum SYMBOL_TRACE = true;
-enum COMPRESSED_TRACE = false;
+enum COMPRESSED_TRACE = true;
 
 
 struct SymbolProfileEntry
@@ -146,12 +146,18 @@ static if (COMPRESSED_TRACE)
     static struct SymInfo
     {
         void* sym;
-        ulong id;
+        uint id;
+        uint pad;
         
         const (char)* name;
         const (char)* loc;
         const (char)* typename;
     }
+
+	uint[string] kindArray;
+	uint kindArrayNextId = 1;
+	uint[string] phaseArray;
+	uint phaseArrayNextId = 1;
 
     SymInfo[Expression] expArray;
     SymInfo[Dsymbol] symArray;
@@ -166,9 +172,50 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 
     static if (COMPRESSED_TRACE)
     {
-        static running_id = 1;
+		int result;
 
-        ulong id;
+		int getKindId(string kind, bool justLookup = true)
+		{
+			if (auto id = kind in kindArray)
+			{
+				result = *id;
+			}
+			else
+			{
+				assert(!justLookup);
+				auto id = kindArrayNextId++;
+				kindArray[kind] = id;
+				result = id;
+			}
+
+			return result;
+		}
+
+		int getPhaseId(string phase, bool justLookup = true)
+		{
+			int result;
+
+			if (auto id = phase in phaseArray)
+			{
+				result = *id;
+			}
+			else
+			{
+				assert(!justLookup);
+				auto id = phaseArrayNextId++;
+				phaseArray[phase] = id;
+				result = id;
+			}
+
+			return result;
+		}
+
+		auto kindId = getKindId(dp.kind, false);
+		auto phaseId = getPhaseId(dp.fn, false);
+
+        static uint running_id = 1;
+
+        uint id;
         SymInfo info;
 
         final switch(dp.nodeType)
@@ -201,7 +248,6 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
             case ProfileNodeType.Invalid:
                 numInvalidProfileNodes++;
                 return ;
-                
         }
 
         if (!id) // we haven't haven't seen this symbol before
@@ -227,15 +273,18 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
                     symInfo.name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement()) ? 
                         "toChars() for statement not implemented" :
                         dp.stmt.toChars());
-                    symInfo.loc = dp.stmt.loc;
+                    symInfo.loc = dp.stmt.loc.toChars();
 
                     stmtArray[dp.stmt] = symInfo;
                 break;
                 case ProfileNodeType.Type :
-                    name = dp.type.toChars();
+                    symInfo.name = dp.type.toChars();
 
                     typeArray[dp.type] = symInfo;
                 break;
+
+                 case ProfileNodeType.Invalid:
+                     assert(0); // this cannot happen
             }
         }
     }
@@ -256,7 +305,10 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
             break;             
             case ProfileNodeType.Statement :
                 loc = dp.stmt.loc;
-                name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement) ? "toChars() for statement not implemented" : dp.stmt.toChars());
+                name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement) ?
+					"toChars() for statement not implemented" :
+					dp.stmt.toChars()
+				);
             break;
             case ProfileNodeType.Type :
                 name = dp.type.toChars();
@@ -267,16 +319,18 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
     
         }
     }
-    // Identifier id = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
+    // Identifier ident = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
     static if (COMPRESSED_TRACE)
     {
-        bufferPos += sprintf(cast(char*) bufferPos,
-            "%lld|%llu|%s|%s|%lld|%lld|%lld|%lld|\n",
-            dp.end_ticks - dp.begin_ticks,
-            id, &dp.kind[0], &dp.fn[0],
-            dp.begin_ticks, dp.end_ticks,
-            dp.begin_mem, dp.end_mem
-        );
+		SymbolProfileRecord* rp = cast(SymbolProfileRecord*) bufferPos;
+		bufferPos += SymbolProfileRecord.sizeof;
+
+		SymbolProfileRecord r = {
+			dp.begin_ticks, dp.end_ticks,
+			dp.begin_mem, dp.end_mem,
+			id, kindId, phaseId
+		};
+        (*rp) = r;
     }
     else
     {
@@ -371,24 +425,21 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
 
         printf("traced_symbols: %d\n", dsymbol_profile_array_count);
 
-        bufferPos += sprintf(cast(char*) bufferPos, "//");
-        foreach(arg;arguments)
-        {
-            bufferPos += sprintf(bufferPos, "%s ", arg);
-        }
-        bufferPos += sprintf(cast(char*) bufferPos, "\n");
         static if (COMPRESSED_TRACE)
         {
-            bufferPos += sprintf(cast(char*) bufferPos,
-                "%s|%s|%s|%s|%s|%s|%s|%s|\n",
-                "inclusive ticks".ptr,
-                "id".ptr, "kind".ptr, "phase".ptr,
-                "begin_ticks".ptr, "end_ticks".ptr,
-                "begin_mem".ptr, "end_mem".ptr
-            );
+			// we don't write the args ... will need to be fixed at some point
+			// no schema information is written for the compressed trance,
+			// since it's known by the reader
         }
         else
         {
+			bufferPos += sprintf(cast(char*) bufferPos, "//");
+			foreach(arg;arguments)
+			{
+				bufferPos += sprintf(bufferPos, "%s ", arg);
+			}
+			bufferPos += sprintf(cast(char*) bufferPos, "\n");
+
             bufferPos += sprintf(cast(char*) bufferPos,
                 "%s|%s|%s|%s|%s|%s|%s|%s|%s|\n",
                 "inclusive ticks".ptr,
