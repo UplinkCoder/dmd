@@ -20,6 +20,7 @@ import dmd.root.rootobject;
 enum SYMBOL_TRACE = true;
 enum COMPRESSED_TRACE = true;
 
+import dmd.trace_file;
 
 struct SymbolProfileEntry
 {
@@ -154,15 +155,19 @@ static if (COMPRESSED_TRACE)
         const (char)* typename;
     }
 
+
+    string[] phases;
+    string[] kinds;
+
 	uint[string] kindArray;
 	uint kindArrayNextId = 1;
 	uint[string] phaseArray;
 	uint phaseArrayNextId = 1;
 
-    SymInfo*[void*/*Expression*/] expArray;
-    SymInfo*[void*/*Dsymbol*/] symArray;
-    SymInfo*[void*/*Statement*/] stmtArray;
-    SymInfo*[void*/*Type*/] typeArray;
+    SymInfo*[void*/*Expression*/] expMap;
+    SymInfo*[void*/*Dsymbol*/] symMap;
+    SymInfo*[void*/*Statement*/] stmtMap;
+    SymInfo*[void*/*Type*/] typeMap;
 
     SymInfo[] symInfos;
     uint n_symInfos;
@@ -187,6 +192,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 			{
 				assert(!justLookup);
 				auto id = kindArrayNextId++;
+                kinds ~= kind;
 				kindArray[kind] = id;
 				result = id;
 			}
@@ -206,6 +212,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 			{
 				assert(!justLookup);
 				auto id = phaseArrayNextId++;
+                phases ~= phase;
 				phaseArray[phase] = id;
 				result = id;
 			}
@@ -224,25 +231,25 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
         final switch(dp.nodeType)
         {
             case ProfileNodeType.Dsymbol :
-                if (auto symInfo = (cast(void*)dp.sym) in symArray)
+                if (auto symInfo = (cast(void*)dp.sym) in symMap)
                 {
                     id = (**symInfo).id;
                 }
                 break;
             case ProfileNodeType.Expression :
-                if (auto symInfo = (cast(void*)dp.exp) in expArray)
+                if (auto symInfo = (cast(void*)dp.exp) in expMap)
                 {
                     id = (**symInfo).id;
                 }
                 break;             
             case ProfileNodeType.Statement :
-                if (auto symInfo = (cast(void*)dp.stmt) in stmtArray)
+                if (auto symInfo = (cast(void*)dp.stmt) in stmtMap)
                 {
                     id = (**symInfo).id;
                 }
                 break;             
             case ProfileNodeType.Type :
-                if (auto symInfo = (cast(void*)dp.type) in typeArray)
+                if (auto symInfo = (cast(void*)dp.type) in typeMap)
                 {
                     id = (**symInfo).id;
                 }
@@ -268,13 +275,13 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
                     symInfo.name = dp.sym.toChars();
                     symInfo.loc = dp.sym.loc.toChars();
                     
-                    symArray[cast(void*)dp.sym] = symInfo;
+                    symMap[cast(void*)dp.sym] = symInfo;
                 break;
                 case ProfileNodeType.Expression :
                     symInfo.name = dp.exp.toChars();
                     symInfo.loc = dp.exp.loc.toChars();
                     
-                    expArray[cast(void*)dp.exp] = symInfo;
+                    expMap[cast(void*)dp.exp] = symInfo;
                 break;
                 case ProfileNodeType.Statement:
                     symInfo.name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement()) ? 
@@ -282,12 +289,12 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
                         dp.stmt.toChars());
                     symInfo.loc = dp.stmt.loc.toChars();
 
-                    stmtArray[cast(void*)dp.stmt] = symInfo;
+                    stmtMap[cast(void*)dp.stmt] = symInfo;
                 break;
                 case ProfileNodeType.Type :
                     symInfo.name = dp.type.toChars();
 
-                    typeArray[cast(void*)dp.type] = symInfo;
+                    typeMap[cast(void*)dp.type] = symInfo;
                 break;
 
                  case ProfileNodeType.Invalid:
@@ -351,40 +358,71 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
     }
 
 }
-
-void writeSymInfos(ref char* bufferPos)
+/// Copies a string from src to dst
+/// Params:
+///     dst = destination memory
+///     src = source string
+/// Returns:
+///     a pointer to the end of dst;
+char* copyAndPointPastEnd(char* dst, const char * src)
 {
+    import core.stdc.string;
+    auto n = strlen(src); // len including the zero terminator
+    return cast(char*)memcpy(dst, src, n) + n;
+}
+
+void writeSymInfos(ref char* bufferPos, const char* fileBuffer)
+{
+    // first we write 3 pointers each
+    // start of name_string
+    // start of location_string
+    // one past the end of location string
+
+    /// Returns:
+    ///     Current offset from the beginning of the file
+    pragma(inline, true) uint currentOffset32()
+    {
+        return cast(uint)(bufferPos - fileBuffer);
+    }
+
+    SymbolInfoPointers* symInfoPtrs = cast(SymbolInfoPointers*)bufferPos;
+    bufferPos += SymbolInfoPointers.sizeof * n_symInfos;
+
     foreach(symInfo; symInfos[0 .. n_symInfos])
     {
-
+        auto p = symInfoPtrs++;
+        p.symbol_name_start = currentOffset32();
+        bufferPos = copyAndPointPastEnd(bufferPos, symInfo.name);
+        p.symobol_location_start = currentOffset32();
+        bufferPos = copyAndPointPastEnd(bufferPos, symInfo.loc);
+        p.one_past_symbol_location_end = currentOffset32();
     }
-    assert(0, "Finish implementation of " ~ __FUNCTION__);
 }
 
-struct SymbolProfileRecord
+extern (D) void writeStrings(ref char* bufferPos, const char* fileBuffer, string[] strings)
 {
-    ulong begin_ticks;
-    ulong end_ticks;
-    
-    ulong begin_mem;
-    ulong end_mem;
+    /// Returns:
+    ///     Current offset from the beginning of the file
+    pragma(inline, true) uint currentOffset32()
+    {
+        return cast(uint)(bufferPos - fileBuffer);
+    }
 
-    uint symbol_id;
-    uint kind_id;
-    uint phase_id;
-}
+    StringPointer* stringPointers = cast(StringPointer*)bufferPos;
+    bufferPos += StringPointer.sizeof * strings.length;
+    foreach(s;strings)
+    {
+        auto p = stringPointers++;
 
-struct TraceFileHeader
-{
-    uint n_records;
-    uint n_phases;
-    uint n_kinds;
-    uint n_symbols;
+        p.string_start = currentOffset32();
+        bufferPos = copyAndPointPastEnd(bufferPos, s.ptr);
+        p.one_past_string_end = currentOffset32();
+    }
 
-    uint offset_records;
-    uint offset_phases;
-    uint offset_kinds;
-    uint offset_symbol_info_descriptors;
+    if (auto unalingned_bytes = currentOffset32() % 4)
+    {
+        bufferPos += unalingned_bytes;
+    }
 }
 
 struct TraceFileTail
@@ -446,29 +484,40 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
 
         static if (COMPRESSED_TRACE)
         {
-			// we don't write the args ... will need to be fixed at some point
-			// no schema information is written for the compressed trance,
-			// since it's known by the reader
-            // advance buffer by 4*uint.sizeof to keep space for the number of symbols and so on
+            pragma(inline, true) uint currentOffset32()
+            {
+                return cast(uint)(bufferPos - fileBuffer);
+            }
+
+            // reserve space for the header
             TraceFileHeader* header = cast(TraceFileHeader*)bufferPos;
             bufferPos += TraceFileHeader.sizeof;
-            header.offset_records = cast(uint) (bufferPos - fileBuffer);
-            header.n_records = dsymbol_profile_array_count;
+            copyAndPointPastEnd(cast(char*)&header.magic_number, "DMDTRACE".ptr);
+            header.FileVersion = 1;
 
-            // then we write all the recods which should be small enough to fit into 2GB
+            header.n_records = dsymbol_profile_array_count;
+            // the records follow
+            header.offset_records = currentOffset32();
             foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count])
             {
                 writeRecord(dp, bufferPos);
             }
-            // print out size
-            printf("profile_records size: %dk\n ", (bufferPos - fileBuffer) / 1024);
+            printf("unique symbols: %d\n", n_symInfos);
+            printf("profile_records size: %dk\n", (bufferPos - fileBuffer) / 1024);
+            // after writing the records we know how many symbols infos we have
+            header.n_symbols = n_symInfos;
+            header.n_phases = cast(uint)phases.length;
+            header.n_kinds = cast(uint)kinds.length;
 
-            header.offset_symbol_descriptors = cast(uint)(bufferPos - fileBuffer);
-
-            // after writing the recoreds we know how many symbol infos we have
+            // write phases
+            header.offset_phases = currentOffset32();
+            writeStrings(bufferPos, fileBuffer, phases);
+            header.offset_kinds = currentOffset32();
+            writeStrings(bufferPos, fileBuffer, kinds);
 
             // now attach the metadata
-            writeSymInfos(bufferPos);
+            header.offset_symbol_info_descriptors = currentOffset32();
+            writeSymInfos(bufferPos, fileBuffer);
             //
             auto data = fileBuffer[0 .. bufferPos - fileBuffer];
             auto errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
@@ -519,3 +568,4 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
         free(fileBuffer);
     }
 }
+
