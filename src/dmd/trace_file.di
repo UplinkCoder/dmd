@@ -9,15 +9,16 @@ struct SymbolProfileRecord
     ulong end_mem;
     
     uint symbol_id;
-    uint kind_id;
-    uint phase_id;
-    
-    ubyte[4] pad;
+    ushort kind_id;
+    ushort phase_id;
 }
+
+pragma(msg, "ProfileRecord.sizeof = ", SymbolProfileRecord.sizeof);
 
 struct TraceFileHeader
 {
     ulong magic_number;
+
     uint FileVersion;
 
     uint n_records;
@@ -48,15 +49,16 @@ align(1):
 
 // the only reason this is a template is becuase d does not allow one to
 // specify inline linkage ... sigh
-static string[] readString()(const void[] file, uint offset_strings, uint n_strings)
+static string[] readStrings()(const void[] file, uint offset_strings, uint n_strings)
 {
     const (char)[][] result;
+    result.length = n_strings;
 
-    StringPointer* stringPointers = cast(StringPointer*)(startOfFile.ptr + offset_strings);
-    foreach(i; 0 .. header.n_strings)
+    StringPointer* stringPointers = cast(StringPointer*)(file.ptr + offset_strings);
+    foreach(i; 0 .. n_strings)
     {
         StringPointer p = *stringPointers++;
-        result ~= (cast(char*)startOfFile.ptr)[p.string_start .. p.one_past_string_end];
+        result[i] = (cast(char*)file.ptr)[p.string_start .. p.one_past_string_end];
     }
 
     return (cast(string*)result.ptr)[0 .. result.length];

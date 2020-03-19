@@ -159,10 +159,10 @@ static if (COMPRESSED_TRACE)
     string[] phases;
     string[] kinds;
 
-	uint[string] kindArray;
-	uint kindArrayNextId = 1;
-	uint[string] phaseArray;
-	uint phaseArrayNextId = 1;
+	ushort[string] kindArray;
+	ushort kindArrayNextId = 1;
+	ushort[string] phaseArray;
+	ushort phaseArrayNextId = 1;
 
     SymInfo*[void*/*Expression*/] expMap;
     SymInfo*[void*/*Dsymbol*/] symMap;
@@ -172,6 +172,10 @@ static if (COMPRESSED_TRACE)
     SymInfo[] symInfos;
     uint n_symInfos;
 }
+const(size_t) align4(const size_t val) @safe pure @nogc
+{
+    return ((val + 3) & ~3);
+}
 
 void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 {
@@ -180,10 +184,10 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 
     static if (COMPRESSED_TRACE)
     {
-		int result;
-
-		int getKindId(string kind, bool justLookup = true)
+		ushort getKindId(string kind, bool justLookup = true)
 		{
+            ushort result;
+
 			if (auto id = kind in kindArray)
 			{
 				result = *id;
@@ -200,9 +204,9 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 			return result;
 		}
 
-		int getPhaseId(string phase, bool justLookup = true)
+		ushort getPhaseId(string phase, bool justLookup = true)
 		{
-			int result;
+			ushort result;
 
 			if (auto id = phase in phaseArray)
 			{
@@ -284,9 +288,11 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
                     expMap[cast(void*)dp.exp] = symInfo;
                 break;
                 case ProfileNodeType.Statement:
-                    symInfo.name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement()) ? 
+                    /* don't set name for statement because doesn't really have a name
+                     * symInfo.name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement()) ? 
                         "toChars() for statement not implemented" :
                         dp.stmt.toChars());
+                    */
                     symInfo.loc = dp.stmt.loc.toChars();
 
                     stmtMap[cast(void*)dp.stmt] = symInfo;
@@ -319,10 +325,12 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
             break;             
             case ProfileNodeType.Statement :
                 loc = dp.stmt.loc;
-                name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement) ?
-					"toChars() for statement not implemented" :
-					dp.stmt.toChars()
+                /* don't set name for statement because doesn't really have a name
+                     * symInfo.name = ((dp.stmt.isForwardingStatement() || dp.stmt.isPeelStatement()) ? 
+                        "toChars() for statement not implemented" :
+                        dp.stmt.toChars());        
 				);
+            */            
             break;
             case ProfileNodeType.Type :
                 name = dp.type.toChars();
@@ -340,9 +348,13 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 		bufferPos += SymbolProfileRecord.sizeof;
 
 		SymbolProfileRecord r = {
-			dp.begin_ticks, dp.end_ticks,
-			dp.begin_mem, dp.end_mem,
-			id, kindId, phaseId
+            begin_ticks : dp.begin_ticks,
+            end_ticks : dp.end_ticks,
+    		begin_mem :	dp.begin_mem,
+            end_mem : dp.end_mem,
+    	    symbol_id : id,
+            kind_id : kindId,
+            phase_id : phaseId
 		};
         (*rp) = r;
     }
@@ -366,11 +378,14 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 ///     a pointer to the end of dst;
 char* copyAndPointPastEnd(char* dst, const char * src)
 {
+    // if we copy 0 bytes the dst is where we are at
+    if (!src) return dst;
+
     import core.stdc.string;
     auto n = strlen(src); // len including the zero terminator
     return cast(char*)memcpy(dst, src, n) + n;
 }
-
+static if (COMPRESSED_TRACE)
 void writeSymInfos(ref char* bufferPos, const char* fileBuffer)
 {
     // first we write 3 pointers each
@@ -409,7 +424,7 @@ extern (D) void writeStrings(ref char* bufferPos, const char* fileBuffer, string
     }
 
     StringPointer* stringPointers = cast(StringPointer*)bufferPos;
-    bufferPos += StringPointer.sizeof * strings.length;
+    bufferPos += align4(StringPointer.sizeof * strings.length);
     foreach(s;strings)
     {
         auto p = stringPointers++;
@@ -418,11 +433,8 @@ extern (D) void writeStrings(ref char* bufferPos, const char* fileBuffer, string
         bufferPos = copyAndPointPastEnd(bufferPos, s.ptr);
         p.one_past_string_end = currentOffset32();
     }
-
-    if (auto unalingned_bytes = currentOffset32() % 4)
-    {
-        bufferPos += unalingned_bytes;
-    }
+    // align after writing the strings
+    (*(cast(size_t*)&bufferPos)) = align4(cast(size_t)bufferPos);
 }
 
 struct TraceFileTail
@@ -511,8 +523,10 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
 
             // write phases
             header.offset_phases = currentOffset32();
+            assert(align4(currentOffset32()) == currentOffset32());
             writeStrings(bufferPos, fileBuffer, phases);
             header.offset_kinds = currentOffset32();
+            assert(align4(currentOffset32()) == currentOffset32());
             writeStrings(bufferPos, fileBuffer, kinds);
 
             // now attach the metadata

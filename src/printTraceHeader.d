@@ -8,10 +8,9 @@ void main(string[] args)
     (cast(void*)&header)[0 .. header.sizeof] = fileBytes[0 .. header.sizeof];
     writeln(structToString(header));
 
-    writeln("phases:\n    ", readPhases((cast(char*)fileBytes.ptr)[0 .. fileBytes.length]));
-    writeln("kinds:\n    ", readKinds((cast(char*)fileBytes.ptr)[0 .. fileBytes.length]));
+    writeln("phases:\n    ", readStrings(fileBytes, header.offset_phases, header.n_phases));
+    writeln("kinds:\n    ", readStrings(fileBytes, header.offset_kinds, header.n_kinds));
 }
-
 
 struct NoPrint {}
 
