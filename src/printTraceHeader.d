@@ -29,7 +29,7 @@ void main(string[] args)
         lastBeginTicks = r.begin_ticks;
     }
 
-    if (!strange_record_count)
+    if (strange_record_count)
     {
         writeln(strange_record_count, " strange records encounterd");
         return ;
@@ -40,7 +40,31 @@ void main(string[] args)
     //writeln("records are sorted that's good n_records: ", records.length);
 
     // now can start establishing parent child relationships;
+    string indent;
+    foreach(i; 0 .. records.length)
+    {
+        if (i && records[i-1].end_ticks > records[i].end_ticks)
+        {
+            indent ~= " ";
+        }
+        else if (indent.length) indent = indent [0 .. $-1];
 
+        auto r = records[i];
+
+        writeln(indent,
+            r.end_ticks - r.begin_ticks, 
+            getSymbolName(fileBytes, r), ":",
+            getSymbolLocation(fileBytes, r)
+        );
+    }
+    import std.algorithm;
+    auto sorted_records = 
+        records.sort!((a, b) => (a.end_ticks - a.begin_ticks > b.end_ticks - b.begin_ticks)).release;
+    writeln("TopList");
+    foreach(r;sorted_records)
+    {
+        writeln(r.end_ticks - r.begin_ticks, "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
+    }
 }
 
 struct NoPrint {}

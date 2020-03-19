@@ -102,7 +102,7 @@ static string getSymbolLocation()(const void[] file, SymbolProfileRecord r)
     auto loc = (cast(char*)file.ptr)[symp.symobol_location_start .. symp.one_past_symbol_location_end];
     if (symp.symobol_location_start == symp.one_past_symbol_location_end)
     {
-        name = null;
+        loc = null;
     }
     
     return cast(string) loc;
