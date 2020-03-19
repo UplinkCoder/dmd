@@ -63,3 +63,47 @@ static string[] readStrings()(const void[] file, uint offset_strings, uint n_str
 
     return (cast(string*)result.ptr)[0 .. result.length];
 }
+
+// the only reason this is a template is becuase d does not allow one to
+// specify inline linkage ... sigh
+static SymbolProfileRecord[] readRecords()(const void[] file, uint offset_records, uint n_records)
+{
+    SymbolProfileRecord[] result = 
+        (cast(SymbolProfileRecord*)(file.ptr + offset_records))[0 .. n_records];
+
+    return result;
+}
+
+static string getSymbolName()(const void[] file, SymbolProfileRecord r)
+{
+    import std.stdio;
+
+    TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
+    SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
+
+    auto symp = symbolInfoPointers[r.symbol_id - 1];
+    auto name = (cast(char*)file.ptr)[symp.symbol_name_start .. symp.symobol_location_start];
+    if (symp.symbol_name_start == symp.symobol_location_start)
+    {
+        name = null;
+    }
+
+    return cast(string) name;
+}
+
+static string getSymbolLocation()(const void[] file, SymbolProfileRecord r)
+{
+    import std.stdio;
+    
+    TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
+    SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
+    
+    auto symp = symbolInfoPointers[r.symbol_id - 1];
+    auto loc = (cast(char*)file.ptr)[symp.symobol_location_start .. symp.one_past_symbol_location_end];
+    if (symp.symobol_location_start == symp.one_past_symbol_location_end)
+    {
+        name = null;
+    }
+    
+    return cast(string) loc;
+}

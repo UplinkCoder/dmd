@@ -8,8 +8,39 @@ void main(string[] args)
     (cast(void*)&header)[0 .. header.sizeof] = fileBytes[0 .. header.sizeof];
     writeln(structToString(header));
 
-    writeln("phases:\n    ", readStrings(fileBytes, header.offset_phases, header.n_phases));
-    writeln("kinds:\n    ", readStrings(fileBytes, header.offset_kinds, header.n_kinds));
+
+    string[] kinds = readStrings(fileBytes, header.offset_kinds, header.n_kinds);
+    string[] phases = readStrings(fileBytes, header.offset_phases, header.n_phases);
+
+    writeln("phases:\n    ", phases);
+    writeln("kinds:\n    ", kinds);
+
+    SymbolProfileRecord[] records = readRecords(fileBytes, header.offset_records, header.n_records);
+    uint strange_record_count;
+    ulong lastBeginTicks;
+
+    foreach(r;records)
+    {
+        if (r.begin_ticks <= lastBeginTicks)
+        {
+            strange_record_count++;
+            writeln("Symbol: ", getSymbolName(fileBytes, r), "is proucing a strange record");
+        }
+        lastBeginTicks = r.begin_ticks;
+    }
+
+    if (!strange_record_count)
+    {
+        writeln(strange_record_count, " strange records encounterd");
+        return ;
+    }
+    // if we get here records are sorted  by begin_ticks
+    // as they should be
+
+    //writeln("records are sorted that's good n_records: ", records.length);
+
+    // now can start establishing parent child relationships;
+
 }
 
 struct NoPrint {}

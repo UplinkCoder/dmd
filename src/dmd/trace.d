@@ -227,6 +227,12 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 		auto kindId = getKindId(dp.kind, false);
 		auto phaseId = getPhaseId(dp.fn, false);
 
+        if (kindId > 500)
+            assert(0);
+
+        if (phaseId > 500)
+            assert(0);
+
         static uint running_id = 1;
 
         uint id;
