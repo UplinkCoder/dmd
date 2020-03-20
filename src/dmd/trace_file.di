@@ -76,6 +76,9 @@ static SymbolProfileRecord[] readRecords()(const void[] file, uint offset_record
 
 static string getSymbolName()(const void[] file, SymbolProfileRecord r)
 {
+    if (r.symbol_id == uint.max)
+        return "NullSymbol";
+
     TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
     SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
 
@@ -91,9 +94,12 @@ static string getSymbolName()(const void[] file, SymbolProfileRecord r)
 
 static string getSymbolLocation()(const void[] file, SymbolProfileRecord r)
 {
+    if (r.symbol_id == uint.max)
+        return "NullSymbol";
+
     TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
     SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
-    
+
     auto symp = symbolInfoPointers[r.symbol_id - 1];
     auto loc = (cast(char*)file.ptr)[symp.symobol_location_start .. symp.one_past_symbol_location_end];
     if (symp.symobol_location_start == symp.one_past_symbol_location_end)

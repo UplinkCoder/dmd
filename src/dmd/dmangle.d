@@ -275,6 +275,7 @@ public:
 
     void mangleIdentifier(Identifier id, Dsymbol s)
     {
+        import dmd.trace; mixin(traceString("s"));
         if (!backrefIdentifier(id))
             toBuffer(id.toString(), s);
     }

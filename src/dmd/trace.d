@@ -49,6 +49,7 @@ struct SymbolProfileEntry
 enum ProfileNodeType
 {
     Invalid,
+    NullSymbol,
     Dsymbol,
     Expression,
     Statement,
@@ -95,44 +96,57 @@ string traceString(string vname, string fn = null)
         auto v = ` ~ vname ~ `;
         alias v_type = typeof(v);
         QueryPerformanceCounter(&end_sema_ticks);
-        static if (is(v_type : Dsymbol))
-        {
-            dsymbol_profile_array[insert_pos] =
-                SymbolProfileEntry(ProfileNodeType.Dsymbol,
-                begin_sema_ticks, end_sema_ticks,
-                begin_sema_mem, Mem.allocated,
-                astTypeName(v), ` ~ (fn
-                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-            dsymbol_profile_array[insert_pos].sym = v; 
-        } else static if (is(v_type : Expression))
-        {
-            dsymbol_profile_array[insert_pos] =
-                SymbolProfileEntry(ProfileNodeType.Expression,
-                begin_sema_ticks, end_sema_ticks,
-                begin_sema_mem, Mem.allocated,
-                astTypeName(v), ` ~ (fn
-                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-            dsymbol_profile_array[insert_pos].exp = v; 
-        } else static if (is(v_type : Statement))
-        {
-            dsymbol_profile_array[insert_pos] =
-                SymbolProfileEntry(ProfileNodeType.Statement,
-                begin_sema_ticks, end_sema_ticks,
-                begin_sema_mem, Mem.allocated,
-                astTypeName(v), ` ~ (fn
-                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-            dsymbol_profile_array[insert_pos].stmt = v; 
-        } else static if (is(v_type : Type))
-        {
-            dsymbol_profile_array[insert_pos] =
-                SymbolProfileEntry(ProfileNodeType.Type,
-                begin_sema_ticks, end_sema_ticks,
-                begin_sema_mem, Mem.allocated,
-                astTypeName(v), ` ~ (fn
-                    ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-            dsymbol_profile_array[insert_pos].type = v; 
+        if (v !is null)
+        { 
+            static if (is(v_type : Dsymbol))
+            {
+                dsymbol_profile_array[insert_pos] =
+                    SymbolProfileEntry(ProfileNodeType.Dsymbol,
+                    begin_sema_ticks, end_sema_ticks,
+                    begin_sema_mem, Mem.allocated,
+                    astTypeName(v), ` ~ (fn
+                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                dsymbol_profile_array[insert_pos].sym = v; 
+            } else static if (is(v_type : Expression))
+            {
+                dsymbol_profile_array[insert_pos] =
+                    SymbolProfileEntry(ProfileNodeType.Expression,
+                    begin_sema_ticks, end_sema_ticks,
+                    begin_sema_mem, Mem.allocated,
+                    astTypeName(v), ` ~ (fn
+                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                dsymbol_profile_array[insert_pos].exp = v; 
+            } else static if (is(v_type : Statement))
+            {
+                dsymbol_profile_array[insert_pos] =
+                    SymbolProfileEntry(ProfileNodeType.Statement,
+                    begin_sema_ticks, end_sema_ticks,
+                    begin_sema_mem, Mem.allocated,
+                    astTypeName(v), ` ~ (fn
+                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                dsymbol_profile_array[insert_pos].stmt = v; 
+            } else static if (is(v_type : Type))
+            {
+                dsymbol_profile_array[insert_pos] =
+                    SymbolProfileEntry(ProfileNodeType.Type,
+                    begin_sema_ticks, end_sema_ticks,
+                    begin_sema_mem, Mem.allocated,
+                    astTypeName(v), ` ~ (fn
+                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                dsymbol_profile_array[insert_pos].type = v; 
+            }
+            else
+                static assert(0, "we dont know how to deal with: " ~ v_type.stringof);
         }
-        else static assert(0, "we dont know how to deal with: " ~ v_type.stringof);
+        else
+        {
+            dsymbol_profile_array[insert_pos] =
+                    SymbolProfileEntry(ProfileNodeType.NullSymbol,
+                    begin_sema_ticks, end_sema_ticks,
+                    begin_sema_mem, Mem.allocated,
+                    "Dsymbol(Null)", ` ~ (fn
+                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+        }
     }
 `;
 }
@@ -240,6 +254,9 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 
         final switch(dp.nodeType)
         {
+            case ProfileNodeType.NullSymbol :
+                id = uint.max;
+            break;
             case ProfileNodeType.Dsymbol :
                 if (auto symInfo = (cast(void*)dp.sym) in symMap)
                 {
@@ -281,6 +298,9 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 
             final switch(dp.nodeType)
             {
+                case ProfileNodeType.NullSymbol :
+                    running_id--;
+                break;
                 case ProfileNodeType.Dsymbol :
                     symInfo.name = dp.sym.toChars();
                     symInfo.loc = dp.sym.loc.toChars();
@@ -344,6 +364,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
             // we should probably assert here.
             case ProfileNodeType.Invalid:
                 return ;
+            case ProfileNodeType.NullSymbol: break;
     
         }
     }

@@ -161,6 +161,8 @@ void main(string[] args)
     else if (mode == "Header")
     {
         writeln(structToString(header));
+        writeln("kinds:\n\t", kinds);
+        writeln("phases:\n\t", phases);
     }
     else 
         writeln("Mode unsupported: ", mode);

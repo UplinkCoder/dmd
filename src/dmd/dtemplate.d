@@ -1105,6 +1105,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
      */
     extern (D) MATCH deduceFunctionTemplateMatch(TemplateInstance ti, Scope* sc, ref FuncDeclaration fd, Type tthis, Expressions* fargs)
     {
+        import dmd.trace; mixin(traceString("ti"));
         size_t nfparams;
         size_t nfargs;
         size_t ntargs; // array size of tiargs
@@ -6027,6 +6028,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
     override Dsymbol syntaxCopy(Dsymbol s)
     {
+        import dmd.trace; mixin(traceString("s"));
         TemplateInstance ti = s ? cast(TemplateInstance)s : new TemplateInstance(loc, name, null);
         ti.tiargs = arraySyntaxCopy(tiargs);
         TemplateDeclaration td;
