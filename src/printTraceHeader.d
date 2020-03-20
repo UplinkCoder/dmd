@@ -4,7 +4,7 @@ import std.file;
 void main(string[] args)
 {
 
-    string[] supportedModes = ["Tree", "Toplist"];
+    string[] supportedModes = ["Tree", "Toplist", "Header"];
 
     if (args.length != 3)
     {
@@ -17,7 +17,7 @@ void main(string[] args)
 
     if (!exists(traceFile))
     {
-        writeln("TraceFile does not exist");
+        writeln(`TraceFile: "`, traceFile, `" does not exist`);
         return ;
     }
 
@@ -34,14 +34,11 @@ void main(string[] args)
         return ;
     }
 
-    writeln(structToString(header));
-
-
     string[] kinds = readStrings(fileBytes, header.offset_kinds, header.n_kinds);
     string[] phases = readStrings(fileBytes, header.offset_phases, header.n_phases);
 
-    writeln("phases:\n    ", phases);
-    writeln("kinds:\n    ", kinds);
+    // writeln("phases:\n    ", phases);
+    // writeln("kinds:\n    ", kinds);
 
     SymbolProfileRecord[] records = readRecords(fileBytes, header.offset_records, header.n_records);
     uint strange_record_count;
@@ -98,6 +95,10 @@ void main(string[] args)
         {
             writeln(r.end_ticks - r.begin_ticks, "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
         }
+    }
+    else if (mode == "Header")
+    {
+        writeln(structToString(header));
     }
     else 
         writeln("Mode unsupported: ", mode);
