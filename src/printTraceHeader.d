@@ -47,6 +47,18 @@ void main(string[] args)
     // writeln("kinds:\n    ", kinds);
 
     SymbolProfileRecord[] records = readRecords(fileBytes, header.offset_records, header.n_records);
+
+    static ulong hashRecord(SymbolProfileRecord r) pure
+    {
+        ulong hash;
+        hash ^= r.begin_mem;
+        hash ^= (r.end_mem << 8);
+        hash ^= (r.end_ticks << 16);
+        hash ^= (r.begin_ticks << 24);
+        hash ^= (ulong(r.symbol_id) << 32);
+        return hash;
+    }
+
     uint strange_record_count;
     ulong lastBeginTicks;
 
@@ -73,23 +85,67 @@ void main(string[] args)
     // now can start establishing parent child relationships;
     if (mode == "Tree")
     {
+        import core.stdc.stdlib;
+        uint[] depth = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
+        uint[2][] self_time = (cast(uint[2]*)calloc(records.length, uint.sizeof * 2))[0 .. records.length];
+
         string indent;
+        uint currentDepth = 0;
+
         foreach(i; 0 .. records.length)
         {
-            if (i && records[i-1].end_ticks > records[i].end_ticks)
+            const r = records[i];
+            const time = cast(uint)(r.end_ticks - r.begin_ticks);
+            self_time[i][0] = cast(uint)i;
+            self_time[i][1] = time;
+
+            if (i && records[i-1].end_ticks > r.end_ticks)
             {
+                depth[i] = currentDepth++;
+                self_time[i-1][1] -= time;
                 indent ~= " ";
             }
-            else if (indent.length) indent = indent [0 .. $-1];
+            else if (i)
+            {
+                // the indent does not increase now we have to check if we have to pull back or not
+                // our indent level is the one of the first record that ended after we ended
 
-            auto r = records[i];
+                size_t currentParent = i;
+                while(currentParent--)
+                {
+                    auto p = records[currentParent];
+                    if (p.end_ticks > r.end_ticks)
+                    {
+                        self_time[currentParent][1] -= time;
+                        assert(self_time[currentParent][1] > 1);
+                        currentDepth = depth[currentParent] + 1;
+                        depth[i] = currentDepth;
+                        indent = indent[0 .. currentDepth];
+                        break;
+                    }
 
+                }
+                //assert(currentParent);
+            }
+/+
             writeln(indent,
                 r.end_ticks - r.begin_ticks, 
                 getSymbolName(fileBytes, r), ":",
                 getSymbolLocation(fileBytes, r)
             );
++/            
         }
+        import std.algorithm;
+        auto sorted_self_times  = 
+            self_time.sort!((a, b) => a[1] > b[1]).release;
+        writeln("SelfTimes");
+        foreach(st;sorted_self_times[0 .. 1000])
+        {
+            const r = records[st[0]];
+            writeln(st[1], "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
+        }
+
+        free(depth.ptr);
     }
     else if (mode == "Toplist")
     {
