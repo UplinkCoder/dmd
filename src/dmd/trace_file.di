@@ -76,8 +76,6 @@ static SymbolProfileRecord[] readRecords()(const void[] file, uint offset_record
 
 static string getSymbolName()(const void[] file, SymbolProfileRecord r)
 {
-    import std.stdio;
-
     TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
     SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
 
@@ -93,8 +91,6 @@ static string getSymbolName()(const void[] file, SymbolProfileRecord r)
 
 static string getSymbolLocation()(const void[] file, SymbolProfileRecord r)
 {
-    import std.stdio;
-    
     TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
     SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
     

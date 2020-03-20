@@ -3,9 +3,37 @@ import std.stdio;
 import std.file;
 void main(string[] args)
 {
+
+    string[] supportedModes = ["Tree", "Toplist"];
+
+    if (args.length != 3)
+    {
+        writeln("Invalid invocatoion: ", args);
+        writeln("Expected: ", args[0], " traceFile mode");
+        writeln("Modes are", supportedModes);
+        return ;
+    }
+    auto traceFile = args[1];
+
+    if (!exists(traceFile))
+    {
+        writeln("TraceFile does not exist");
+        return ;
+    }
+
+    auto mode = args[2];
+
+
     TraceFileHeader header;
     void[] fileBytes = read(args[1]);
     (cast(void*)&header)[0 .. header.sizeof] = fileBytes[0 .. header.sizeof];
+
+    if (header.magic_number != (*cast(ulong*)"DMDTRACE".ptr))
+    {
+        writeln("Tracefile does not have the correct magic number");
+        return ;
+    }
+
     writeln(structToString(header));
 
 
@@ -40,31 +68,39 @@ void main(string[] args)
     //writeln("records are sorted that's good n_records: ", records.length);
 
     // now can start establishing parent child relationships;
-    string indent;
-    foreach(i; 0 .. records.length)
+    if (mode == "Tree")
     {
-        if (i && records[i-1].end_ticks > records[i].end_ticks)
+        string indent;
+        foreach(i; 0 .. records.length)
         {
-            indent ~= " ";
+            if (i && records[i-1].end_ticks > records[i].end_ticks)
+            {
+                indent ~= " ";
+            }
+            else if (indent.length) indent = indent [0 .. $-1];
+
+            auto r = records[i];
+
+            writeln(indent,
+                r.end_ticks - r.begin_ticks, 
+                getSymbolName(fileBytes, r), ":",
+                getSymbolLocation(fileBytes, r)
+            );
         }
-        else if (indent.length) indent = indent [0 .. $-1];
-
-        auto r = records[i];
-
-        writeln(indent,
-            r.end_ticks - r.begin_ticks, 
-            getSymbolName(fileBytes, r), ":",
-            getSymbolLocation(fileBytes, r)
-        );
     }
-    import std.algorithm;
-    auto sorted_records = 
-        records.sort!((a, b) => (a.end_ticks - a.begin_ticks > b.end_ticks - b.begin_ticks)).release;
-    writeln("TopList");
-    foreach(r;sorted_records)
+    else if (mode == "Toplist")
     {
-        writeln(r.end_ticks - r.begin_ticks, "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
+        import std.algorithm;
+        auto sorted_records = 
+            records.sort!((a, b) => (a.end_ticks - a.begin_ticks > b.end_ticks - b.begin_ticks)).release;
+        writeln("Toplist");
+        foreach(r;sorted_records)
+        {
+            writeln(r.end_ticks - r.begin_ticks, "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
+        }
     }
+    else 
+        writeln("Mode unsupported: ", mode);
 }
 
 struct NoPrint {}
