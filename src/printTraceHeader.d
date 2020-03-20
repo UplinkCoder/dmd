@@ -13,11 +13,12 @@ void main(string[] args)
         writeln("Modes are", supportedModes);
         return ;
     }
+
     auto traceFile = args[1];
 
     if (!exists(traceFile))
     {
-        writeln(`TraceFile: "`, traceFile, `" does not exist`);
+        writeln(`TraceFile: "`, traceFile, `" does not exist.`);
         return ;
     }
 
@@ -26,11 +27,16 @@ void main(string[] args)
 
     TraceFileHeader header;
     void[] fileBytes = read(args[1]);
+    if (fileBytes.length < header.sizeof)
+    {
+        writeln("Tracefile truncated.");
+    }
+
     (cast(void*)&header)[0 .. header.sizeof] = fileBytes[0 .. header.sizeof];
 
     if (header.magic_number != (*cast(ulong*)"DMDTRACE".ptr))
     {
-        writeln("Tracefile does not have the correct magic number");
+        writeln("Tracefile does not have the correct magic number.");
         return ;
     }
 
