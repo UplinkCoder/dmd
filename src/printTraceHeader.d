@@ -87,6 +87,7 @@ void main(string[] args)
     {
         import core.stdc.stdlib;
         uint[] depth = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
+        uint[] parents = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
         uint[2][] self_time = (cast(uint[2]*)calloc(records.length, uint.sizeof * 2))[0 .. records.length];
 
         string indent;
@@ -98,20 +99,21 @@ void main(string[] args)
             const time = cast(uint)(r.end_ticks - r.begin_ticks);
             self_time[i][0] = cast(uint)i;
             self_time[i][1] = time;
-
+            // either our parent is right above us
             if (i && records[i-1].end_ticks > r.end_ticks)
             {
+                parents[i] = cast(uint)(i-1);
                 depth[i] = currentDepth++;
                 self_time[i-1][1] -= time;
                 indent ~= " ";
             }
-            else if (i)
+            else if (i) // or it's the parent of our parent
             {
                 // the indent does not increase now we have to check if we have to pull back or not
                 // our indent level is the one of the first record that ended after we ended
 
-                size_t currentParent = i;
-                while(currentParent--)
+                uint currentParent = parents[i-1];
+                while(currentParent)
                 {
                     auto p = records[currentParent];
                     if (p.end_ticks > r.end_ticks)
@@ -123,23 +125,26 @@ void main(string[] args)
                         indent = indent[0 .. currentDepth];
                         break;
                     }
+                    currentParent = parents[currentParent];
 
                 }
                 //assert(currentParent);
             }
-/+
+
             writeln(indent,
-                r.end_ticks - r.begin_ticks, 
+                r.end_ticks - r.begin_ticks, ":",
+                self_time[i],
+                phases[r.phase_id - 1], ":",
                 getSymbolName(fileBytes, r), ":",
-                getSymbolLocation(fileBytes, r)
+                getSymbolLocation(fileBytes, r), ":",
             );
-+/            
+
         }
         import std.algorithm;
         auto sorted_self_times  = 
             self_time.sort!((a, b) => a[1] > b[1]).release;
         writeln("SelfTimes");
-        foreach(st;sorted_self_times[0 .. 1000])
+        foreach(st;sorted_self_times[0 .. 2000])
         {
             const r = records[st[0]];
             writeln(st[1], "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
