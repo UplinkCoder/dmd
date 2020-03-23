@@ -264,18 +264,19 @@ public:
 
     void mangleSymbol(Dsymbol s)
     {
+        import dmd.trace; mixin(traceString("s"));
         s.accept(this);
     }
 
     void mangleType(Type t)
     {
+        import dmd.trace; mixin(traceString("t"));
         if (!backrefType(t))
             t.accept(this);
     }
 
     void mangleIdentifier(Identifier id, Dsymbol s)
     {
-        import dmd.trace; mixin(traceString("s"));
         if (!backrefIdentifier(id))
             toBuffer(id.toString(), s);
     }
