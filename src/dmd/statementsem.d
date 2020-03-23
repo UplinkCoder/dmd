@@ -650,6 +650,7 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
      */
     MakeTupleForeachRet!isDecl makeTupleForeach(bool isStatic, bool isDecl)(ForeachStatement fs, TupleForeachArgs!(isStatic, isDecl) args)
     {
+        import dmd.trace; mixin(traceString("fs"));
         auto returnEarly()
         {
             static if (isDecl)
@@ -1036,6 +1037,7 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(ForeachStatement fs)
     {
+        import dmd.trace; mixin(traceString("fs", "ForeachStatementSemantic"));
         /* https://dlang.org/spec/statement.html#foreach-statement
          */
 
