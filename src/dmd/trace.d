@@ -79,6 +79,11 @@ string traceString(string vname, string fn = null)
     static if (SYMBOL_TRACE)
 {
     return q{
+        import dmd.dsymbol;
+        import dmd.expression;
+        import dmd.mtype;
+        import dmd.statement;
+
     import queryperf : QueryPerformanceCounter;
     import dmd.root.rmem;
     import dmd.asttypename;
