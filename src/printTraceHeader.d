@@ -4,7 +4,7 @@ import std.file;
 void main(string[] args)
 {
 
-    string[] supportedModes = ["Tree", "Toplist", "Header"];
+    string[] supportedModes = ["Tree", "Toplist", "Header", "PhaseHist"];
 
     if (args.length != 3)
     {
@@ -83,29 +83,25 @@ void main(string[] args)
     //writeln("records are sorted that's good n_records: ", records.length);
 
     // now can start establishing parent child relationships;
-    if (mode == "Tree")
+    import core.stdc.stdlib;
+
+    uint[] parents = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
+    uint[] depth = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
+    uint[2][] selfTime = (cast(uint[2]*)calloc(records.length, uint.sizeof*2))[0 .. records.length];
+
     {
-        import core.stdc.stdlib;
-        uint[] depth = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
-        uint[] parents = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
-        uint[2][] self_time = (cast(uint[2]*)calloc(records.length, uint.sizeof * 2))[0 .. records.length];
-
-        string indent;
-        uint currentDepth = 0;
-
+        uint currentDepth = 1;
         foreach(i; 0 .. records.length)
         {
             const r = records[i];
             const time = cast(uint)(r.end_ticks - r.begin_ticks);
-            self_time[i][0] = cast(uint)i;
-            self_time[i][1] = time;
+            selfTime[i][0] = cast(uint)i;
+            selfTime[i][1] = time;
             // either our parent is right above us
             if (i && records[i-1].end_ticks > r.end_ticks)
             {
                 parents[i] = cast(uint)(i-1);
                 depth[i] = currentDepth++;
-                self_time[i-1][1] -= time;
-                indent ~= " ";
             }
             else if (i) // or it's the parent of our parent
             {
@@ -118,33 +114,43 @@ void main(string[] args)
                     auto p = records[currentParent];
                     if (p.end_ticks > r.end_ticks)
                     {
-                        self_time[currentParent][1] -= time;
-                        assert(self_time[currentParent][1] > 1);
+                        selfTime[currentParent][1] -= time;
+                        assert(selfTime[currentParent][1] > 1);
                         currentDepth = depth[currentParent] + 1;
                         depth[i] = currentDepth;
-                        indent = indent[0 .. currentDepth];
                         break;
                     }
                     currentParent = parents[currentParent];
-
                 }
+
                 //assert(currentParent);
             }
+        }
 
-            writeln(indent,
-                r.end_ticks - r.begin_ticks, ":",
-                self_time[i],
-                phases[r.phase_id - 1], ":",
-                getSymbolName(fileBytes, r), ":",
-                getSymbolLocation(fileBytes, r), ":",
+    }
+
+    if (mode == "Tree")
+    {
+        const char[1024] indent = '-';
+
+        foreach(i; 0 .. records.length)
+        {
+            const r = records[i];
+
+            writeln(indent[0 .. depth[i-1]], ' ',
+                r.end_ticks - r.begin_ticks, "|",
+                selfTime[i], "|",
+                phases[r.phase_id - 1], "|",
+                getSymbolName(fileBytes, r), "|",
+                getSymbolLocation(fileBytes, r), "|",
             );
 
         }
         import std.algorithm;
-        auto sorted_self_times  = 
-            self_time.sort!((a, b) => a[1] > b[1]).release;
+        auto sorted_selfTimes  = 
+            selfTime.sort!((a, b) => a[1] > b[1]).release;
         writeln("SelfTimes");
-        foreach(st;sorted_self_times[0 .. 2000])
+        foreach(st;sorted_selfTimes[0 .. 2000])
         {
             const r = records[st[0]];
             writeln(st[1], "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
@@ -163,6 +169,38 @@ void main(string[] args)
             writeln(r.end_ticks - r.begin_ticks, "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
         }
     }
+    else if (mode == "PhaseHist")
+    {
+        static struct SortRecord
+        {
+            uint phaseId;
+            uint freq;
+            float absTime = 0;
+            float avgTime = 0;
+        }
+
+        SortRecord[] sortRecords;
+        sortRecords.length = header.n_phases;
+
+        foreach(i, r;records)
+        {
+            sortRecords[r.phase_id-1].absTime += selfTime[i][1];
+            sortRecords[r.phase_id-1].freq++;
+        }
+        foreach(i; 0 .. header.n_phases)
+        {
+            sortRecords[i].phaseId = i + 1;
+            sortRecords[i].avgTime = sortRecords[i].absTime / double(sortRecords[i].freq);
+        }
+        import std.algorithm : sort;
+        sortRecords.sort!((a,b) => a.absTime > b.absTime);
+        writeln(" === Phase Time Distribution : ===");
+        writefln(" %-90s %-10s %-12s %-7s ", "phase",  "avgTime", "absTime", "freq");
+        foreach(sr;sortRecords)
+        {
+            writefln(" %-90s %-10.2f %-12.0f %-7d ", phases[sr.phaseId - 1],  sr.avgTime, sr.absTime, sr.freq);
+        }
+    }
     else if (mode == "Header")
     {
         writeln(structToString(header));
@@ -170,7 +208,7 @@ void main(string[] args)
         writeln("phases:\n\t", phases);
     }
     else 
-        writeln("Mode unsupported: ", mode);
+        writeln("Mode unsupported: ", mode, "\nsupported modes are: ", supportedModes);
 }
 
 struct NoPrint {}
