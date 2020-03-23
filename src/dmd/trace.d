@@ -1,3 +1,4 @@
+
 /**
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
@@ -195,7 +196,7 @@ const(size_t) align4(const size_t val) @safe pure @nogc
 {
     return ((val + 3) & ~3);
 }
-
+ulong timeBase = 0;
 void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 {
     import core.stdc.stdio;
@@ -378,17 +379,40 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
     {
 		SymbolProfileRecord* rp = cast(SymbolProfileRecord*) bufferPos;
 		bufferPos += SymbolProfileRecord.sizeof;
+        enum FileVersion = 2;
+        if (fileVersion == 2)
+        {
+            //TODO test this works
 
-		SymbolProfileRecord r = {
-            begin_ticks : dp.begin_ticks,
-            end_ticks : dp.end_ticks,
-    		begin_mem :	dp.begin_mem,
-            end_mem : dp.end_mem,
-    	    symbol_id : id,
-            kind_id : kindId,
-            phase_id : phaseId
-		};
-        (*rp) = r;
+            ulong[3] byteField;
+            byteField[0] = (dp.begin_ticks -  timeBase) & bitmask_lower_48;
+            byteField[0] |= (((dp.end_ticks - timeBase) & bitmask_lower_16) << 48);
+            byteField[1] = (((dp.end_ticks -  timeBase) & bitmask_upper_32) >> 16);
+            byteField[1] |= (((dp.begin_mem           ) & bitmask_lower_32) << 32);
+            byteField[2] = (((dp.begin_mem            ) & (0xFFFF << 32)  ) >> 32);
+            byteField[2] |= (((dp.end_mem             ) & bitmask_lower_48) << 16);
+
+
+            SymbolProfileRecordV2 r = {
+                begin_ticks_48_end_ticks_48_begin_memomry_48_end_memory_48 :
+                    byteField,
+                kind_id_9_phase_id_7 : kindId | (phaseId << 9),
+                symbol_id : id,
+            }
+        }
+        else
+        {
+            SymbolProfileRecord r = {
+                begin_ticks : dp.begin_ticks,
+                end_ticks : dp.end_ticks,
+    		    begin_mem :	dp.begin_mem,
+                end_mem : dp.end_mem,
+    	        symbol_id : id,
+                kind_id : kindId,
+                phase_id : phaseId
+		    };
+            (*rp) = r;
+        }
     }
     else
     {
@@ -521,13 +545,14 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
             }
         }
 
-        auto fileNameLength =
-            sprintf(&fileNameBuffer[0], "symbol-%s.1.csv".ptr, traceFileName ? traceFileName : timeString);
 
         printf("traced_symbols: %d\n", dsymbol_profile_array_count);
 
         static if (COMPRESSED_TRACE)
         {
+            auto fileNameLength =
+                sprintf(&fileNameBuffer[0], "symbol-%s.trace".ptr, traceFileName ? traceFileName : timeString);
+
             pragma(inline, true) uint currentOffset32()
             {
                 return cast(uint)(bufferPos - fileBuffer);
@@ -570,6 +595,9 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
         }
         else
         {
+            auto fileNameLength =
+                sprintf(&fileNameBuffer[0], "symbol-%s.1.csv".ptr, traceFileName ? traceFileName : timeString);
+
 			bufferPos += sprintf(cast(char*) bufferPos, "//");
 			foreach(arg;arguments)
 			{
