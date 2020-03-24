@@ -99,7 +99,6 @@ string traceString(string vname, string fn = null)
         alias v_type = typeof(v);
 
         enum asttypename_build = false;
-
         static if (asttypename_build && __traits(compiles, () { import dmd.asttypename; astTypeName(Dsymbol.init); }))
         {
             import dmd.asttypename;
@@ -575,7 +574,7 @@ pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFi
         static if (COMPRESSED_TRACE)
         {
             auto fileNameLength =
-                snprintf(&fileNameBuffer[0], fileNameBuffer.sizeof, "symbol-%.*s.trace".ptr, nameStringLength, nameStringPointer);
+                snprintf(&fileNameBuffer[0], fileNameBuffer.sizeof, "%.*s.trace".ptr, nameStringLength, nameStringPointer);
 
             int currentOffset32()
             {

@@ -138,12 +138,6 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     Strings libmodules;
     global._init();
 
-    import dmd.trace; 
-    if (params.traceFile !is null)
-    {
-        tracingEnabled = true;
-        initTraceMemory();
-    }
     debug
     {
         printf("DMD %.*s DEBUG\n", cast(int) global._version.length - 1, global._version.ptr);
@@ -699,6 +693,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     if (params.traceFile !is null)
     {
+        import dmd.trace;
         writeTrace(null, params.traceFile.length ? params.traceFile : null);
     }
     if (!params.obj)
@@ -1861,6 +1856,23 @@ bool parseCommandLine(const ref Strings arguments, const size_t argc, ref Param 
                 goto Lerror;
             else
                 params.trace = true;
+        }
+        else if (startsWith(p + 1, "trace"))
+        {
+            if (p["-trace".length] == '=')
+            {
+                params.traceFile = p["-trace=".length .. arg.length];
+            }
+            else if (!p[8])
+            {
+                params.traceFile = "";
+            }
+            else
+                goto Lerror;
+
+            import dmd.trace;
+            tracingEnabled = true;
+            initTraceMemory();
         }
         else if (arg == "-v") // https://dlang.org/dmd.html#switch-v
             params.verbose = true;
