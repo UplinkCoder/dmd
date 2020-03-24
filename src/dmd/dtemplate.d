@@ -51,7 +51,6 @@ import dmd.typesem;
 import dmd.visitor;
 
 import dmd.templateparamsem;
-import dmd.root.aav;
 
 //debug = FindExistingInstance; // print debug stats of findExistingInstance
 private enum LOG = false;
@@ -5975,7 +5974,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
     hash_t hash;                // cached result of toHash()
     Expressions* fargs;         // for function template, these are the function arguments
 
-    AssocArray!(hash_t, TemplateInstance) *deferred;
+    TemplateInstances* deferred;
 
     Module memberOf;            // if !null, then this TemplateInstance appears in memberOf.members[]
 
