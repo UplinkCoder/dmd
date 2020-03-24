@@ -241,6 +241,8 @@ struct Param
     const(char)[] moduleDepsFile;        // filename for deps output
     OutBuffer* moduleDeps;              // contents to be written to deps file
 
+    const(char)[] traceFile = null;     // write dmd internal profiling
+
     // Hidden debug switches
     bool debugb;
     bool debugc;

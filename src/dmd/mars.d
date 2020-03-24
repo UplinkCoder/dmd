@@ -137,7 +137,13 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     Strings files;
     Strings libmodules;
     global._init();
-    import dmd.trace; initTraceMemory();
+
+    import dmd.trace; 
+    if (params.traceFile !is null)
+    {
+        tracingEnabled = true;
+        initTraceMemory();
+    }
     debug
     {
         printf("DMD %.*s DEBUG\n", cast(int) global._version.length - 1, global._version.ptr);
@@ -164,8 +170,6 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     files.reserve(arguments.dim - 1);
     // Set default values
     params.argv0 = arguments[0].toDString;
-
-    import dmd.trace; initTraceMemory();
 
     // Temporary: Use 32 bits OMF as the default on Windows, for config parsing
     static if (TARGET.Windows)
@@ -692,7 +696,11 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             File.write(cgFilename.ptr, buf.peekSlice());
         }
     }
-    writeTrace(null);
+
+    if (params.traceFile !is null)
+    {
+        writeTrace(null, params.traceFile.length ? params.traceFile : null);
+    }
     if (!params.obj)
     {
     }
@@ -2384,7 +2392,7 @@ bool parseCommandLine(const ref Strings arguments, const size_t argc, ref Param 
                 goto Lerror;
             }
             params.moduleDeps = new OutBuffer();
-        }
+        }                   
         else if (arg == "-main")             // https://dlang.org/dmd.html#switch-main
         {
             params.addMain = true;

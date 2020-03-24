@@ -1,5 +1,13 @@
 ﻿module dmd.trace_file;
 
+
+enum bitmask_lower_48 = 0xFFFF_FFFF_FFFFUL;
+enum bitmask_upper_16 = 0xFFFFUL << 32UL;
+enum bitmask_lower_32 = 0xFFFF_FFFFUL;
+enum bitmask_upper_32 = 0xFFFF_FFFFUL << 16UL;
+enum bitmask_lower_16 = 0xFFFFUL;
+enum bitmask_upper_48 = 0xFFFF_FFFF_FFFFUL << 16UL;
+
 struct SymbolProfileRecord
 {
     ulong begin_ticks;
@@ -13,7 +21,18 @@ struct SymbolProfileRecord
     ushort phase_id;
 }
 
+struct SymbolProfileRecordV2
+{
+    // represents 4 48 bit values
+    ulong[3] begin_ticks_48_end_ticks_48_begin_memomry_48_end_memory_48;
+
+    uint symbol_id;
+    ushort kind_id_9_phase_id_7;
+}
+
+
 pragma(msg, "ProfileRecord.sizeof = ", SymbolProfileRecord.sizeof);
+pragma(msg, "ProfileRecordV2.sizeof = ", SymbolProfileRecordV2.sizeof);
 
 struct TraceFileHeader
 {
@@ -32,6 +51,26 @@ struct TraceFileHeader
     uint offset_symbol_info_descriptors;
 }
 
+struct TraceFileHeaderV3
+{
+    ulong magic_number;
+    
+    uint FileVersion;
+    
+    uint n_records;
+    uint n_phases;
+    uint n_kinds;
+    uint n_symbols;
+    
+    uint offset_records;
+    uint offset_phases;
+    uint offset_kinds;
+    uint offset_symbol_info_descriptors;
+
+    uint n_parts;
+    uint this_part;
+}
+
 align(1) struct SymbolInfoPointers
 {
 align(1):
@@ -47,8 +86,6 @@ align(1):
     uint one_past_string_end;
 }
 
-// the only reason this is a template is becuase d does not allow one to
-// specify inline linkage ... sigh
 static string[] readStrings()(const void[] file, uint offset_strings, uint n_strings)
 {
     const (char)[][] result;
@@ -66,10 +103,36 @@ static string[] readStrings()(const void[] file, uint offset_strings, uint n_str
 
 // the only reason this is a template is becuase d does not allow one to
 // specify inline linkage ... sigh
-static SymbolProfileRecord[] readRecords()(const void[] file, uint offset_records, uint n_records)
+static SymbolProfileRecord[] readRecords()(const void[] file, const void[][] additionalFiles = null)
 {
-    SymbolProfileRecord[] result = 
-        (cast(SymbolProfileRecord*)(file.ptr + offset_records))[0 .. n_records];
+    SymbolProfileRecord[] result;
+
+    TraceFileHeader header;
+    (cast(void*)&header)[0 .. header.sizeof] = file[0 ..header.sizeof];
+
+    if (header.FileVersion == 1)
+    {
+        result = (cast(SymbolProfileRecord*)(file.ptr + header.offset_records))[0 .. header.n_records];
+    }
+    else if (header.FileVersion == 2)
+    {
+        import core.stdc.stdlib;
+        auto source = (cast(SymbolProfileRecordV2*)(file.ptr + header.offset_records))[0 .. header.n_records];
+        result = (cast(SymbolProfileRecord*)calloc(result[0].sizeof, header.n_records))[0 .. header.n_records];
+
+        foreach(i;0 .. header.n_records)
+        {
+            ulong[3] byteField = source[i].begin_ticks_48_end_ticks_48_begin_memomry_48_end_memory_48;
+
+            result[i].begin_ticks = (byteField[0] & bitmask_lower_48);
+            result[i].end_ticks = (byteField[0] >> 48UL) | ((byteField[1] & bitmask_lower_32) << 16UL);
+            result[i].begin_mem = (byteField[1] >> 32UL) | ((byteField[2] & bitmask_lower_16) << 32UL);
+            result[i].end_mem = (byteField[2] >> 16);
+
+            result[i].kind_id = source[i].kind_id_9_phase_id_7 & ((1 << 9) -1);
+            result[i].phase_id = source[i].kind_id_9_phase_id_7 >> 9;
+        }
+    }
 
     return result;
 }

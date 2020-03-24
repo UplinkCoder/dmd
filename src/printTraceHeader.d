@@ -149,7 +149,7 @@ void main(string[] args)
         auto sorted_selfTimes  = 
             selfTime.sort!((a, b) => a[1] > b[1]).release;
         writeln("SelfTimes");
-        foreach(st;sorted_selfTimes[0 .. 2000])
+        foreach(st;sorted_selfTimes[0 .. (header.n_records > 2000 ? 2000 : header.n_records)])
         {
             const r = records[st[0]];
             writeln(st[1], "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));

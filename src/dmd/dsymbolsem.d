@@ -6141,16 +6141,16 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
          * https://issues.dlang.org/show_bug.cgi?id=9050
          * To avoid the issue, don't run semantic3 until semantic and semantic2 done.
          */
-        TemplateInstances deferred;
+        typeof(*tempinst.deferred) deferred;
         tempinst.deferred = &deferred;
 
         //printf("Run semantic3 on %s\n", toChars());
         tempinst.trySemantic3(sc2);
 
-        for (size_t i = 0; i < deferred.dim; i++)
+        foreach (e; deferred.asRange())
         {
             //printf("+ run deferred semantic3 on %s\n", deferred[i].toChars());
-            deferred[i].semantic3(null);
+            e.value.semantic3(null);
         }
 
         tempinst.deferred = null;
@@ -6222,15 +6222,11 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
         if (ti && ti.deferred)
         {
             //printf("deferred semantic3 of %p %s, ti = %s, ti.deferred = %p\n", this, toChars(), ti.toChars());
-            for (size_t i = 0;; i++)
+            TemplateInstance* slot;
+            slot = ti.deferred.getLvalue(tempinst.toHash());
+            if ((*slot) is null)
             {
-                if (i == ti.deferred.dim)
-                {
-                    ti.deferred.push(tempinst);
-                    break;
-                }
-                if ((*ti.deferred)[i] == tempinst)
-                    break;
+                *slot = tempinst;
             }
         }
     }

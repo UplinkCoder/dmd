@@ -17,10 +17,14 @@ import dmd.mtype;
 import dmd.statement;
 import dmd.root.rootobject;
 
+import dmd.arraytypes : Strings;
+
 enum SYMBOL_TRACE = true;
 enum COMPRESSED_TRACE = true;
 
 import dmd.trace_file;
+
+__gshared bool tracingEnabled = false;
 
 struct SymbolProfileEntry
 {
@@ -78,84 +82,84 @@ string traceString(string vname, string fn = null)
 {
     static if (SYMBOL_TRACE)
 {
-    return q{
+    return (`import dmd.trace : tracingEnabled; if (tracingEnabled)
+    {
         import dmd.dsymbol;
         import dmd.expression;
         import dmd.mtype;
         import dmd.statement;
 
-    import queryperf : QueryPerformanceCounter;
-    import dmd.root.rmem;
-    import dmd.asttypename;
-    ulong begin_sema_ticks;
-    ulong end_sema_ticks;
-    ulong begin_sema_mem = Mem.allocated;
+        import queryperf : QueryPerformanceCounter;
+        import dmd.root.rmem;
+        import dmd.asttypename;
+        ulong begin_sema_ticks;
+        ulong end_sema_ticks;
+        ulong begin_sema_mem = Mem.allocated;
 
-    auto insert_pos = dsymbol_profile_array_count++;
-    assert(dsymbol_profile_array_count < dsymbol_profile_array_size,
-        "Trying to push more then" ~ dsymbol_profile_array_size.stringof ~ " symbols");
-    QueryPerformanceCounter(&begin_sema_ticks);
-} ~ `
-    scope(exit)
-    {
-        auto v = ` ~ vname ~ `;
-        alias v_type = typeof(v);
-        QueryPerformanceCounter(&end_sema_ticks);
-        if (v !is null)
-        { 
-            static if (is(v_type : Dsymbol))
-            {
-                dsymbol_profile_array[insert_pos] =
-                    SymbolProfileEntry(ProfileNodeType.Dsymbol,
-                    begin_sema_ticks, end_sema_ticks,
-                    begin_sema_mem, Mem.allocated,
-                    astTypeName(v), ` ~ (fn
-                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-                dsymbol_profile_array[insert_pos].sym = v; 
-            } else static if (is(v_type : Expression))
-            {
-                dsymbol_profile_array[insert_pos] =
-                    SymbolProfileEntry(ProfileNodeType.Expression,
-                    begin_sema_ticks, end_sema_ticks,
-                    begin_sema_mem, Mem.allocated,
-                    astTypeName(v), ` ~ (fn
-                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-                dsymbol_profile_array[insert_pos].exp = v; 
-            } else static if (is(v_type : Statement))
-            {
-                dsymbol_profile_array[insert_pos] =
-                    SymbolProfileEntry(ProfileNodeType.Statement,
-                    begin_sema_ticks, end_sema_ticks,
-                    begin_sema_mem, Mem.allocated,
-                    astTypeName(v), ` ~ (fn
-                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-                dsymbol_profile_array[insert_pos].stmt = v; 
-            } else static if (is(v_type : Type))
-            {
-                dsymbol_profile_array[insert_pos] =
-                    SymbolProfileEntry(ProfileNodeType.Type,
-                    begin_sema_ticks, end_sema_ticks,
-                    begin_sema_mem, Mem.allocated,
-                    astTypeName(v), ` ~ (fn
-                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-                dsymbol_profile_array[insert_pos].type = v; 
+        auto insert_pos = dsymbol_profile_array_count++;
+        assert(dsymbol_profile_array_count < dsymbol_profile_array_size,
+            "Trying to push more then" ~ dsymbol_profile_array_size.stringof ~ " symbols");
+        QueryPerformanceCounter(&begin_sema_ticks);
+
+        scope(exit)
+        {
+            auto v = ` ~ vname ~ `;
+            alias v_type = typeof(v);
+            QueryPerformanceCounter(&end_sema_ticks);
+            if (v !is null)
+            { 
+                static if (is(v_type : Dsymbol))
+                {
+                    dsymbol_profile_array[insert_pos] =
+                        SymbolProfileEntry(ProfileNodeType.Dsymbol,
+                        begin_sema_ticks, end_sema_ticks,
+                        begin_sema_mem, Mem.allocated,
+                        astTypeName(v), ` ~ (fn
+                            ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                    dsymbol_profile_array[insert_pos].sym = v; 
+                } else static if (is(v_type : Expression))
+                {
+                    dsymbol_profile_array[insert_pos] =
+                        SymbolProfileEntry(ProfileNodeType.Expression,
+                        begin_sema_ticks, end_sema_ticks,
+                        begin_sema_mem, Mem.allocated,
+                        astTypeName(v), ` ~ (fn
+                            ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                    dsymbol_profile_array[insert_pos].exp = v; 
+                } else static if (is(v_type : Statement))
+                {
+                    dsymbol_profile_array[insert_pos] =
+                        SymbolProfileEntry(ProfileNodeType.Statement,
+                        begin_sema_ticks, end_sema_ticks,
+                        begin_sema_mem, Mem.allocated,
+                        astTypeName(v), ` ~ (fn
+                            ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                    dsymbol_profile_array[insert_pos].stmt = v; 
+                } else static if (is(v_type : Type))
+                {
+                    dsymbol_profile_array[insert_pos] =
+                        SymbolProfileEntry(ProfileNodeType.Type,
+                        begin_sema_ticks, end_sema_ticks,
+                        begin_sema_mem, Mem.allocated,
+                        astTypeName(v), ` ~ (fn
+                            ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+                    dsymbol_profile_array[insert_pos].type = v; 
+                }
+                else
+                    static assert(0, "we dont know how to deal with: " ~ v_type.stringof);
             }
             else
-                static assert(0, "we dont know how to deal with: " ~ v_type.stringof);
+            {
+                dsymbol_profile_array[insert_pos] =
+                        SymbolProfileEntry(ProfileNodeType.NullSymbol,
+                        begin_sema_ticks, end_sema_ticks,
+                        begin_sema_mem, Mem.allocated,
+                        "Dsymbol(Null)", ` ~ (fn
+                            ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
+            }
         }
-        else
-        {
-            dsymbol_profile_array[insert_pos] =
-                    SymbolProfileEntry(ProfileNodeType.NullSymbol,
-                    begin_sema_ticks, end_sema_ticks,
-                    begin_sema_mem, Mem.allocated,
-                    "Dsymbol(Null)", ` ~ (fn
-                        ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
-        }
-    }
-`;
-}
-    else
+    }`);
+}  else
         return "";
 }
 
@@ -206,7 +210,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos, uint FileVersion = 
 		ushort getKindId(string kind, bool justLookup = true)
 		{
             ushort result;
-
+            //TODO: don't use AA's here
 			if (auto id = kind in kindArray)
 			{
 				result = *id;
@@ -226,7 +230,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos, uint FileVersion = 
 		ushort getPhaseId(string phase, bool justLookup = true)
 		{
 			ushort result;
-
+            //TODO: don't use AAs here
 			if (auto id = phase in phaseArray)
 			{
 				result = *id;
@@ -365,6 +369,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos, uint FileVersion = 
             break;
             case ProfileNodeType.Type :
                 name = dp.type.toChars();
+                loc = dp.type.toDsymbol().loc;
             break;
             // we should probably assert here.
             case ProfileNodeType.Invalid:
@@ -454,7 +459,7 @@ void writeSymInfos(ref char* bufferPos, const char* fileBuffer)
 
     /// Returns:
     ///     Current offset from the beginning of the file
-    pragma(inline, true) uint currentOffset32()
+    uint currentOffset32()
     {
         return cast(uint)(bufferPos - fileBuffer);
     }
@@ -477,7 +482,7 @@ extern (D) void writeStrings(ref char* bufferPos, const char* fileBuffer, string
 {
     /// Returns:
     ///     Current offset from the beginning of the file
-    pragma(inline, true) uint currentOffset32()
+    uint currentOffset32() // should be inlined but dmd's inliner can't do it yet
     {
         return cast(uint)(bufferPos - fileBuffer);
     }
@@ -507,7 +512,7 @@ struct TraceFileTail
 }
  
 
-void writeTrace(char*[] arguments, char* traceFileName = null)
+pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFileName = null, uint fVersion = 2)
 {
     static if (SYMBOL_TRACE)
     {
@@ -526,37 +531,40 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
         auto now = time(null);
 
         auto timeString = ctime(&now);
+        uint timeStringLength = 0;
         // replace the ' ' by _ and '\n' or '\r' by '\0'
         {
-            int len = 0;
             char c = void;
             for(;;)
             {
-                c = timeString[len++];
+                c = timeString[timeStringLength++];
                 // break on null, just to be safe;
                 if (!c)
                     break;
 
                 if (c == ' ')
-                    timeString[len - 1] = '_';
+                    timeString[timeStringLength - 1] = '_';
 
                 if (c == '\r' || c == '\n')
                 {
-                    timeString[len - 1] = '\0';
+                    timeString[timeStringLength - 1] = '\0';
                     break;
                 }
             }
         }
 
 
-        printf("traced_symbols: %d\n", dsymbol_profile_array_count);
+        fprintf(stderr, "traced_symbols: %d\n", dsymbol_profile_array_count);
+
+        auto nameStringLength = (traceFileName !is null ? traceFileName.length : timeStringLength);
+        auto nameStringPointer = (traceFileName !is null ? traceFileName.ptr : timeString);
 
         static if (COMPRESSED_TRACE)
         {
             auto fileNameLength =
-                sprintf(&fileNameBuffer[0], "symbol-%s.trace".ptr, traceFileName ? traceFileName : timeString);
+                snprintf(&fileNameBuffer[0], fileNameBuffer.sizeof, "symbol-%.*s.trace".ptr, nameStringLength, nameStringPointer);
 
-            pragma(inline, true) uint currentOffset32()
+            int currentOffset32()
             {
                 return cast(uint)(bufferPos - fileBuffer);
             }
@@ -565,7 +573,7 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
             TraceFileHeader* header = cast(TraceFileHeader*)bufferPos;
             bufferPos += TraceFileHeader.sizeof;
             copyAndPointPastEnd(cast(char*)&header.magic_number, "DMDTRACE".ptr);
-            header.FileVersion = 2;
+            header.FileVersion = fVersion;
 
             header.n_records = dsymbol_profile_array_count;
             // the records follow
@@ -576,8 +584,8 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
             }
             assert(align4(currentOffset32()) == currentOffset32());
 
-            printf("unique symbols: %d\n", n_symInfos);
-            printf("profile_records size: %dk\n", (bufferPos - fileBuffer) / 1024);
+            fprintf(stderr, "unique symbols: %d\n", n_symInfos);
+            fprintf(stderr, "profile_records size: %dk\n", (bufferPos - fileBuffer) / 1024);
             // after writing the records we know how many symbols infos we have
             header.n_symbols = n_symInfos;
             header.n_phases = cast(uint)phases.length;
@@ -641,8 +649,6 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
             data = fileBuffer[0 .. bufferPos - fileBuffer];
             errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
         }
-
-
 
         free(fileBuffer);
     }
