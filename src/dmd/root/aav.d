@@ -129,92 +129,95 @@ private Value dmd_aaGetRvalue(AA* aa, Key key) pure nothrow @nogc
     return null; // not found
 }
 
-/**
-Gets a range of key/values for `aa`.
-
-Returns: a range of key/values for `aa`.
-*/
-@property auto asRange(AA* aa) pure nothrow @nogc
+debug
 {
-    return AARange!(Key, Value)(aa);
-}
+    /**
+    Gets a range of key/values for `aa`.
 
-private struct AARange(K,V)
-{
-    AA* aa;
-    // current index into bucket array `aa.b`
-    size_t bIndex;
-    aaA* current;
-
-    this(AA* aa) pure nothrow @nogc
+    Returns: a range of key/values for `aa`.
+    */
+    @property auto asRange(AA* aa) pure nothrow @nogc
     {
-        if (aa)
+        return AARange!(Key, Value)(aa);
+    }
+
+    private struct AARange(K,V)
+    {
+        AA* aa;
+        // current index into bucket array `aa.b`
+        size_t bIndex;
+        aaA* current;
+
+        this(AA* aa) pure nothrow @nogc
         {
-            this.aa = aa;
-            toNext();
-        }
-    }
-
-    @property bool empty() const pure nothrow @nogc @safe
-    {
-        return current is null;
-    }
-
-    @property auto front() const pure nothrow @nogc
-    {
-        return cast(KeyValueTemplate!(K,V))current.keyValue;
-    }
-
-    void popFront() pure nothrow @nogc
-    {
-        if (current.next)
-            current = current.next;
-        else
-        {
-            bIndex++;
-            toNext();
-        }
-    }
-
-    private void toNext() pure nothrow @nogc
-    {
-        for (; bIndex < aa.b_length; bIndex++)
-        {
-            if (auto next = aa.b[bIndex])
+            if (aa)
             {
-                current = next;
-                return;
+                this.aa = aa;
+                toNext();
             }
         }
-        current = null;
-    }
-}
-unittest
-{
-    AA* aa = null;
-    foreach(keyValue; aa.asRange)
-        assert(0);
 
-    enum totalKeyLength = 50;
-    foreach (i; 1 .. totalKeyLength + 1)
+        @property bool empty() const pure nothrow @nogc @safe
+        {
+            return current is null;
+        }
+
+        @property auto front() const pure nothrow @nogc
+        {
+            return cast(KeyValueTemplate!(K,V))current.keyValue;
+        }
+
+        void popFront() pure nothrow @nogc
+        {
+            if (current.next)
+                current = current.next;
+            else
+            {
+                bIndex++;
+                toNext();
+            }
+        }
+
+        private void toNext() pure nothrow @nogc
+        {
+            for (; bIndex < aa.b_length; bIndex++)
+            {
+                if (auto next = aa.b[bIndex])
+                {
+                    current = next;
+                    return;
+                }
+            }
+            current = null;
+        }
+    }
+    unittest
     {
-        auto key = cast(void*)i;
+        AA* aa = null;
+        foreach(keyValue; aa.asRange)
+            assert(0);
+
+        enum totalKeyLength = 50;
+        foreach (i; 1 .. totalKeyLength + 1)
         {
-            auto valuePtr = dmd_aaGet(&aa, key);
-            assert(valuePtr);
-            *valuePtr = key;
+            auto key = cast(void*)i;
+            {
+                auto valuePtr = dmd_aaGet(&aa, key);
+                assert(valuePtr);
+                *valuePtr = key;
+            }
+            bool[totalKeyLength] found;
+            size_t rangeCount = 0;
+            foreach (keyValue; aa.asRange)
+            {
+                assert(keyValue.key <= key);
+                assert(keyValue.key == keyValue.value);
+                rangeCount++;
+                assert(!found[cast(size_t)keyValue.key - 1]);
+                found[cast(size_t)keyValue.key - 1] = true;
+            }
+            assert(rangeCount == i);
         }
-        bool[totalKeyLength] found;
-        size_t rangeCount = 0;
-        foreach (keyValue; aa.asRange)
-        {
-            assert(keyValue.key <= key);
-            assert(keyValue.key == keyValue.value);
-            rangeCount++;
-            assert(!found[cast(size_t)keyValue.key - 1]);
-            found[cast(size_t)keyValue.key - 1] = true;
-        }
-        assert(rangeCount == i);
     }
 }
 
@@ -249,10 +252,7 @@ private void dmd_aaRehash(AA** paa) nothrow
                 }
             }
             if (aa.b != cast(aaA**)aa.binit)
-            {
                 mem.xfree(aa.b);
-                aa.b = null;
-            }
             aa.b = newb;
             aa.b_length = len;
         }
@@ -312,8 +312,8 @@ struct AssocArray(K,V)
         return cast(V)dmd_aaGetRvalue(aa, cast(void*)key);
     }
 
-//    debug
-    // {
+    debug
+    {
         /**
         Gets a range of key/values for `aa`.
 
@@ -323,7 +323,7 @@ struct AssocArray(K,V)
         {
             return AARange!(K,V)(aa);
         }
-    // }
+    }
 }
 
 ///
