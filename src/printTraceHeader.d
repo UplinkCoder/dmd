@@ -46,7 +46,7 @@ void main(string[] args)
     // writeln("phases:\n    ", phases);
     // writeln("kinds:\n    ", kinds);
 
-    SymbolProfileRecord[] records = readRecords(fileBytes, header.offset_records, header.n_records);
+    SymbolProfileRecord[] records = readRecords(fileBytes);
 
     static ulong hashRecord(SymbolProfileRecord r) pure
     {
@@ -131,13 +131,12 @@ void main(string[] args)
 
     if (mode == "Tree")
     {
-        const char[1024] indent = '-';
-
+        const char[4096*4] indent = '-';
         foreach(i; 0 .. records.length)
         {
             const r = records[i];
 
-            writeln(indent[0 .. depth[i-1]], ' ',
+            writeln(indent[0 .. depth[i]], ' ',
                 r.end_ticks - r.begin_ticks, "|",
                 selfTime[i], "|",
                 phases[r.phase_id - 1], "|",
@@ -195,10 +194,10 @@ void main(string[] args)
         import std.algorithm : sort;
         sortRecords.sort!((a,b) => a.absTime > b.absTime);
         writeln(" === Phase Time Distribution : ===");
-        writefln(" %-90s %-10s %-12s %-7s ", "phase",  "avgTime", "absTime", "freq");
+        writefln(" %-90s %-10s %-13s %-7s ", "phase",  "avgTime", "absTime", "freq");
         foreach(sr;sortRecords)
         {
-            writefln(" %-90s %-10.2f %-12.0f %-7d ", phases[sr.phaseId - 1],  sr.avgTime, sr.absTime, sr.freq);
+            writefln(" %-90s %-10.2f %-13.0f %-7d ", phases[sr.phaseId - 1],  sr.avgTime, sr.absTime, sr.freq);
         }
     }
     else if (mode == "Header")

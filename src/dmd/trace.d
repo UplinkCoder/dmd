@@ -1,4 +1,3 @@
-
 /**
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
@@ -197,7 +196,7 @@ const(size_t) align4(const size_t val) @safe pure @nogc
     return ((val + 3) & ~3);
 }
 ulong timeBase = 0;
-void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
+void writeRecord(SymbolProfileEntry dp, ref char* bufferPos, uint FileVersion = 1)
 {
     import core.stdc.stdio;
     import dmd.globals : Loc;
@@ -244,8 +243,8 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
 			return result;
 		}
 
-		auto kindId = getKindId(dp.kind, false);
-		auto phaseId = getPhaseId(dp.fn, false);
+		ushort kindId = getKindId(dp.kind, false);
+		ushort phaseId = getPhaseId(dp.fn, false);
 
         if (kindId > 500)
             assert(0);
@@ -377,31 +376,35 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos)
     // Identifier ident = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
     static if (COMPRESSED_TRACE)
     {
-		SymbolProfileRecord* rp = cast(SymbolProfileRecord*) bufferPos;
-		bufferPos += SymbolProfileRecord.sizeof;
-        enum FileVersion = 2;
-        if (fileVersion == 2)
+
+        if (FileVersion == 2)
         {
+            SymbolProfileRecordV2* rp = cast(SymbolProfileRecordV2*) bufferPos;
+            bufferPos += SymbolProfileRecordV2.sizeof;
             //TODO test this works
 
             ulong[3] byteField;
-            byteField[0] = (dp.begin_ticks -  timeBase) & bitmask_lower_48;
-            byteField[0] |= (((dp.end_ticks - timeBase) & bitmask_lower_16) << 48);
-            byteField[1] = (((dp.end_ticks -  timeBase) & bitmask_upper_32) >> 16);
-            byteField[1] |= (((dp.begin_mem           ) & bitmask_lower_32) << 32);
-            byteField[2] = (((dp.begin_mem            ) & (0xFFFF << 32)  ) >> 32);
-            byteField[2] |= (((dp.end_mem             ) & bitmask_lower_48) << 16);
 
+            byteField[0] = ((dp.begin_ticks - timeBase) & bitmask_lower_48);
+            byteField[0] |= (((dp.end_ticks - timeBase) & bitmask_lower_16) << 48UL);
+            byteField[1] = (((dp.end_ticks -  timeBase) & bitmask_upper_32) >> 16UL);
+            byteField[1] |= (((dp.begin_mem           ) & bitmask_lower_32) << 32UL);
+            byteField[2] = (((dp.begin_mem            ) & bitmask_upper_16) >> 32UL);
+            byteField[2] |= (((dp.end_mem             ) & bitmask_lower_48) << 16UL);
 
             SymbolProfileRecordV2 r = {
                 begin_ticks_48_end_ticks_48_begin_memomry_48_end_memory_48 :
                     byteField,
-                kind_id_9_phase_id_7 : kindId | (phaseId << 9),
+                kind_id_9_phase_id_7 : kindId | cast(ushort)(phaseId << 9),
                 symbol_id : id,
-            }
+            };
+            *rp = r;
         }
-        else
+        else if (FileVersion == 1)
         {
+            SymbolProfileRecord* rp = cast(SymbolProfileRecord*) bufferPos;
+            bufferPos += SymbolProfileRecord.sizeof;
+
             SymbolProfileRecord r = {
                 begin_ticks : dp.begin_ticks,
                 end_ticks : dp.end_ticks,
@@ -562,15 +565,17 @@ void writeTrace(char*[] arguments, char* traceFileName = null)
             TraceFileHeader* header = cast(TraceFileHeader*)bufferPos;
             bufferPos += TraceFileHeader.sizeof;
             copyAndPointPastEnd(cast(char*)&header.magic_number, "DMDTRACE".ptr);
-            header.FileVersion = 1;
+            header.FileVersion = 2;
 
             header.n_records = dsymbol_profile_array_count;
             // the records follow
             header.offset_records = currentOffset32();
             foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count])
             {
-                writeRecord(dp, bufferPos);
+                writeRecord(dp, bufferPos, header.FileVersion);
             }
+            assert(align4(currentOffset32()) == currentOffset32());
+
             printf("unique symbols: %d\n", n_symInfos);
             printf("profile_records size: %dk\n", (bufferPos - fileBuffer) / 1024);
             // after writing the records we know how many symbols infos we have
