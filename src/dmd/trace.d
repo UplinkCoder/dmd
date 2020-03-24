@@ -82,7 +82,8 @@ string traceString(string vname, string fn = null)
 {
     static if (SYMBOL_TRACE)
 {
-    return (`import dmd.trace : tracingEnabled; if (tracingEnabled)
+    return (`
+    if (tracingEnabled)
     {
         import dmd.dsymbol;
         import dmd.expression;
@@ -91,20 +92,32 @@ string traceString(string vname, string fn = null)
 
         import queryperf : QueryPerformanceCounter;
         import dmd.root.rmem;
-        import dmd.asttypename;
         ulong begin_sema_ticks;
         ulong end_sema_ticks;
         ulong begin_sema_mem = Mem.allocated;
+        auto v = ` ~ vname ~ `;
+        alias v_type = typeof(v);
+
+        enum asttypename_build = false;
+
+        static if (asttypename_build && __traits(compiles, () { import dmd.asttypename; astTypeName(Dsymbol.init); }))
+        {
+            import dmd.asttypename;
+            string asttypename_v = astTypeName(v);
+        }
+        else
+        {
+            string asttypename_v = v_type.stringof;
+        }
 
         auto insert_pos = dsymbol_profile_array_count++;
+
         assert(dsymbol_profile_array_count < dsymbol_profile_array_size,
             "Trying to push more then" ~ dsymbol_profile_array_size.stringof ~ " symbols");
         QueryPerformanceCounter(&begin_sema_ticks);
 
         scope(exit)
         {
-            auto v = ` ~ vname ~ `;
-            alias v_type = typeof(v);
             QueryPerformanceCounter(&end_sema_ticks);
             if (v !is null)
             { 
@@ -114,7 +127,7 @@ string traceString(string vname, string fn = null)
                         SymbolProfileEntry(ProfileNodeType.Dsymbol,
                         begin_sema_ticks, end_sema_ticks,
                         begin_sema_mem, Mem.allocated,
-                        astTypeName(v), ` ~ (fn
+                        asttypename_v, ` ~ (fn
                             ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
                     dsymbol_profile_array[insert_pos].sym = v; 
                 } else static if (is(v_type : Expression))
@@ -123,7 +136,7 @@ string traceString(string vname, string fn = null)
                         SymbolProfileEntry(ProfileNodeType.Expression,
                         begin_sema_ticks, end_sema_ticks,
                         begin_sema_mem, Mem.allocated,
-                        astTypeName(v), ` ~ (fn
+                        asttypename_v, ` ~ (fn
                             ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
                     dsymbol_profile_array[insert_pos].exp = v; 
                 } else static if (is(v_type : Statement))
@@ -132,7 +145,7 @@ string traceString(string vname, string fn = null)
                         SymbolProfileEntry(ProfileNodeType.Statement,
                         begin_sema_ticks, end_sema_ticks,
                         begin_sema_mem, Mem.allocated,
-                        astTypeName(v), ` ~ (fn
+                        asttypename_v, ` ~ (fn
                             ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
                     dsymbol_profile_array[insert_pos].stmt = v; 
                 } else static if (is(v_type : Type))
@@ -141,7 +154,7 @@ string traceString(string vname, string fn = null)
                         SymbolProfileEntry(ProfileNodeType.Type,
                         begin_sema_ticks, end_sema_ticks,
                         begin_sema_mem, Mem.allocated,
-                        astTypeName(v), ` ~ (fn
+                        asttypename_v, ` ~ (fn
                             ? `"` ~ fn ~ `"` : `__FUNCTION__`) ~ `);
                     dsymbol_profile_array[insert_pos].type = v; 
                 }
