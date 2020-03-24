@@ -134,7 +134,7 @@ public:
             {
                 /* Increase size by 1.5x to avoid excessive memory fragmentation
                  */
-                auto increment = (length < 16 ? 4 : length / 2);
+                auto increment = length / 2;
                 if (nentries > increment)       // if 1.5 is not enough
                     increment = nentries;
                 allocdim = length + increment;
