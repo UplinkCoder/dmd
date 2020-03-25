@@ -1,17 +1,20 @@
 import dmd.trace_file;
 import std.stdio;
 import std.file;
+
 void main(string[] args)
 {
 
-    string[] supportedModes = ["Tree", "Toplist", "Header", "PhaseHist"];
+    string[] supportedModes = [
+        "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol"
+    ];
 
-    if (args.length != 3)
+    if (args.length < 3)
     {
         writeln("Invalid invocatoion: ", args);
-        writeln("Expected: ", args[0], " traceFile mode");
+        writeln("Expected: ", args[0], " traceFile mode {args depending on mode}");
         writeln("Modes are", supportedModes);
-        return ;
+        return;
     }
 
     auto traceFile = args[1];
@@ -19,11 +22,10 @@ void main(string[] args)
     if (!exists(traceFile))
     {
         writeln(`TraceFile: "`, traceFile, `" does not exist.`);
-        return ;
+        return;
     }
 
     auto mode = args[2];
-
 
     TraceFileHeader header;
     void[] fileBytes = read(args[1]);
@@ -34,10 +36,10 @@ void main(string[] args)
 
     (cast(void*)&header)[0 .. header.sizeof] = fileBytes[0 .. header.sizeof];
 
-    if (header.magic_number != (*cast(ulong*)"DMDTRACE".ptr))
+    if (header.magic_number != (*cast(ulong*) "DMDTRACE".ptr))
     {
         writeln("Tracefile does not have the correct magic number.");
-        return ;
+        return;
     }
 
     string[] kinds = readStrings(fileBytes, header.offset_kinds, header.n_kinds);
@@ -62,7 +64,19 @@ void main(string[] args)
     uint strange_record_count;
     ulong lastBeginTicks;
 
-    foreach(r;records)
+    if (mode == "Header")
+    {
+        writeln(structToString(header));
+        writeln("kinds:\n\t", kinds);
+        writeln("phases:\n\t", phases);
+
+        // a file with a correct header might not have a symbol table
+        // and we don't want to scan for strange records
+        // just to show the header
+        return ;
+     }
+
+    foreach (r; records)
     {
         if (r.begin_ticks <= lastBeginTicks)
         {
@@ -75,7 +89,7 @@ void main(string[] args)
     if (strange_record_count)
     {
         writeln(strange_record_count, " strange records encounterd");
-        return ;
+        return;
     }
     // if we get here records are sorted  by begin_ticks
     // as they should be
@@ -85,22 +99,23 @@ void main(string[] args)
     // now can start establishing parent child relationships;
     import core.stdc.stdlib;
 
-    uint[] parents = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
-    uint[] depth = (cast(uint*)calloc(records.length, uint.sizeof))[0 .. records.length];
-    uint[2][] selfTime = (cast(uint[2]*)calloc(records.length, uint.sizeof*2))[0 .. records.length];
+    uint[] parents = (cast(uint*) calloc(records.length, uint.sizeof))[0 .. records.length];
+    uint[] depth = (cast(uint*) calloc(records.length, uint.sizeof))[0 .. records.length];
+    uint[2][] selfTime = (cast(uint[2]*) calloc(records.length, uint.sizeof * 2))[0
+        .. records.length];
 
     {
         uint currentDepth = 1;
-        foreach(i; 0 .. records.length)
+        foreach (i; 0 .. records.length)
         {
             const r = records[i];
             const time = cast(uint)(r.end_ticks - r.begin_ticks);
-            selfTime[i][0] = cast(uint)i;
+            selfTime[i][0] = cast(uint) i;
             selfTime[i][1] = time;
             // either our parent is right above us
-            if (i && records[i-1].end_ticks > r.end_ticks)
+            if (i && records[i - 1].end_ticks > r.end_ticks)
             {
-                parents[i] = cast(uint)(i-1);
+                parents[i] = cast(uint)(i - 1);
                 depth[i] = currentDepth++;
             }
             else if (i) // or it's the parent of our parent
@@ -108,8 +123,8 @@ void main(string[] args)
                 // the indent does not increase now we have to check if we have to pull back or not
                 // our indent level is the one of the first record that ended after we ended
 
-                uint currentParent = parents[i-1];
-                while(currentParent)
+                uint currentParent = parents[i - 1];
+                while (currentParent)
                 {
                     auto p = records[currentParent];
                     if (p.end_ticks > r.end_ticks)
@@ -131,28 +146,24 @@ void main(string[] args)
 
     if (mode == "Tree")
     {
-        const char[4096*4] indent = '-';
-        foreach(i; 0 .. records.length)
+        const char[4096 * 4] indent = '-';
+        foreach (i; 0 .. records.length)
         {
             const r = records[i];
 
-            writeln(indent[0 .. depth[i]], ' ',
-                r.end_ticks - r.begin_ticks, "|",
-                selfTime[i], "|",
-                phases[r.phase_id - 1], "|",
-                getSymbolName(fileBytes, r), "|",
-                getSymbolLocation(fileBytes, r), "|",
-            );
+            writeln(indent[0 .. depth[i]], ' ', r.end_ticks - r.begin_ticks, "|",
+                    selfTime[i], "|", phases[r.phase_id - 1], "|", getSymbolName(fileBytes,
+                        r), "|", getSymbolLocation(fileBytes, r), "|",);
 
         }
         import std.algorithm;
-        auto sorted_selfTimes  = 
-            selfTime.sort!((a, b) => a[1] > b[1]).release;
+
+        auto sorted_selfTimes = selfTime.sort!((a, b) => a[1] > b[1]).release;
         writeln("SelfTimes");
-        foreach(st;sorted_selfTimes[0 .. (header.n_records > 2000 ? 2000 : header.n_records)])
+        foreach (st; sorted_selfTimes[0 .. (header.n_records > 2000 ? 2000 : header.n_records)])
         {
             const r = records[st[0]];
-            writeln(st[1], "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
+            writeln(st[1], "|", kinds[r.kind_id - 1], "|", getSymbolLocation(fileBytes, r));
         }
 
         free(depth.ptr);
@@ -160,12 +171,14 @@ void main(string[] args)
     else if (mode == "Toplist")
     {
         import std.algorithm;
-        auto sorted_records = 
-            records.sort!((a, b) => (a.end_ticks - a.begin_ticks > b.end_ticks - b.begin_ticks)).release;
+
+        auto sorted_records = records.sort!((a,
+                b) => (a.end_ticks - a.begin_ticks > b.end_ticks - b.begin_ticks)).release;
         writeln("Toplist");
-        foreach(r;sorted_records)
+        foreach (r; sorted_records)
         {
-            writeln(r.end_ticks - r.begin_ticks, "|", kinds[r.kind_id-1], "|", getSymbolLocation(fileBytes, r));
+            writeln(r.end_ticks - r.begin_ticks, "|", kinds[r.kind_id - 1], "|",
+                    getSymbolLocation(fileBytes, r));
         }
     }
     else if (mode == "PhaseHist")
@@ -181,55 +194,100 @@ void main(string[] args)
         SortRecord[] sortRecords;
         sortRecords.length = header.n_phases;
 
-        foreach(i, r;records)
+        foreach (i, r; records)
         {
-            sortRecords[r.phase_id-1].absTime += selfTime[i][1];
-            sortRecords[r.phase_id-1].freq++;
+            sortRecords[r.phase_id - 1].absTime += selfTime[i][1];
+            sortRecords[r.phase_id - 1].freq++;
         }
-        foreach(i; 0 .. header.n_phases)
+        foreach (i; 0 .. header.n_phases)
         {
             sortRecords[i].phaseId = i + 1;
             sortRecords[i].avgTime = sortRecords[i].absTime / double(sortRecords[i].freq);
         }
         import std.algorithm : sort;
-        sortRecords.sort!((a,b) => a.absTime > b.absTime);
+
+        sortRecords.sort!((a, b) => a.absTime > b.absTime);
         writeln(" === Phase Time Distribution : ===");
-        writefln(" %-90s %-10s %-13s %-7s ", "phase",  "avgTime", "absTime", "freq");
-        foreach(sr;sortRecords)
+        writefln(" %-90s %-10s %-13s %-7s ", "phase", "avgTime", "absTime", "freq");
+        foreach (sr; sortRecords)
         {
-            writefln(" %-90s %-10.2f %-13.0f %-7d ", phases[sr.phaseId - 1],  sr.avgTime, sr.absTime, sr.freq);
+            writefln(" %-90s %-10.2f %-13.0f %-7d ", phases[sr.phaseId - 1],
+                    sr.avgTime, sr.absTime, sr.freq);
         }
     }
-    else if (mode == "Header")
+    else if (mode == "KindHist")
     {
-        writeln(structToString(header));
-        writeln("kinds:\n\t", kinds);
-        writeln("phases:\n\t", phases);
+        static struct SortRecord_Kind
+        {
+            uint kindId;
+            uint freq;
+            float absTime = 0;
+            float avgTime = 0;
+        }
+
+        SortRecord_Kind[] sortRecords;
+        sortRecords.length = header.n_kinds;
+
+        foreach (i, r; records)
+        {
+            sortRecords[r.kind_id - 1].absTime += selfTime[i][1];
+            sortRecords[r.kind_id - 1].freq++;
+        }
+        foreach (i; 0 .. header.n_kinds)
+        {
+            sortRecords[i].kindId = i + 1;
+            sortRecords[i].avgTime = sortRecords[i].absTime / double(sortRecords[i].freq);
+        }
+        import std.algorithm : sort;
+
+        sortRecords.sort!((a, b) => a.absTime > b.absTime);
+        writeln(" === Kind Time Distribution ===");
+        writefln(" %-90s %-10s %-13s %-7s ", "kind", "avgTime", "absTime", "freq");
+        foreach (sr; sortRecords)
+        {
+            writefln(" %-90s %-10.2f %-13.0f %-7d ", kinds[sr.kindId - 1],
+                    sr.avgTime, sr.absTime, sr.freq);
+        }
     }
-    else 
+    else if (mode == "Symbol")
+    {
+        import std.conv : to;
+        uint sNumber = to!uint(args[3]);
+
+        writeln("{name: ", getSymbolName(fileBytes, sNumber), 
+            "\nlocation: " ~ getSymbolLocation(fileBytes, sNumber) ~ "}");
+
+    }
+    else
         writeln("Mode unsupported: ", mode, "\nsupported modes are: ", supportedModes);
 }
 
-struct NoPrint {}
+struct NoPrint
+{
+}
 
-string structToString(T)(auto ref T _struct)
+string structToString(T)(auto ref T _struct, int indent = 1)
 {
     char[] result;
 
-    result ~= T.stringof ~ " (";
+    result ~= T.stringof ~ " (\n";
 
-    foreach(i, e;_struct.tupleof)
+    foreach (i, e; _struct.tupleof)
     {
         bool skip = false;
 
-        foreach(attrib;__traits(getAttributes, _struct.tupleof[i]))
+        foreach (attrib; __traits(getAttributes, _struct.tupleof[i]))
         {
             static if (is(attrib == NoPrint))
-            skip = true;
+                skip = true;
         }
 
         if (!skip)
         {
+            foreach(_;0 .. indent)
+            {
+                result ~= "\t";
+            }
             alias type = typeof(_struct.tupleof[i]);
             const fieldName = _struct.tupleof[i].stringof["_struct.".length .. $];
 
@@ -247,23 +305,23 @@ string structToString(T)(auto ref T _struct)
             {
                 pragma(msg, type);
                 import std.conv : to;
+
                 result ~= to!string(e);
             }
-            result ~= ", ";
+            result ~= ",\n";
         }
     }
 
-    result = result[0 .. $-1];
-    result[$-1] = ')';
-
+    result[$ - 2] = '\n';
+    result[$ - 1] = ')';
     return cast(string) result;
 }
 
 const(uint) fastLog10(const uint val) pure nothrow @nogc @safe
 {
-    return (val < 10) ? 0 : (val < 100) ? 1 : (val < 1000) ? 2 : (val < 10000) ? 3
-        : (val < 100000) ? 4 : (val < 1000000) ? 5 : (val < 10000000) ? 6
-        : (val < 100000000) ? 7 : (val < 1000000000) ? 8 : 9;
+    return (val < 10) ? 0 : (val < 100) ? 1 : (val < 1000) ? 2 : (val < 10000)
+        ? 3 : (val < 100000) ? 4 : (val < 1000000) ? 5 : (val < 10000000)
+        ? 6 : (val < 100000000) ? 7 : (val < 1000000000) ? 8 : 9;
 }
 
 /*@unique*/
@@ -302,34 +360,33 @@ string itos64(const ulong val) pure @trusted nothrow
     return cast(string) "((" ~ hiString ~ "<< 32)" ~ "|" ~ lwString ~ ")";
 }
 
-
 string enumToString(E)(E v)
 {
-    static assert(is(E == enum),
-        "emumToString is only meant for enums");
+    static assert(is(E == enum), "emumToString is only meant for enums");
     string result;
 
-    Switch : switch(v)
+Switch:
+    switch (v)
     {
-        foreach(m;__traits(allMembers, E))
+        foreach (m; __traits(allMembers, E))
         {
-            case mixin("E." ~ m) :
-                result = m;
+    case mixin("E." ~ m):
+            result = m;
             break Switch;
         }
 
-        default :
+    default:
         {
             result = "cast(" ~ E.stringof ~ ")";
             uint val = v;
             enum headLength = cast(uint)(E.stringof.length + "cast()".length);
-            uint log10Val = (val < 10) ? 0 : (val < 100) ? 1 : (val < 1000) ? 2 :
-                (val < 10000) ? 3 : (val < 100000) ? 4 : (val < 1000000) ? 5 :
-                (val < 10000000) ? 6 : (val < 100000000) ? 7 : (val < 1000000000) ? 8 : 9;
+            uint log10Val = (val < 10) ? 0 : (val < 100) ? 1 : (val < 1000)
+                ? 2 : (val < 10000) ? 3 : (val < 100000) ? 4 : (val < 1000000)
+                ? 5 : (val < 10000000) ? 6 : (val < 100000000) ? 7 : (val < 1000000000) ? 8 : 9;
             result.length += log10Val + 1;
-            for(uint i;i != log10Val + 1;i++)
+            for (uint i; i != log10Val + 1; i++)
             {
-                cast(char)result[headLength + log10Val - i] = cast(char) ('0' + (val % 10));
+                cast(char) result[headLength + log10Val - i] = cast(char)('0' + (val % 10));
                 val /= 10;
             }
         }
@@ -338,18 +395,14 @@ string enumToString(E)(E v)
     return result;
 }
 
-enum hexString = (ulong value)
-{
+enum hexString = (ulong value) {
     const wasZero = !value;
     static immutable NibbleRep = "0123456789abcdef";
     char[] resultBuffer;
     resultBuffer.length = 18; // ulong.sizeof * 2 + "0x".length
     resultBuffer[] = '0';
     int p;
-    for(ubyte currentNibble = value & 0xF;
-        value;
-        currentNibble = ((value >>>= 4) & 0xF)
-    )
+    for (ubyte currentNibble = value & 0xF; value; currentNibble = ((value >>>= 4) & 0xF))
     {
         resultBuffer[17 - p++] = NibbleRep[currentNibble];
     }

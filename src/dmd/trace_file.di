@@ -31,9 +31,6 @@ struct SymbolProfileRecordV2
 }
 
 
-pragma(msg, "ProfileRecord.sizeof = ", SymbolProfileRecord.sizeof);
-pragma(msg, "ProfileRecordV2.sizeof = ", SymbolProfileRecordV2.sizeof);
-
 struct TraceFileHeader
 {
     ulong magic_number;
@@ -86,6 +83,23 @@ align(1):
     uint one_past_string_end;
 }
 
+static TraceFileHeader readHeader()(void[] file)
+{
+    TraceFileHeader header;
+
+    if (file.length < header.sizeof)
+    {
+        import std.stdio;
+        writeln(stderr, "Tracefile truncated.");
+    }
+    else
+    {
+        (cast(void*)&header)[0 .. header.sizeof] = file[0 .. header.sizeof];
+    }
+
+    return header;
+}
+
 static string[] readStrings()(const void[] file, uint offset_strings, uint n_strings)
 {
     const (char)[][] result;
@@ -129,12 +143,32 @@ static SymbolProfileRecord[] readRecords()(const void[] file, const void[][] add
             result[i].begin_mem = (byteField[1] >> 32UL) | ((byteField[2] & bitmask_lower_16) << 32UL);
             result[i].end_mem = (byteField[2] >> 16);
 
+            result[i].symbol_id = source[i].symbol_id;
+
             result[i].kind_id = source[i].kind_id_9_phase_id_7 & ((1 << 9) -1);
             result[i].phase_id = source[i].kind_id_9_phase_id_7 >> 9;
         }
     }
 
     return result;
+}
+
+static string getSymbolName()(const void[] file, uint id)
+{
+    if (id == uint.max)
+        return "NullSymbol";
+    
+    TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
+    SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
+    
+    auto symp = symbolInfoPointers[id - 1];
+    auto name = (cast(char*)file.ptr)[symp.symbol_name_start .. symp.symobol_location_start];
+    if (symp.symbol_name_start == symp.symobol_location_start)
+    {
+        name = null;
+    }
+    
+    return cast(string) name;
 }
 
 static string getSymbolName()(const void[] file, SymbolProfileRecord r)
@@ -153,6 +187,24 @@ static string getSymbolName()(const void[] file, SymbolProfileRecord r)
     }
 
     return cast(string) name;
+}
+
+static string getSymbolLocation()(const void[] file, uint id)
+{
+    if (id == uint.max)
+        return "NullSymbol";
+    
+    TraceFileHeader* header = cast(TraceFileHeader*)file.ptr;
+    SymbolInfoPointers* symbolInfoPointers = cast(SymbolInfoPointers*) (file.ptr + header.offset_symbol_info_descriptors);
+    
+    auto symp = symbolInfoPointers[id - 1];
+    auto loc = (cast(char*)file.ptr)[symp.symobol_location_start .. symp.one_past_symbol_location_end];
+    if (symp.symobol_location_start == symp.one_past_symbol_location_end)
+    {
+        loc = null;
+    }
+    
+    return cast(string) loc;
 }
 
 static string getSymbolLocation()(const void[] file, SymbolProfileRecord r)
