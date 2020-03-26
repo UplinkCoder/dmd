@@ -1,12 +1,5 @@
 import dmd.trace_file;
 
-enum bitmask_lower_48 = 0xFFFF_FFFF_FFFFUL;
-enum bitmask_upper_16 = 0xFFFFUL << 32UL;
-enum bitmask_lower_32 = 0xFFFF_FFFFUL;
-enum bitmask_upper_32 = 0xFFFF_FFFFUL << 16UL;
-enum bitmask_lower_16 = 0xFFFFUL;
-enum bitmask_upper_48 = 0xFFFF_FFFF_FFFFUL << 16UL;
-
 import std.file;
 import std.file : fileWrite = write;
 import core.stdc.stdio;
@@ -14,9 +7,11 @@ import core.stdc.stdlib;
 
 void main(string[] args)
 {
+    import core.memory : GC; GC.disable();    
+
     if (args.length <= 1 || !exists(args[1]))
     {
-        fprintf(stderr, ("Usage" ~ args[0] ~ " <filename>" ~ "\0").ptr);
+        fprintf(stderr, ("Usage: " ~ args[0] ~ " <filename>\n\0").ptr);
         return ;
     }
     auto inFile = args[1];
@@ -28,7 +23,7 @@ void main(string[] args)
     enum DMDTRACE = 4990904633913527620UL;
     if (header.magic_number != DMDTRACE)
     {
-        fprintf(stderr, "This file does not look like a dmd trace");
+        fprintf(stderr, "This file does not look like a dmd trace\n");
         return ;
     }
     if (header.FileVersion != 2)
@@ -38,11 +33,9 @@ void main(string[] args)
         return ;
     }
 
-    fprintf(stderr, "Currently this will only write out a file which contains records ... the symbol table is dropped");
+    fprintf(stderr, "Currently this will only write out a file which contains records ... the symbol table is dropped\n");
 
-    import core.memory : GC; GC.disable();    
-
-    auto size = header.sizeof + (header.n_symbols * SymbolProfileRecord.sizeof);
+    auto size = header.sizeof + (header.n_records * SymbolProfileRecord.sizeof);
     void [] mem = malloc(size)[0 .. size];
     auto newHeader = cast(typeof(header)*)mem;
 
@@ -62,12 +55,12 @@ void main(string[] args)
 
     newSymbols = null;
 
-    printf("Conversion done.");
+    printf("Conversion done.\n");
     fileWrite(inFile ~ ".v1", mem);
 
     free(mem.ptr);
 
-    printf("File written");
+    printf("File written\n");
 }
 /+
 SymbolProfileRecordV2 toV2(SymbolProfileRecord v1, ulong timeBase = 0)
