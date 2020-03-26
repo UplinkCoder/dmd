@@ -6,7 +6,7 @@ void main(string[] args)
 {
 
     string[] supportedModes = [
-        "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol"
+        "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol", "Kind", "Phase", "RandSample" ,"OutputSelftime"
     ];
 
     if (args.length < 3)
@@ -104,8 +104,11 @@ void main(string[] args)
     uint[2][] selfTime = (cast(uint[2]*) calloc(records.length, uint.sizeof * 2))[0
         .. records.length];
 
+
     {
+        ulong parentsFound = 0;
         uint currentDepth = 1;
+        stderr.writeln("Looking for parents");
         foreach (i; 0 .. records.length)
         {
             const r = records[i];
@@ -117,6 +120,8 @@ void main(string[] args)
             {
                 parents[i] = cast(uint)(i - 1);
                 depth[i] = currentDepth++;
+                selfTime[i-1][1] -= time;
+                parentsFound++;
             }
             else if (i) // or it's the parent of our parent
             {
@@ -133,6 +138,7 @@ void main(string[] args)
                         assert(selfTime[currentParent][1] > 1);
                         currentDepth = depth[currentParent] + 1;
                         depth[i] = currentDepth;
+                        parentsFound++;
                         break;
                     }
                     currentParent = parents[currentParent];
@@ -141,11 +147,19 @@ void main(string[] args)
                 //assert(currentParent);
             }
         }
-
+        stderr.writeln("parentsFound: ", parentsFound, " out of ", header.n_records, " tracepoints");
+        if (!parentsFound)
+        {
+            stderr.writeln("No Parents? Something is fishy!");
+            return ;
+        }
     }
+
+
 
     if (mode == "Tree")
     {
+/+
         const char[4096 * 4] indent = '-';
         foreach (i; 0 .. records.length)
         {
@@ -156,6 +170,7 @@ void main(string[] args)
                         r), "|", getSymbolLocation(fileBytes, r), "|",);
 
         }
++/
         import std.algorithm;
 
         auto sorted_selfTimes = selfTime.sort!((a, b) => a[1] > b[1]).release;
@@ -165,15 +180,13 @@ void main(string[] args)
             const r = records[st[0]];
             writeln(st[1], "|", kinds[r.kind_id - 1], "|", getSymbolLocation(fileBytes, r));
         }
-
-        free(depth.ptr);
     }
     else if (mode == "Toplist")
     {
         import std.algorithm;
 
         auto sorted_records = records.sort!((a,
-                b) => (a.end_ticks - a.begin_ticks > b.end_ticks - b.begin_ticks)).release;
+                b) => (a.end_mem - a.begin_mem > b.end_mem - b.begin_mem)).release;
         writeln("Toplist");
         foreach (r; sorted_records)
         {
@@ -258,6 +271,31 @@ void main(string[] args)
             "\nlocation: " ~ getSymbolLocation(fileBytes, sNumber) ~ "}");
 
     }
+    else if (mode == "Phase")
+    {
+        import std.conv : to;
+        uint sNumber = to!uint(args[3]);
+        writeln("{phase: " ~ phases[sNumber - 1] ~ "}");
+    }
+    else if (mode == "Kind")
+    {
+        import std.conv : to;
+        uint sNumber = to!uint(args[3]);
+        writeln("{kind: " ~ kinds[sNumber - 1] ~ "}");
+    }
+    else if (mode == "RandSample")
+    {
+        import std.random : randomSample;
+        import std.algorithm : map, each;
+
+        randomSample(records, 24).map!(r => structToString(r)).each!writeln;
+    }
+    else if (mode == "OutputSelftime")
+    {
+        void [] selfTimeMem = (cast(void*)selfTime)[0 .. (selfTime.length * selfTime[0].sizeof)];  
+        std.file.write(traceFile ~ ".st", selfTimeMem);
+    }
+
     else
         writeln("Mode unsupported: ", mode, "\nsupported modes are: ", supportedModes);
 }
