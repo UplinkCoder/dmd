@@ -62,7 +62,7 @@ enum ProfileNodeType
 
 extern (C) __gshared uint dsymbol_profile_array_count;
 extern (C) __gshared SymbolProfileEntry* dsymbol_profile_array;
-enum dsymbol_profile_array_size = 64 * 1024 * 1024; // 64 million entries should do, no ?
+enum dsymbol_profile_array_size = 128 * 1024 * 1024; // 128 million entries should do, no ?
 void initTraceMemory()
 {
     static if (SYMBOL_TRACE)
