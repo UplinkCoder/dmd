@@ -26,9 +26,9 @@ void main(string[] args)
         fprintf(stderr, "This file does not look like a dmd trace\n");
         return ;
     }
-    if (header.FileVersion != 2)
+    if (header.FileVersion != 2 && header.FileVersion != 3)
     {
-        fprintf(stderr, "Currently this tools only converts from v2 to v1. {DetectedFileVersion: %d}\n",
+        fprintf(stderr, "Currently this tools only converts from {v2, v3} to v1. {DetectedFileVersion: %d}\n",
             header.FileVersion);
         return ;
     }
