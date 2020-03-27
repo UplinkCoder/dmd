@@ -1150,6 +1150,7 @@ extern (C++) const(char)* mangleExact(FuncDeclaration fd)
 
 extern (C++) void mangleToBuffer(Type t, OutBuffer* buf)
 {
+    import dmd.trace; mixin(traceString("t", "Type::mangleToBuffer"));
     if (t.deco)
         buf.writestring(t.deco);
     else
@@ -1161,18 +1162,21 @@ extern (C++) void mangleToBuffer(Type t, OutBuffer* buf)
 
 extern (C++) void mangleToBuffer(Expression e, OutBuffer* buf)
 {
+    import dmd.trace; mixin(traceString("e", "Expression::mangleToBuffer"));
     scope Mangler v = new Mangler(buf);
     e.accept(v);
 }
 
 extern (C++) void mangleToBuffer(Dsymbol s, OutBuffer* buf)
 {
+    import dmd.trace; mixin(traceString("s", "Dsymbol::mangleToBuffer"));
     scope Mangler v = new Mangler(buf);
     s.accept(v);
 }
 
 extern (C++) void mangleToBuffer(TemplateInstance ti, OutBuffer* buf)
 {
+    import dmd.trace; mixin(traceString("ti", "TemplateInstance::mangleToBuffer"));
     scope Mangler v = new Mangler(buf);
     v.mangleTemplateInstance(ti);
 }
