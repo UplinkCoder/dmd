@@ -6,7 +6,7 @@ void main(string[] args)
 {
 
     string[] supportedModes = [
-        "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol", "Kind", "Phase", "RandSample" ,"OutputSelftime"
+        "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol", "Kind", "Phase", "RandSample" ,"OutputSelfStats"
     ];
 
     if (args.length < 3)
@@ -41,10 +41,22 @@ void main(string[] args)
         writeln("Tracefile does not have the correct magic number.");
         return;
     }
+    string[] kinds;
+    string[] phases;
 
-    string[] kinds = readStrings(fileBytes, header.offset_kinds, header.n_kinds);
-    string[] phases = readStrings(fileBytes, header.offset_phases, header.n_phases);
-
+    if (header.FileVersion < 3)
+    {
+        kinds = readStrings(fileBytes, header.offset_kinds, header.n_kinds);
+        phases = readStrings(fileBytes, header.offset_phases, header.n_phases);
+    }
+    else
+    {
+        auto symTableBytes = read(traceFile[0 .. $-"trace".length] ~ "symbol");
+        auto symTableHeader = readHeader(symTableBytes);
+        kinds = readStrings(symTableBytes, symTableHeader.offset_kinds, symTableHeader.n_kinds);
+        phases = readStrings(symTableBytes, symTableHeader.offset_phases, symTableHeader.n_phases);
+    }
+     
     // writeln("phases:\n    ", phases);
     // writeln("kinds:\n    ", kinds);
 
@@ -67,8 +79,8 @@ void main(string[] args)
     if (mode == "Header")
     {
         writeln(structToString(header));
-        writeln("kinds:\n\t", kinds);
-        writeln("phases:\n\t", phases);
+        writeln("kinds=", kinds);
+        writeln("phases=", phases);
 
         // a file with a correct header might not have a symbol table
         // and we don't want to scan for strange records
@@ -103,6 +115,8 @@ void main(string[] args)
     uint[] depth = (cast(uint*) calloc(records.length, uint.sizeof))[0 .. records.length];
     uint[2][] selfTime = (cast(uint[2]*) calloc(records.length, uint.sizeof * 2))[0
         .. records.length];
+    uint[2][] selfMem = (cast(uint[2]*) calloc(records.length, uint.sizeof * 2))[0
+        .. records.length];
 
 
     {
@@ -113,14 +127,20 @@ void main(string[] args)
         {
             const r = records[i];
             const time = cast(uint)(r.end_ticks - r.begin_ticks);
+            const mem = cast(uint)(r.end_mem - r.begin_mem);
+
             selfTime[i][0] = cast(uint) i;
             selfTime[i][1] = time;
+            selfMem[i][0] = cast(uint) i;
+            selfMem[i][1] = mem;
+
             // either our parent is right above us
             if (i && records[i - 1].end_ticks > r.end_ticks)
             {
                 parents[i] = cast(uint)(i - 1);
                 depth[i] = currentDepth++;
                 selfTime[i-1][1] -= time;
+                selfMem[i-1][1] -= mem;
                 parentsFound++;
             }
             else if (i) // or it's the parent of our parent
@@ -135,6 +155,8 @@ void main(string[] args)
                     if (p.end_ticks > r.end_ticks)
                     {
                         selfTime[currentParent][1] -= time;
+                        selfMem[currentParent][1] -= mem;
+
                         assert(selfTime[currentParent][1] > 1);
                         currentDepth = depth[currentParent] + 1;
                         depth[i] = currentDepth;
@@ -290,10 +312,12 @@ void main(string[] args)
 
         randomSample(records, 24).map!(r => structToString(r)).each!writeln;
     }
-    else if (mode == "OutputSelftime")
+    else if (mode == "OutputSelfStats")
     {
-        void [] selfTimeMem = (cast(void*)selfTime)[0 .. (selfTime.length * selfTime[0].sizeof)];  
+        void [] selfTimeMem = (cast(void*)selfTime)[0 .. (selfTime.length * selfTime[0].sizeof)];
         std.file.write(traceFile ~ ".st", selfTimeMem);
+        void [] selfMemMem = (cast(void*)selfMem)[0 .. (selfMem.length * selfMem[0].sizeof)];
+        std.file.write(traceFile ~ ".sm", selfMemMem);
     }
 
     else
