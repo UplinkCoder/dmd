@@ -44,18 +44,8 @@ void main(string[] args)
     string[] kinds;
     string[] phases;
 
-    if (header.FileVersion < 3)
-    {
-        kinds = readStrings(fileBytes, header.offset_kinds, header.n_kinds);
-        phases = readStrings(fileBytes, header.offset_phases, header.n_phases);
-    }
-    else
-    {
-        auto symTableBytes = read(traceFile[0 .. $-"trace".length] ~ "symbol");
-        auto symTableHeader = readHeader(symTableBytes);
-        kinds = readStrings(symTableBytes, symTableHeader.offset_kinds, symTableHeader.n_kinds);
-        phases = readStrings(symTableBytes, symTableHeader.offset_phases, symTableHeader.n_phases);
-    }
+    kinds = readStrings(fileBytes, header.offset_kinds, header.n_kinds);
+    phases = readStrings(fileBytes, header.offset_phases, header.n_phases);
      
     // writeln("phases:\n    ", phases);
     // writeln("kinds:\n    ", kinds);

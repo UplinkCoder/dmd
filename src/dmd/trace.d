@@ -101,7 +101,7 @@ string traceString(string vname, string fn = null)
     static if (asttypename_build && __traits(compiles, () { import dmd.asttypename; astTypeName(Dsymbol.init); }))
     {
         import dmd.asttypename;
-        string asttypename_v = (tracingEnabled ? astTypeName(v_) : "");
+        string asttypename_v = (tracingEnabled && v_ !is null ? astTypeName(v_) : "");
     }
     else
     {
@@ -393,8 +393,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos, uint FileVersion = 
     // Identifier ident = dp.sym.ident ? dp.sym.ident : dp.sym.getIdent();
     static if (COMPRESSED_TRACE)
     {
-
-        if (FileVersion == 2)
+        if (FileVersion == 2 || FileVersion == 3)
         {
             SymbolProfileRecordV2* rp = cast(SymbolProfileRecordV2*) bufferPos;
             bufferPos += SymbolProfileRecordV2.sizeof;
@@ -524,7 +523,7 @@ struct TraceFileTail
 }
  
 
-pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFileName = null, uint fVersion = 2)
+pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFileName = null, uint fVersion = 3)
 {
     static if (SYMBOL_TRACE)
     {
@@ -590,33 +589,69 @@ pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFi
             header.n_records = dsymbol_profile_array_count;
             // the records follow
             header.offset_records = currentOffset32();
+            import std.datetime.stopwatch : StopWatch;
+            StopWatch sw;
+            sw.reset();
+            sw.start();
             foreach(dp;dsymbol_profile_array[0 .. dsymbol_profile_array_count])
             {
                 writeRecord(dp, bufferPos, header.FileVersion);
             }
+            sw.stop();
+            import std.stdio : writeln; writeln("writing out records took: ", sw.peek());
             assert(align4(currentOffset32()) == currentOffset32());
+
 
             fprintf(stderr, "unique symbols: %d\n", n_symInfos);
             fprintf(stderr, "profile_records size: %dk\n", (bufferPos - fileBuffer) / 1024);
             // after writing the records we know how many symbols infos we have
-            header.n_symbols = n_symInfos;
-            header.n_phases = cast(uint)phases.length;
-            header.n_kinds = cast(uint)kinds.length;
+
+
+            // we write a symbolInfo file only
+            // therefore no records
 
             // write phases
             header.offset_phases = currentOffset32();
             assert(align4(currentOffset32()) == currentOffset32());
             writeStrings(bufferPos, fileBuffer, phases);
+
+            // write kinds
             header.offset_kinds = currentOffset32();
             assert(align4(currentOffset32()) == currentOffset32());
             writeStrings(bufferPos, fileBuffer, kinds);
+            sw.reset();
+            sw.start();
 
-            // now attach the metadata
-            header.offset_symbol_info_descriptors = currentOffset32();
-            writeSymInfos(bufferPos, fileBuffer);
-            //
             auto data = fileBuffer[0 .. bufferPos - fileBuffer];
             auto errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
+
+            sw.stop();
+            import std.stdio : writeln; writeln("writing records to disk took: ", sw.peek());
+
+            // ----------------------------------------------------------------------------
+
+            fileNameLength =
+                snprintf(&fileNameBuffer[0], fileNameBuffer.sizeof, "%.*s.symbol".ptr, nameStringLength, nameStringPointer);
+
+            // reset buffer
+            bufferPos = fileBuffer;
+            auto symHeader = cast(TraceFileHeader*)bufferPos;
+            bufferPos += TraceFileHeader.sizeof;
+            
+            copyAndPointPastEnd(cast(char*)&symHeader.magic_number, "DMDTRACE".ptr);
+            symHeader.FileVersion = 3;
+
+            symHeader.n_records = 0;
+            symHeader.n_kinds = 0;
+            symHeader.n_phases = 0;
+            symHeader.n_symbols = n_symInfos;
+
+            // now attach the metadata
+            symHeader.offset_symbol_info_descriptors = currentOffset32();
+            writeSymInfos(bufferPos, fileBuffer);
+
+            data = fileBuffer[0 .. bufferPos - fileBuffer];
+            errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
         }
         else
         {

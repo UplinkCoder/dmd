@@ -128,7 +128,7 @@ static SymbolProfileRecord[] readRecords()(const void[] file, const void[][] add
     {
         result = (cast(SymbolProfileRecord*)(file.ptr + header.offset_records))[0 .. header.n_records];
     }
-    else if (header.FileVersion == 2)
+    else if (header.FileVersion == 2 || header.FileVersion == 3)
     {
         import core.stdc.stdlib;
         auto source = (cast(SymbolProfileRecordV2*)(file.ptr + header.offset_records))[0 .. header.n_records];
