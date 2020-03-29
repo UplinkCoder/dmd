@@ -160,7 +160,7 @@ void main(string[] args)
             }
         }
         stderr.writeln("parentsFound: ", parentsFound, " out of ", header.n_records, " tracepoints");
-        if (!parentsFound)
+        if (!parentsFound && header.n_records)
         {
             stderr.writeln("No Parents? Something is fishy!");
             return ;
