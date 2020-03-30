@@ -6,7 +6,8 @@ void main(string[] args)
 {
 
     string[] supportedModes = [
-        "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol", "Kind", "Phase", "RandSample" ,"OutputSelfStats"
+        "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol", "Kind",
+        "Phase", "RandSample" ,"OutputSelfStats", "OutputParentTable"
     ];
 
     if (args.length < 3)
@@ -17,7 +18,11 @@ void main(string[] args)
         return;
     }
 
-    auto traceFile = args[1];
+    import std.path : setExtension;
+
+    auto originalFile = args[1];
+    auto traceFile = originalFile.setExtension(".trace");
+    auto symbolFile = originalFile.setExtension(".symbol");
 
     if (!exists(traceFile))
     {
@@ -28,7 +33,7 @@ void main(string[] args)
     auto mode = args[2];
 
     TraceFileHeader header;
-    void[] fileBytes = read(args[1]);
+    void[] fileBytes = read(originalFile);
     if (fileBytes.length < header.sizeof)
     {
         writeln("Tracefile truncated.");
@@ -309,6 +314,12 @@ void main(string[] args)
         void [] selfMemMem = (cast(void*)selfMem)[0 .. (selfMem.length * selfMem[0].sizeof)];
         std.file.write(traceFile ~ ".sm", selfMemMem);
     }
+    else if (mode == "OutputParentTable")
+    {
+        void [] parentsMem = (cast(void*)parents)[0 .. (parents.length * parents[0].sizeof)];
+        std.file.write(traceFile ~ ".pt", parentsMem);
+    }
+
 
     else
         writeln("Mode unsupported: ", mode, "\nsupported modes are: ", supportedModes);
