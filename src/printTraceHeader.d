@@ -222,7 +222,7 @@ void main(string[] args)
         }
 
         SortRecord[] sortRecords;
-        sortRecords.length = header.n_phases;
+        sortRecords.length = phases.length;
 
         foreach (i, r; records)
         {
@@ -256,7 +256,7 @@ void main(string[] args)
         }
 
         SortRecord_Kind[] sortRecords;
-        sortRecords.length = header.n_kinds;
+        sortRecords.length = kinds.length;
 
         foreach (i, r; records)
         {

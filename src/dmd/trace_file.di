@@ -1,11 +1,10 @@
 ﻿module dmd.trace_file;
 
-
 enum bitmask_lower_48 = 0xFFFF_FFFF_FFFFUL;
-enum bitmask_upper_16 = 0xFFFFUL << 32UL;
 enum bitmask_lower_32 = 0xFFFF_FFFFUL;
-enum bitmask_upper_32 = 0xFFFF_FFFFUL << 16UL;
 enum bitmask_lower_16 = 0xFFFFUL;
+enum bitmask_upper_16 = 0xFFFFUL << 32UL;
+enum bitmask_upper_32 = 0xFFFF_FFFFUL << 16UL;
 enum bitmask_upper_48 = 0xFFFF_FFFF_FFFFUL << 16UL;
 
 struct SymbolProfileRecord
@@ -48,7 +47,7 @@ struct TraceFileHeader
     uint offset_symbol_info_descriptors;
 }
 
-struct TraceFileHeaderV3
+struct TraceFileHeaderV4
 {
     ulong magic_number;
     
@@ -64,8 +63,7 @@ struct TraceFileHeaderV3
     uint offset_kinds;
     uint offset_symbol_info_descriptors;
 
-    uint n_parts;
-    uint this_part;
+    ulong hash;
 }
 
 align(1) struct SymbolInfoPointers
@@ -128,7 +126,7 @@ static SymbolProfileRecord[] readRecords()(const void[] file, const void[][] add
     {
         result = (cast(SymbolProfileRecord*)(file.ptr + header.offset_records))[0 .. header.n_records];
     }
-    else if (header.FileVersion == 2 || header.FileVersion == 3)
+    else if (header.FileVersion == 2 || header.FileVersion == 3 || header.FileVersion == 4)
     {
         import core.stdc.stdlib;
         auto source = (cast(SymbolProfileRecordV2*)(file.ptr + header.offset_records))[0 .. header.n_records];
