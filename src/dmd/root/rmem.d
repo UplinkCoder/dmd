@@ -28,6 +28,20 @@ version (GC)
 else
     enum isGCAvailable = false;
 
+void Background (alias dg, Args ...) (Args args)
+{
+	dg(args);
+}
+
+__gshared FILE* alloc_log;
+shared static this()
+{
+	alloc_log = fopen("alloc.log", "a+");
+}
+shared static ~this()
+{
+	fclose(alloc_log);
+}
 extern (C++) struct Mem
 {
     __gshared ulong allocated = 0;
@@ -60,12 +74,14 @@ extern (C++) struct Mem
         Free(p);
     }
 
-    static void* xmalloc(size_t size)  nothrow
+    extern(D)static void* xmalloc(size_t size, int line = __LINE__, string file = __FILE__)  nothrow
     {
         if (!size)
             return null;
 
         allocated += size;
+
+		Background!((size, line, file){ fprintf(alloc_log, "%s, %d, %d\n", file, line, size); })(size, line, file.ptr);
         version (GC)
             if (isGCEnabled)
                 return size ? GC.malloc(size) : null;
