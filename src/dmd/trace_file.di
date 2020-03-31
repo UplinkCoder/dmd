@@ -7,7 +7,7 @@ enum bitmask_upper_16 = 0xFFFFUL << 32UL;
 enum bitmask_upper_32 = 0xFFFF_FFFFUL << 16UL;
 enum bitmask_upper_48 = 0xFFFF_FFFF_FFFFUL << 16UL;
 
-struct SymbolProfileRecord
+extern(C) struct SymbolProfileRecord
 {
     ulong begin_ticks;
     ulong end_ticks;
@@ -20,7 +20,7 @@ struct SymbolProfileRecord
     ushort phase_id;
 }
 
-struct SymbolProfileRecordV2
+extern(C) struct SymbolProfileRecordV2
 {
     // represents 4 48 bit values
     ulong[3] begin_ticks_48_end_ticks_48_begin_memomry_48_end_memory_48;
@@ -30,7 +30,7 @@ struct SymbolProfileRecordV2
 }
 
 
-struct TraceFileHeader
+extern (C) struct TraceFileHeader
 {
     ulong magic_number;
 
@@ -47,7 +47,7 @@ struct TraceFileHeader
     uint offset_symbol_info_descriptors;
 }
 
-struct TraceFileHeaderV4
+extern (C) struct TraceFileHeaderV4
 {
     ulong magic_number;
     
