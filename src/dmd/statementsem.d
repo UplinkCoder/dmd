@@ -146,19 +146,16 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(Statement s)
     {
-        import dmd.trace; mixin(traceString("s", "StatementSemantic::" ~ typeof(s).stringof));
         result = s;
     }
 
     override void visit(ErrorStatement s)
     {
-        import dmd.trace; mixin(traceString("s", "StatementSemantic::" ~ typeof(s).stringof));
         result = s;
     }
 
     override void visit(PeelStatement s)
     {
-        import dmd.trace; mixin(traceString("s", "StatementSemantic::" ~ typeof(s).stringof));
         /* "peel" off this wrapper, and don't run semantic()
          * on the result.
          */
@@ -167,7 +164,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(ExpStatement s)
     {
-        import dmd.trace; mixin(traceString("s", "StatementSemantic::" ~ typeof(s).stringof));
         /* https://dlang.org/spec/statement.html#expression-statement
          */
 
@@ -201,7 +197,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(CompileStatement cs)
     {
-        import dmd.trace; mixin(traceString("cs", "StatementSemantic::" ~ typeof(cs).stringof));
         /* https://dlang.org/spec/statement.html#mixin-statement
          */
 
@@ -215,7 +210,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(CompoundStatement cs)
     {
-        import dmd.trace; mixin(traceString("cs", "StatementSemantic::" ~ typeof(cs).stringof));
         //printf("CompoundStatement::semantic(this = %p, sc = %p)\n", cs, sc);
         version (none)
         {
@@ -402,7 +396,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(UnrolledLoopStatement uls)
     {
-        import dmd.trace; mixin(traceString("uls", "StatementSemantic::" ~ typeof(uls).stringof));
         //printf("UnrolledLoopStatement::semantic(this = %p, sc = %p)\n", uls, sc);
         Scope* scd = sc.push();
         scd.sbreak = uls;
@@ -426,7 +419,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(ScopeStatement ss)
     {
-        import dmd.trace; mixin(traceString("ss", "StatementSemantic::" ~ typeof(ss).stringof));
         //printf("ScopeStatement::semantic(sc = %p)\n", sc);
         if (ss.statement)
         {
@@ -472,7 +464,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(ForwardingStatement ss)
     {
-        import dmd.trace; mixin(traceString("ss", "StatementSemantic::" ~ typeof(ss).stringof));
         assert(ss.sym);
         for (Scope* csc = sc; !ss.sym.forward; csc = csc.enclosing)
         {
@@ -489,7 +480,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(WhileStatement ws)
     {
-        import dmd.trace; mixin(traceString("ws", "StatementSemantic::" ~ typeof(ws).stringof));
         /* Rewrite as a for(;condition;) loop
          * https://dlang.org/spec/statement.html#while-statement
          */
@@ -500,7 +490,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(DoStatement ds)
     {
-        import dmd.trace; mixin(traceString("ds", "StatementSemantic::" ~ typeof(ds).stringof));
         /* https://dlang.org/spec/statement.html#do-statement
          */
         const inLoopSave = sc.inLoop;
@@ -537,7 +526,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(ForStatement fs)
     {
-        import dmd.trace; mixin(traceString("fs", "StatementSemantic::" ~ typeof(fs).stringof));
         /* https://dlang.org/spec/statement.html#for-statement
          */
         //printf("ForStatement::semantic %s\n", fs.toChars());
@@ -1050,7 +1038,6 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
 
     override void visit(ForeachStatement fs)
     {
-        import dmd.trace; mixin(traceString("fs", "StatementSemantic::" ~ typeof(fs).stringof));
         /* https://dlang.org/spec/statement.html#foreach-statement
          */
 
@@ -2024,7 +2011,6 @@ else
 
     override void visit(ForeachRangeStatement fs)
     {
-        import dmd.trace; mixin(traceString("fs", "StatementSemantic::" ~ typeof(fs).stringof));
         /* https://dlang.org/spec/statement.html#foreach-range-statement
          */
 
@@ -2211,7 +2197,6 @@ else
 
     override void visit(IfStatement ifs)
     {
-        import dmd.trace; mixin(traceString("ifs", "StatementSemantic::" ~ typeof(ifs).stringof));
         /* https://dlang.org/spec/statement.html#IfStatement
          */
 
@@ -2304,7 +2289,6 @@ else
 
     override void visit(ConditionalStatement cs)
     {
-        import dmd.trace; mixin(traceString("cs", "StatementSemantic::" ~ typeof(cs).stringof));
         //printf("ConditionalStatement::semantic()\n");
 
         // If we can short-circuit evaluate the if statement, don't do the
@@ -2334,7 +2318,6 @@ else
 
     override void visit(PragmaStatement ps)
     {
-        import dmd.trace; mixin(traceString("ps", "StatementSemantic::" ~ typeof(ps).stringof));
         /* https://dlang.org/spec/statement.html#pragma-statement
          */
         // Should be merged with PragmaDeclaration
@@ -2493,13 +2476,11 @@ else
 
     override void visit(StaticAssertStatement s)
     {
-        import dmd.trace; mixin(traceString("s", "StatementSemantic::" ~ typeof(s).stringof));
         s.sa.semantic2(sc);
     }
 
     override void visit(SwitchStatement ss)
     {
-        import dmd.trace; mixin(traceString("ss", "StatementSemantic::" ~ typeof(ss).stringof));
         /* https://dlang.org/spec/statement.html#switch-statement
          */
 
@@ -2791,7 +2772,6 @@ else
 
     override void visit(CaseStatement cs)
     {
-        import dmd.trace; mixin(traceString("cs", "StatementSemantic::" ~ typeof(cs).stringof));
         SwitchStatement sw = sc.sw;
         bool errors = false;
 
@@ -2925,7 +2905,6 @@ else
 
     override void visit(CaseRangeStatement crs)
     {
-        import dmd.trace; mixin(traceString("crs", "StatementSemantic::" ~ typeof(crs).stringof));
         SwitchStatement sw = sc.sw;
         if (sw is null)
         {
@@ -3009,7 +2988,6 @@ else
 
     override void visit(DefaultStatement ds)
     {
-        import dmd.trace; mixin(traceString("ds", "StatementSemantic::" ~ typeof(ds).stringof));
         //printf("DefaultStatement::semantic()\n");
         bool errors = false;
         if (sc.sw)
@@ -3049,7 +3027,6 @@ else
 
     override void visit(GotoDefaultStatement gds)
     {
-        import dmd.trace; mixin(traceString("gds", "StatementSemantic::" ~ typeof(gds).stringof));
         /* https://dlang.org/spec/statement.html#goto-statement
          */
 
@@ -3069,7 +3046,6 @@ else
 
     override void visit(GotoCaseStatement gcs)
     {
-        import dmd.trace; mixin(traceString("gcs", "StatementSemantic::" ~ typeof(gcs).stringof));
         /* https://dlang.org/spec/statement.html#goto-statement
          */
 
@@ -3094,7 +3070,6 @@ else
 
     override void visit(ReturnStatement rs)
     {
-        import dmd.trace; mixin(traceString("rs", "StatementSemantic::" ~ typeof(rs).stringof));
         /* https://dlang.org/spec/statement.html#return-statement
          */
 
@@ -3452,7 +3427,6 @@ else
 
     override void visit(BreakStatement bs)
     {
-        import dmd.trace; mixin(traceString("bs", "StatementSemantic::" ~ typeof(bs).stringof));
         /* https://dlang.org/spec/statement.html#break-statement
          */
 
@@ -3531,7 +3505,6 @@ else
 
     override void visit(ContinueStatement cs)
     {
-        import dmd.trace; mixin(traceString("cs", "StatementSemantic::" ~ typeof(cs).stringof));
         /* https://dlang.org/spec/statement.html#continue-statement
          */
 
@@ -3619,7 +3592,6 @@ else
 
     override void visit(SynchronizedStatement ss)
     {
-        import dmd.trace; mixin(traceString("ss", "StatementSemantic::" ~ typeof(ss).stringof));
         /* https://dlang.org/spec/statement.html#synchronized-statement
          */
 
@@ -3745,7 +3717,6 @@ else
 
     override void visit(WithStatement ws)
     {
-        import dmd.trace; mixin(traceString("ws", "StatementSemantic::" ~ typeof(ws).stringof));
         /* https://dlang.org/spec/statement.html#with-statement
          */
 
@@ -3859,7 +3830,6 @@ else
     // https://dlang.org/spec/statement.html#TryStatement
     override void visit(TryCatchStatement tcs)
     {
-        import dmd.trace; mixin(traceString("tcs", "StatementSemantic::" ~ typeof(tcs).stringof));
         //printf("TryCatchStatement.semantic()\n");
 
         if (!global.params.useExceptions)
@@ -3959,7 +3929,6 @@ else
 
     override void visit(TryFinallyStatement tfs)
     {
-        import dmd.trace; mixin(traceString("tfs", "StatementSemantic::" ~ typeof(tfs).stringof));
         //printf("TryFinallyStatement::semantic()\n");
         tfs._body = tfs._body.statementSemantic(sc);
 
@@ -3999,7 +3968,6 @@ else
 
     override void visit(ScopeGuardStatement oss)
     {
-        import dmd.trace; mixin(traceString("oss", "StatementSemantic::" ~ typeof(oss).stringof));
         /* https://dlang.org/spec/statement.html#scope-guard-statement
          */
 
@@ -4043,7 +4011,6 @@ else
 
     override void visit(ThrowStatement ts)
     {
-        import dmd.trace; mixin(traceString("ts", "StatementSemantic::" ~ typeof(ts).stringof));
         /* https://dlang.org/spec/statement.html#throw-statement
          */
 
@@ -4090,7 +4057,6 @@ else
 
     override void visit(DebugStatement ds)
     {
-        import dmd.trace; mixin(traceString("ds", "StatementSemantic::" ~ typeof(ds).stringof));
         if (ds.statement)
         {
             sc = sc.push();
@@ -4103,7 +4069,6 @@ else
 
     override void visit(GotoStatement gs)
     {
-        import dmd.trace; mixin(traceString("gs", "StatementSemantic::" ~ typeof(gs).stringof));
         /* https://dlang.org/spec/statement.html#goto-statement
          */
 
@@ -4145,7 +4110,6 @@ else
 
     override void visit(LabelStatement ls)
     {
-        import dmd.trace; mixin(traceString("ls", "StatementSemantic::" ~ typeof(ls).stringof));
         //printf("LabelStatement::semantic()\n");
         FuncDeclaration fd = sc.parent.isFuncDeclaration();
 
@@ -4178,7 +4142,6 @@ else
 
     override void visit(AsmStatement s)
     {
-        import dmd.trace; mixin(traceString("s", "StatementSemantic::" ~ typeof(s).stringof));
         /* https://dlang.org/spec/statement.html#asm
          */
 
@@ -4187,7 +4150,6 @@ else
 
     override void visit(CompoundAsmStatement cas)
     {
-        import dmd.trace; mixin(traceString("cas", "StatementSemantic::" ~ typeof(cas).stringof));
         // Apply postfix attributes of the asm block to each statement.
         sc = sc.push();
         sc.stc |= cas.stc;
@@ -4212,7 +4174,6 @@ else
 
     override void visit(ImportStatement imps)
     {
-        import dmd.trace; mixin(traceString("imps", "StatementSemantic::" ~ typeof(imps).stringof));
         /* https://dlang.org/spec/module.html#ImportDeclaration
          */
 
