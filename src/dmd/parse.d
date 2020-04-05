@@ -3597,6 +3597,10 @@ final class Parser(AST) : Lexer
         //printf("parseBasicType()\n");
         switch (token.value)
         {
+        case TOK.alias_ :
+            t = AST.Type.talias;
+            goto LabelX;
+
         case TOK.void_:
             t = AST.Type.tvoid;
             goto LabelX;
