@@ -802,7 +802,7 @@ auto initCodegenWorkerThreads()
                 pthread_create(&result[i], null, &codegenLoop, null);
             }
             return () {
-                enqueue_FuncDeclarartion_toObjFile(TerminationOrder, false);
+                enqueue_FuncDeclaration_toObjFile(TerminationOrder, false);
                 for(int i = 0; i < MAX_WORKER_THREADS; i++)
                     pthread_join(result[i], null);
             };
@@ -816,7 +816,7 @@ auto initCodegenWorkerThreads()
                 result[i] = new Thread(&codegenLoop).start();
             }
             return () {
-                enqueue_FuncDeclarartion_toObjFile(TerminationOrder, false);
+                enqueue_FuncDeclaration_toObjFile(TerminationOrder, false);
                 for(int i = 0; i < MAX_WORKER_THREADS; i++)
                     result[i].join();
             };
@@ -827,7 +827,7 @@ auto initCodegenWorkerThreads()
 enum no_threads = 0;
 
 alias wait_handle = uint;
-wait_handle enqueue_FuncDeclarartion_toObjFile(FuncDeclaration fd, bool multiobj)
+wait_handle enqueue_FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
 {
     static if (no_threads)
     {

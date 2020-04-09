@@ -307,7 +307,10 @@ void toObjFile(Dsymbol ds, bool multiobj)
         override void visit(FuncDeclaration fd)
         {
 
-            enqueue_FuncDeclarartion_toObjFile(fd, multiobj);
+            enqueue_FuncDeclaration_toObjFile(fd, multiobj);
+            import core.thread;
+            // we currently can't reliably wait for the completion of this ...
+            Thread.sleep(300.msecs);
             // in glue.c
             // FuncDeclaration_toObjFile(fd, multiobj);
         }
