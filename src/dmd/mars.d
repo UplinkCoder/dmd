@@ -558,7 +558,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     backend_init();
     // should be part of backend init ...
     import dmd.glue;
-    initCodegenWorkerThreads();
+    auto joinDg = initCodegenWorkerThreads();
     // Do semantic analysis
     foreach (m; modules)
     {
@@ -735,6 +735,8 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     }
     if (params.lib && !global.errors)
         library.write();
+    // backends terminates we've gotta join our workers
+    joinDg();
     backend_term();
     if (global.errors)
         fatal();

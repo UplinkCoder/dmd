@@ -89,12 +89,11 @@ __gshared
 }
 
 
+__gshared Dsymbols obj_symbols_towrite; /// this is _shared_
+
 /**************************************
  * Append s to list of object files to generate later.
  */
-
-__gshared Dsymbols obj_symbols_towrite;
-
 void obj_append(Dsymbol s)
 {
     //printf("deferred: %s\n", s.toChars());
@@ -713,7 +712,7 @@ __gshared FuncDeclaration_toObjFile_work[512]* backQueuePtr;
 __gshared FuncDeclaration_toObjFile_work[512] codegenFrontQueue;
 __gshared FuncDeclaration_toObjFile_work[512] codegenBackQueue;
 
-enum MAX_WORKER_THREADS = 10;
+enum MAX_WORKER_THREADS = 1;
 
 void swapQueues()
 {
@@ -722,6 +721,8 @@ void swapQueues()
     backQueuePtr = oldFront;
 }
 
+__gshared FuncDeclaration TerminationOrder = FuncDeclaration.init;
+
 extern(C) void* codegenLoop(void* arg)
 {
 
@@ -729,10 +730,46 @@ extern(C) void* codegenLoop(void* arg)
     import core.time;
     for(;;)
     {
-        printf("Waiting for codegen-work\n ....");
-        int maybeTrue = false;
-        if (maybeTrue) break;
-        Thread.sleep(2000.msecs);
+/*
+        if (codegenQueueCount < 64)
+        {
+            printf("Waiting for codegen-work queue to be full enough\n");    
+            Thread.sleep(64.usecs);
+        }
+*/      bool Terminate = false;  
+        {
+            import dmd.queue;
+            uint FrontQueueCount = 0;
+            if (!codegenQueueLocked)
+            {
+                mixin(LockQueue("codegenQueueLocked"));
+                {
+                    FrontQueueCount = codegenQueueCount;
+                    codegenQueueCount = 0;
+                    swapQueues();
+                }
+                mixin(UnlockQueue("codegenQueueLocked"));
+
+                const frontQueue = *frontQueuePtr;
+                for(int i = 0; i < FrontQueueCount; i++)
+                {
+                    auto work = cast()frontQueue[i];
+
+                    if (work.fd == TerminationOrder)
+                    {
+                        printf("We got the termination Order\n");
+                        Terminate = true;
+                        break;
+                    }
+
+                    printf("Doing codegen for %s\n", work.fd.toChars());
+                    FuncDeclaration_toObjFile(work.fd, work.multiobj);
+                }
+            }
+        }
+
+        if (Terminate)
+            break;
     }
     return cast(void*)0x773455668;
 }
@@ -765,6 +802,7 @@ auto initCodegenWorkerThreads()
                 pthread_create(&result[i], null, &codegenLoop, null);
             }
             return () {
+                enqueue_FuncDeclarartion_toObjFile(TerminationOrder, false);
                 for(int i = 0; i < MAX_WORKER_THREADS; i++)
                     pthread_join(result[i], null);
             };
@@ -778,6 +816,7 @@ auto initCodegenWorkerThreads()
                 result[i] = new Thread(&codegenLoop).start();
             }
             return () {
+                enqueue_FuncDeclarartion_toObjFile(TerminationOrder, false);
                 for(int i = 0; i < MAX_WORKER_THREADS; i++)
                     result[i].join();
             };
@@ -808,9 +847,8 @@ wait_handle enqueue_FuncDeclarartion_toObjFile(FuncDeclaration fd, bool multiobj
                 assert(codegenQueueCount < 480, "Queue got too full");
                 mixin(LockQueue("codegenQueueLocked"));
                 {
-                    result = codegenQueueNextEntry;
-                    codegenQueueCount++;
-                    (*backQueuePtr)[codegenQueueNextEntry++] = FuncDeclaration_toObjFile_work(fd, multiobj);
+                    result = codegenQueueCount;
+                    (*backQueuePtr)[codegenQueueCount++] = FuncDeclaration_toObjFile_work(fd, multiobj);
                 }
                 mixin(UnlockQueue("codegenQueueLocked"));
                 break;
@@ -820,6 +858,8 @@ wait_handle enqueue_FuncDeclarartion_toObjFile(FuncDeclaration fd, bool multiobj
                 mixin(__mmPause);
             }
         }
+
+        return result;
     }
 }
 
