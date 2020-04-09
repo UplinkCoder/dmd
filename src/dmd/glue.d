@@ -387,7 +387,9 @@ void genObjFile(Module m, bool multiobj)
         //printf("toObjFile %s %s\n", member.kind(), member.toChars());
         toObjFile(member, multiobj);
     }
-
+    import core.thread;
+    import core.time;
+    Thread.sleep(350.msecs);
     if (global.params.cov)
     {
         /* Generate
