@@ -306,8 +306,10 @@ void toObjFile(Dsymbol ds, bool multiobj)
 
         override void visit(FuncDeclaration fd)
         {
+
+            enqueue_FuncDeclarartion_toObjFile(fd, multiobj);
             // in glue.c
-            FuncDeclaration_toObjFile(fd, multiobj);
+            // FuncDeclaration_toObjFile(fd, multiobj);
         }
 
         override void visit(ClassDeclaration cd)

@@ -698,6 +698,130 @@ private UnitTestDeclaration needsDeferredNested(FuncDeclaration fd)
     return null;
 }
 
+struct FuncDeclaration_toObjFile_work
+{
+    FuncDeclaration fd;
+    bool multiobj;
+}
+
+extern(D) align(16) shared uint codegenQueueLocked;
+__gshared uint codegenQueueNextEntry;
+__gshared uint codegenQueueCount;
+__gshared FuncDeclaration_toObjFile_work[512]* frontQueuePtr;
+__gshared FuncDeclaration_toObjFile_work[512]* backQueuePtr;
+
+__gshared FuncDeclaration_toObjFile_work[512] codegenFrontQueue;
+__gshared FuncDeclaration_toObjFile_work[512] codegenBackQueue;
+
+enum MAX_WORKER_THREADS = 10;
+
+void swapQueues()
+{
+    auto oldFront = frontQueuePtr;
+    frontQueuePtr = backQueuePtr;
+    backQueuePtr = oldFront;
+}
+
+extern(C) void* codegenLoop(void* arg)
+{
+
+    import core.thread;
+    import core.time;
+    for(;;)
+    {
+        printf("Waiting for codegen-work\n ....");
+        int maybeTrue = false;
+        if (maybeTrue) break;
+        Thread.sleep(2000.msecs);
+    }
+    return cast(void*)0x773455668;
+}
+
+
+/// Returns:
+///     Delegate which joins all the threads for cleanup
+/// 
+auto initCodegenWorkerThreads()
+{
+//    static if (no_threads)
+//    {
+//        void[0] nothing;
+//        return cast(void)nothing;
+//    }
+//    else
+    {
+        backQueuePtr = &codegenBackQueue;
+        frontQueuePtr = &codegenFrontQueue;
+
+        (cast()codegenQueueLocked) = 0;
+
+        version (linux)
+        {
+            import core.sys.posix.pthread;
+            pthread_t[MAX_WORKER_THREADS] result;
+            for(int i = 0; i < /*min(workerThreadCount, */(MAX_WORKER_THREADS); i++)
+            {
+                import core.sys.posix.pthread;
+                pthread_create(&result[i], null, &codegenLoop, null);
+            }
+            return () {
+                for(int i = 0; i < MAX_WORKER_THREADS; i++)
+                    pthread_join(result[i], null);
+            };
+        }
+        else
+        {
+            import core.thread;
+            Thread[MAX_WORKER_THREADS] result;
+            for(int i = 0; i < min(workerThreadCount, MAX_WORKER_THREADS); i++)
+            {
+                result[i] = new Thread(&codegenLoop).start();
+            }
+            return () {
+                for(int i = 0; i < MAX_WORKER_THREADS; i++)
+                    result[i].join();
+            };
+        }
+    }   
+}
+
+enum no_threads = 0;
+
+alias wait_handle = uint;
+wait_handle enqueue_FuncDeclarartion_toObjFile(FuncDeclaration fd, bool multiobj)
+{
+    static if (no_threads)
+    {
+        FuncDeclaration_toObjFile(fd, multiobj);
+        return 0;
+    }
+    else
+    {
+        import dmd.queue;
+
+        wait_handle result;
+
+        for (;;)
+        {
+            if (!codegenQueueLocked)
+            {
+                assert(codegenQueueCount < 480, "Queue got too full");
+                mixin(LockQueue("codegenQueueLocked"));
+                {
+                    result = codegenQueueNextEntry;
+                    codegenQueueCount++;
+                    (*backQueuePtr)[codegenQueueNextEntry++] = FuncDeclaration_toObjFile_work(fd, multiobj);
+                }
+                mixin(UnlockQueue("codegenQueueLocked"));
+                break;
+            }
+            else
+            {
+                mixin(__mmPause);
+            }
+        }
+    }
+}
 
 void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
 {

@@ -556,7 +556,9 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         removeHdrFilesAndFail(params, modules);
 
     backend_init();
-
+    // should be part of backend init ...
+    import dmd.glue;
+    initCodegenWorkerThreads();
     // Do semantic analysis
     foreach (m; modules)
     {
