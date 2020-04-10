@@ -67,11 +67,9 @@ string LockQueue(string lock)
     static if (debug_threading)
     {
         import core.sys.posix.pthread;
-        printf("Trying to Lock %s\n", lbl.ptr);
     LtryAgain:
         auto retval = pthread_spin_trylock(lockPtr);
-        printf("pthread_spin_trylock(lockPtr) = %d at %s\n", retval, lbl.ptr);
-        while(retval != 0) {` ~ __mmPause ~ ` printf("lockedBy: %s\n", lockedBy); goto LtryAgain;}
+        while(retval != 0) {` ~ __mmPause ~ ` goto LtryAgain;}
         printf("Lock has been locked\n");
         lockedBy = lbl.ptr;
     }
@@ -136,9 +134,7 @@ string UnlockQueue(string lock)
         return `
         auto lockPtr = &` ~ lock ~ `;
         import core.sys.posix.pthread;
-        printf("trying to unlock\n");
         pthread_spin_unlock(lockPtr);
-        printf("lock as been unlocked\n");
         lockedBy = "Unlocked";
         `;
     }
