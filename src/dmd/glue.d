@@ -389,7 +389,7 @@ void genObjFile(Module m, bool multiobj)
     }
     import core.thread;
     import core.time;
-    Thread.sleep(350.msecs);
+    Thread.sleep(100.msecs);
     if (global.params.cov)
     {
         /* Generate
@@ -698,14 +698,21 @@ private UnitTestDeclaration needsDeferredNested(FuncDeclaration fd)
     }
     return null;
 }
-
+import dmd.queue : debug_threading;
 struct FuncDeclaration_toObjFile_work
 {
     FuncDeclaration fd;
     bool multiobj;
 }
-
-extern(D) align(16) shared uint codegenQueueLocked;
+static if (debug_threading)
+{
+    import core.sys.posix.pthread;
+    extern(D) align(16) __gshared pthread_spinlock_t codegenQueueLocked;
+}
+else
+{
+    extern(D) align(16) shared uint codegenQueueLocked;
+}
 __gshared uint codegenQueueNextEntry;
 __gshared uint codegenQueueCount;
 __gshared FuncDeclaration_toObjFile_work[512]* frontQueuePtr;
@@ -713,11 +720,13 @@ __gshared FuncDeclaration_toObjFile_work[512]* backQueuePtr;
 
 __gshared FuncDeclaration_toObjFile_work[512] codegenFrontQueue;
 __gshared FuncDeclaration_toObjFile_work[512] codegenBackQueue;
+__gshared bool codegenQueueIsLocked;
 
 enum MAX_WORKER_THREADS = 1;
 
 void swapQueues()
 {
+    assert(codegenQueueIsLocked);
     auto oldFront = frontQueuePtr;
     frontQueuePtr = backQueuePtr;
     backQueuePtr = oldFront;
@@ -727,7 +736,6 @@ __gshared FuncDeclaration TerminationOrder = FuncDeclaration.init;
 
 extern(C) void* codegenLoop(void* arg)
 {
-
     import core.thread;
     import core.time;
     for(;;)
@@ -742,16 +750,18 @@ extern(C) void* codegenLoop(void* arg)
         {
             import dmd.queue;
             uint FrontQueueCount = 0;
-            if (!codegenQueueLocked)
+            if (codegenQueueCount && !codegenQueueIsLocked)
             {
                 mixin(LockQueue("codegenQueueLocked"));
                 {
+                    codegenQueueIsLocked = true;
                     FrontQueueCount = codegenQueueCount;
                     codegenQueueCount = 0;
                     swapQueues();
                 }
                 mixin(UnlockQueue("codegenQueueLocked"));
-
+                codegenQueueIsLocked = false;
+               
                 const frontQueue = *frontQueuePtr;
                 for(int i = 0; i < FrontQueueCount; i++)
                 {
@@ -767,6 +777,12 @@ extern(C) void* codegenLoop(void* arg)
                     printf("Doing codegen for %s\n", work.fd.toChars());
                     FuncDeclaration_toObjFile(work.fd, work.multiobj);
                 }
+                mixin(__mmPause);
+            }
+            else
+            {
+                Thread.sleep(1.msecs);
+                mixin(__mmPause);
             }
         }
 
@@ -792,8 +808,17 @@ auto initCodegenWorkerThreads()
         backQueuePtr = &codegenBackQueue;
         frontQueuePtr = &codegenFrontQueue;
 
-        (cast()codegenQueueLocked) = 0;
-
+        static if (debug_threading)
+        {
+            printf("Initalizing spinlock\n");
+            pthread_spin_init(&codegenQueueLocked, false);
+            codegenQueueIsLocked = false;
+        }
+        else
+        {
+            (cast()codegenQueueLocked) = 0;
+            codegenQueueIsLocked = false;
+        }
         version (linux)
         {
             import core.sys.posix.pthread;
@@ -804,9 +829,11 @@ auto initCodegenWorkerThreads()
                 pthread_create(&result[i], null, &codegenLoop, null);
             }
             return () {
-                enqueue_FuncDeclaration_toObjFile(TerminationOrder, false);
                 for(int i = 0; i < MAX_WORKER_THREADS; i++)
+                {
+                    enqueue_FuncDeclaration_toObjFile(TerminationOrder, false);
                     pthread_join(result[i], null);
+                }
             };
         }
         else
@@ -818,9 +845,11 @@ auto initCodegenWorkerThreads()
                 result[i] = new Thread(&codegenLoop).start();
             }
             return () {
-                enqueue_FuncDeclaration_toObjFile(TerminationOrder, false);
                 for(int i = 0; i < MAX_WORKER_THREADS; i++)
+                {
+                    enqueue_FuncDeclaration_toObjFile(TerminationOrder, false);
                     result[i].join();
+                }
             };
         }
     }   
@@ -844,19 +873,24 @@ wait_handle enqueue_FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
 
         for (;;)
         {
-            if (!codegenQueueLocked)
+            if (!codegenQueueIsLocked)
             {
-                assert(codegenQueueCount < 480, "Queue got too full");
                 mixin(LockQueue("codegenQueueLocked"));
+                codegenQueueIsLocked = true;
+                assert(codegenQueueCount < 480, "Queue got too full");
                 {
                     result = codegenQueueCount;
                     (*backQueuePtr)[codegenQueueCount++] = FuncDeclaration_toObjFile_work(fd, multiobj);
                 }
                 mixin(UnlockQueue("codegenQueueLocked"));
+                codegenQueueIsLocked = false;
                 break;
             }
             else
             {
+                import core.thread;
+                import core.time;
+                Thread.sleep(1.usecs);
                 mixin(__mmPause);
             }
         }

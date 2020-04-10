@@ -33,7 +33,6 @@ import dmd.backend.global;
 import dmd.backend.goh;
 import dmd.backend.obj;
 import dmd.backend.oper;
-import dmd.backend.outbuf;
 import dmd.backend.rtlsym;
 import dmd.backend.ty;
 import dmd.backend.type;
