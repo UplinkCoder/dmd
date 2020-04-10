@@ -13,6 +13,12 @@ immutable string readFence = ``;
 immutable string writeFence = ``;
 enum debug_threading = 1;
 
+static if (debug_threading)
+{
+    pragma(lib, "libittnotify.a");
+    public import ittnotify;
+}
+
 extern(C) uint GetThreadId()
 {
     asm nothrow {
