@@ -15,8 +15,8 @@ enum debug_threading = 1;
 
 static if (debug_threading)
 {
-    pragma(lib, "libittnotify.a");
     public import ittnotify;
+    extern(C) void __itt_suppress_mark_range (__itt_suppress_mode_t mode, uint mask, void* address, size_t size);
 }
 
 extern(C) uint GetThreadId()
