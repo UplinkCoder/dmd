@@ -698,29 +698,6 @@ private UnitTestDeclaration needsDeferredNested(FuncDeclaration fd)
     }
     return null;
 }
-extern (C)
-{
-    enum __itt_suppress_all_errors = 0x7fffffff;
-    enum __itt_suppress_threading_errors = 0x000000ff;
-    enum __itt_suppress_memory_errors = 0x0000ff00;
-
-
-    enum __itt_suppress_mode
-    {
-        __itt_unsuppress_range = 0,
-        __itt_suppress_range = 1
-    }
-    enum __itt_unsuppress_range = __itt_suppress_mode.__itt_unsuppress_range;
-    enum __itt_suppress_range = __itt_suppress_mode.__itt_suppress_range;
-    
-
-    alias __itt_suppress_mode_t = __itt_suppress_mode;
-
-    /**
-    * @brief Mark a range of memory for error suppression or unsuppression for error types included in mask
-    */
-    alias __itt_suppress_mark_range_t = void function (__itt_suppress_mode_t mode, uint mask, void* address, size_t size);
-}
 
 import dmd.queue : debug_threading;
 struct FuncDeclaration_toObjFile_work
@@ -815,7 +792,7 @@ extern(C) void* codegenLoop(void* arg)
     }
     return cast(void*)0x773455668;
 }
-
+import dmd.queue;
 
 /// Returns:
 ///     Delegate which joins all the threads for cleanup
@@ -834,21 +811,13 @@ auto initCodegenWorkerThreads()
 
         static if (debug_threading)
         {
-            import core.sys.posix.dlfcn;
-            auto lib = dlopen("/home/uplink/intel/inspector_2020.1.0.604266/lib64/runtime/libittnotify.so".ptr, RTLD_NOW);
-            auto itt_api_version = cast(void* function ()) dlsym(lib, "__itt_api_version");
-            auto __itt_suppress_mark_range = cast(__itt_suppress_mark_range_t)  dlsym(lib, "__itt_suppress_mark_range");
-            printf("itt version_ptr: %x\n", itt_api_version);
-            printf("itt __itt_suppress_mark_range: %x\n", __itt_suppress_mark_range);
-            printf("itt version = %s\n", /*__itt_api_version()*/itt_api_version());
             // __itt_suppress_mark_range_init_3_0();
             printf("Initalizing spinlock\n");
             pthread_spin_init(&codegenQueueLocked, false);
             codegenQueueIsLocked = false;
 
-            __itt_suppress_mark_range(__itt_suppress_range, __itt_suppress_all_errors, &codegenQueueIsLocked, codegenQueueIsLocked.sizeof);
-            __itt_suppress_mark_range(__itt_suppress_range, __itt_suppress_all_errors, &codegenQueueCount, codegenQueueCount.sizeof);
-
+            SuppressRace(&codegenQueueIsLocked, codegenQueueIsLocked.sizeof);
+            SuppressRace(&codegenQueueCount, codegenQueueCount.sizeof);
         }
         else
         {

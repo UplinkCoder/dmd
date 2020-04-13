@@ -13,12 +13,6 @@ immutable string readFence = ``;
 immutable string writeFence = ``;
 enum debug_threading = 1;
 
-static if (debug_threading)
-{
-    public import ittnotify;
-    extern(C) void __itt_suppress_mark_range (__itt_suppress_mode_t mode, uint mask, void* address, size_t size);
-}
-
 extern(C) uint GetThreadId()
 {
     asm nothrow {
@@ -141,3 +135,87 @@ string UnlockQueue(string lock)
     else
     return "(*(&" ~ lock ~ ")) = 0;";
 }
+
+extern (C)
+{
+    enum __itt_suppress_all_errors = 0x7fffffff;
+    enum __itt_suppress_threading_errors = 0x000000ff;
+    enum __itt_suppress_memory_errors = 0x0000ff00;
+
+
+    enum __itt_suppress_mode
+    {
+        __itt_unsuppress_range = 0,
+        __itt_suppress_range = 1
+    }
+    enum __itt_unsuppress_range = __itt_suppress_mode.__itt_unsuppress_range;
+    enum __itt_suppress_range = __itt_suppress_mode.__itt_suppress_range;
+
+
+    alias __itt_suppress_mode_t = __itt_suppress_mode;
+
+    /**
+    * @brief Mark a range of memory for error suppression or unsuppression for error types included in mask
+    */
+    alias __itt_suppress_mark_range_t = void function (__itt_suppress_mode_t mode, uint mask, void* address, size_t size);
+    alias __itt_api_version_t = char* function ();
+}
+
+__gshared static __itt_suppress_mark_range_t __itt_suppress_mark_range;
+__gshared static  __itt_api_version_t __itt_api_version;
+
+static if (debug_threading)
+{
+    __gshared static bool itt_loaded = false;
+    __gshared static bool itt_load_attempted = false;
+
+    void loadItt()
+    {
+        import core.stdc.stdio;
+        printf("Calling loadItt()\n");
+        if (itt_load_attempted)
+            return ;
+        itt_load_attempted = true;
+
+        import core.sys.posix.dlfcn;
+        import core.stdc.stdlib;
+        import core.stdc.string;
+        char[255] pathbuf;
+        char* inspector_path_prefix = getenv("INSPECTOR_2020_DIR");
+        if (inspector_path_prefix)
+        {
+            strcpy(&pathbuf[0], inspector_path_prefix);
+            strcat(&pathbuf[0], "/lib64/runtime/libittnotify.so");
+            printf("libpath: %s\n", &pathbuf);
+
+            auto lib = dlopen(&pathbuf[0], RTLD_NOW);
+            if (lib)
+            {
+                __itt_suppress_mark_range = cast(__itt_suppress_mark_range_t) dlsym(lib, "__itt_suppress_mark_range");
+                __itt_api_version = cast(__itt_api_version_t) dlsym(lib, "__itt_api_version");
+                itt_loaded = true;
+            }
+            else
+            {
+                itt_loaded = false;
+                printf("loading intel insepector failed ... %s\n", dlerror());
+                // another dlerror to clear out the thing
+                dlerror();
+            }
+        }
+    }
+
+    void SuppressRace(void* var, size_t var_size)
+    {
+        if (!itt_load_attempted)
+        {
+            loadItt();
+            import core.stdc.stdio;
+        }
+        if(itt_loaded)
+        {
+            __itt_suppress_mark_range(__itt_suppress_range, __itt_suppress_threading_errors, var, var_size);
+        } 
+    }
+}
+
