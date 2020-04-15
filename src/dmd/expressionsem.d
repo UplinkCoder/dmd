@@ -77,7 +77,7 @@ import dmd.utf;
 import dmd.utils;
 import dmd.visitor;
 
-enum LOGSEMANTIC = false;
+enum LOGSEMANTIC = true;
 
 /********************************************************
  * Perform semantic analysis and CTFE on expressions to produce
@@ -3010,6 +3010,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     override void visit(TupleExp exp)
     {
+        if (sc.flags & SCOPE.dotdotdot)
+        {
+            assert(0, "We should have transformed the tupleExp already in the ... handling previously");
+        }
         static if (LOGSEMANTIC)
         {
             printf("+TupleExp::semantic(%s)\n", exp.toChars());
@@ -5116,6 +5120,63 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             result = result.expressionSemantic(sc);
         }
     }
+
+    extern(C++) class DotDotDotExpandVisitor : Visitor
+    {
+        TupleExp result;
+        alias visit = Visitor.visit;
+        override void visit(AddExp e)
+        {
+            if (!result)
+            {
+                auto exps = new Expressions;
+                result = new TupleExp(e.loc, exps);
+            }
+            else
+            {
+                assert(0, "At this point there better not be a result");
+            }
+
+            if (e.e1.isTupleExp() && e.e2.isTupleExp())
+            {
+                auto te1 = e.e1.isTupleExp();
+                auto te2 = e.e2.isTupleExp();
+
+                assert(te1.exps.length == te1.exps.length);
+
+
+                foreach(telem;*te1.exps)
+                {
+                    foreach(telem2;*te2.exps)
+                    {
+                        result.exps.push(new AddExp(e.loc, telem, telem2));
+                    }
+                }
+            }
+            else if (e.e1.isTupleExp())
+            {
+                auto te1 = e.e1.isTupleExp();
+
+                foreach(telem;*te1.exps)
+                {
+                    result.exps.push(new AddExp(e.loc, telem, e.e2));
+                }
+            }
+            else if (e.e2.isTupleExp())
+            {
+                auto te2 = e.e2.isTupleExp();
+                foreach(telem;*te2.exps)
+                {
+                    result.exps.push(new AddExp(e.loc, e.e1, telem));
+                }
+            }
+            else
+            {
+                printf("looks like someone expandend an + expression without a tuple in it ... we live in strange times ...\n");
+            }
+        }
+    }
+
     override void visit(DotDotDotExp e)
     {
         if (e.type)
@@ -5127,9 +5188,42 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         else
         {
             printf("We're visiting %s\n", e.toChars());
-            e.e1.expressionSemantic(sc);
-            e.type = Type.tvoid;
-            result = e;
+
+            // What we have to do is the following
+            // (tuple(1,2,3) + 3)... 
+            // transforms into
+            // tuple(1 + 3, 2 + 3, + 3)
+            // So ... Identify an expression depending on the tuple
+            // Copy that expression N times with a place holder where the tuple is, (N = length of tuple) 
+            // replace the placeholder in each expression by the corrosponding tuple member.
+            // since we don't have parent pointer this has to happen by looking down the tree
+            // and triggering the rewrite when we see the tuple
+            // let's go through this for the AddExp we gave up there
+            // in AddExp is if (isTuple(e.e1) && !isTuple(e.e2)) foreach(e;toTupleRange(e.e1)) {  .... } 
+
+
+            // we need to put a flag on the scope to not expand tuples now.
+/+
+            auto sc2 = sc.push(); // just create new scope
+            printf("flags before: %x\n", sc2.flags);
+            sc2.flags |= SCOPE.dotdotdot; // don't expand in the dotdotdot
+
+            printf("flags before calling: %x\n", sc2.flags);
++/
+            scope v = new DotDotDotExpandVisitor();
+            e.e1.accept(v);
+
+            auto exp_tree = cast(Expression) v.result;
+            printf("exp_tree: %s\n", exp_tree.toChars());
+            exp_tree = e.e1.expressionSemantic(sc);
+/+
+            printf("flags after calling: %x\n", sc2.flags);
+
+            sc = sc.pop();
++/
+            //result = e;
+            result = exp_tree;
+            result = semanticString(sc, new StringExp(e.loc, "This is an unexpanded DotDotDotExp ... fix me please"), "...-expansion");
         }
     }
 
@@ -7961,7 +8055,14 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             sc = sc.push(sym);
         }
         if (t1b.ty == Ttuple)
+        {
+            auto wasdotdotdot = (sc.flags & SCOPE.dotdotdot);
             sc = sc.startCTFE();
+            if (wasdotdotdot)
+            {
+                sc.flags |= SCOPE.dotdotdot;
+            }
+        }
         exp.e2 = exp.e2.expressionSemantic(sc);
         exp.e2 = resolveProperties(sc, exp.e2);
         if (t1b.ty == Ttuple)

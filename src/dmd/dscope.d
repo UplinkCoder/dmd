@@ -62,6 +62,7 @@ enum SCOPE
 
     fullinst      = 0x10000,  /// fully instantiate templates
     alias_        = 0x20000,  /// inside alias declaration.
+    dotdotdot     = 0x40000,  /// inside a dotdotdot expression 
 
     // The following are mutually exclusive
     printf        = 0x4_0000, /// printf-style function
@@ -205,7 +206,7 @@ struct Scope
         s.slabel = null;
         s.nofree = false;
         s.ctorflow.fieldinit = ctorflow.fieldinit.arraydup;
-        s.flags = (flags & SCOPEpush);
+        s.flags = (flags & SCOPEpush | flags & SCOPE.dotdotdot);
         s.lastdc = null;
         assert(&this != s);
         return s;
