@@ -5117,6 +5117,13 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
     }
 
+    override void visit(DotDotDotExp e)
+    {
+        printf("expressionSemantic: saw a dotdotdotExp\n");
+        // go to the unregoznized expression case for now
+        visit(cast(Expression)e);
+    }
+
     override void visit(DeclarationExp e)
     {
         if (e.type)
