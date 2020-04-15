@@ -2165,6 +2165,14 @@ public:
         }
     }
 
+    override void visit(DotDotDotExp e)
+    {
+        // buf.writeByte('(');
+        e.e1.accept(this);
+        //buf.writeByte(')');
+        buf.writestring(Token.toChars(e.op));
+    }
+
     override void visit(FuncExp e)
     {
         e.fd.dsymbolToBuffer(buf, hgs);
