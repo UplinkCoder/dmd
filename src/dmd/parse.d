@@ -188,7 +188,7 @@ immutable PREC[TOK.max_] precedence =
 
     TOK.interval : PREC.assign,
 
-    TOK.dotDotDot : PREC.assign,
+    TOK.dotDotDot : PREC.dotdotdot,
 ];
 
 enum ParseStatementFlags : int
@@ -9218,6 +9218,7 @@ enum PREC : int
     add,
     mul,
     pow,
+    dotdotdot,
     unary,
     primary,
 }
