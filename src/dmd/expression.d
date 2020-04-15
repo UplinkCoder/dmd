@@ -5028,6 +5028,25 @@ extern (C++) final class AddrExp : UnaExp
     }
 }
 
+extern (C++) final class DotDotDotExp : UnaExp
+{
+    extern (D) this(const ref Loc loc, Expression e)
+    {
+        super(loc, TOK.dotDotDot, __traits(classInstanceSize, DotDotDotExp), e);
+    }
+    
+    extern (D) this(const ref Loc loc, Expression e, Type t)
+    {
+        super(loc, TOK.dotDotDot, __traits(classInstanceSize, DotDotDotExp), e);
+        type = t;
+    }
+
+    override void accept(Visitor v)
+    {
+        v.visit(this);
+    }
+}
+
 /***********************************************************
  */
 extern (C++) final class PtrExp : UnaExp

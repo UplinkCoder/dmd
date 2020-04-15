@@ -187,6 +187,8 @@ immutable PREC[TOK.max_] precedence =
     TOK.declaration : PREC.expr,
 
     TOK.interval : PREC.assign,
+
+    TOK.dotDotDot : PREC.assign,
 ];
 
 enum ParseStatementFlags : int
@@ -8511,6 +8513,10 @@ final class Parser(AST) : Lexer
             const loc = token.loc;
             switch (token.value)
             {
+                case TOK.dotDotDot : 
+                    printf("PARSER: saw a tuple expand on %s\n", e.toChars());
+                    e = new AST.DotDotDotExp(loc, e);
+                    break;
             case TOK.dot:
                 nextToken();
                 if (token.value == TOK.identifier)

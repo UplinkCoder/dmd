@@ -175,6 +175,11 @@ private extern(C++) final class Semantic3Visitor : Visitor
         }
     }
 
+    override void visit(DotDotDotExp e)
+    {
+        printf("Semantic3: saw a dot dot dot Exp\n");
+    }
+
     override void visit(Module mod)
     {
         //printf("Module::semantic3('%s'): parent = %p\n", toChars(), parent);
