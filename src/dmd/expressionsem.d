@@ -5062,12 +5062,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             result = result.expressionSemantic(sc);
         }
     }
-
     override void visit(DotDotDotExp e)
     {
-        printf("expressionSemantic: saw a dotdotdotExp\n");
-        // go to the unregoznized expression case for now
-        visit(cast(Expression)e);
+        if (e.type)
+        {
+            result = e;
+            return;
+        }
+        // the type of this is the type of the expression e.e1 after Tuple expansion
+        else
+        {
+            printf("We're visiting %s\n", e.toChars());
+            e.e1.expressionSemantic(sc);
+            e.type = Type.tvoid;
+            result = e;
+        }
     }
 
     override void visit(DeclarationExp e)
