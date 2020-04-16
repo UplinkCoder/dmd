@@ -825,7 +825,7 @@ Expression symbolToExp(Dsymbol s, const ref Loc loc, Scope *sc, bool hasOverload
 {
     static if (LOGSEMANTIC)
     {
-        printf("DsymbolExp::resolve(%s %s)\n", s.kind(), s.toChars());
+        printf("symbolToExp(%s %s)\n", s.kind(), s.toChars());
     }
 
 Lagain:
@@ -5125,6 +5125,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
     {
         TupleExp result;
         alias visit = Visitor.visit;
+
+
         override void visit(AddExp e)
         {
             if (!result)
@@ -5136,6 +5138,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             {
                 assert(0, "At this point there better not be a result");
             }
+
+            e.e1 = e.e1.expressionSemantic(sc);
+            e.e2 = e.e2.expressionSemantic(sc);
 
             if (e.e1.isTupleExp() && e.e2.isTupleExp())
             {
@@ -5215,15 +5220,15 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
             auto exp_tree = cast(Expression) v.result;
             printf("exp_tree: %s\n", exp_tree.toChars());
-            exp_tree = e.e1.expressionSemantic(sc);
+            exp_tree = exp_tree.expressionSemantic(sc);
 /+
             printf("flags after calling: %x\n", sc2.flags);
 
             sc = sc.pop();
 +/
             //result = e;
-            result = exp_tree;
-            result = semanticString(sc, new StringExp(e.loc, "This is an unexpanded DotDotDotExp ... fix me please"), "...-expansion");
+            result = (cast(Expression)e) = exp_tree;
+//            result = semanticString(sc, new StringExp(e.loc, "This is an unexpanded DotDotDotExp ... fix me please"), "...-expansion");
         }
     }
 
@@ -9799,6 +9804,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         {
             printf("AddExp::semantic('%s')\n", exp.toChars());
         }
+
         if (exp.type)
         {
             result = exp;
