@@ -5072,7 +5072,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         TupleExp result;
         alias visit = Visitor.visit;
 
-
         override void visit(AddExp e)
         {
             if (!result)
@@ -5130,52 +5129,161 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     override void visit(DotDotDotExp e)
     {
-        if (e.type)
+        struct ExpandCtx
         {
-            result = e;
-            return;
+            bool anyTuples = false;
+            size_t tupLength = 1;
+            size_t currentIndex = 0;
         }
-        // the type of this is the type of the expression e.e1 after Tuple expansion
-        else
+        ExpandCtx ctx;
+
+        Expression duplicateTree(Expression e)
         {
-            printf("We're visiting %s\n", e.toChars());
+            Expression r = e;
 
-            // What we have to do is the following
-            // (tuple(1,2,3) + 3)... 
-            // transforms into
-            // tuple(1 + 3, 2 + 3, + 3)
-            // So ... Identify an expression depending on the tuple
-            // Copy that expression N times with a place holder where the tuple is, (N = length of tuple) 
-            // replace the placeholder in each expression by the corrosponding tuple member.
-            // since we don't have parent pointer this has to happen by looking down the tree
-            // and triggering the rewrite when we see the tuple
-            // let's go through this for the AddExp we gave up there
-            // in AddExp is if (isTuple(e.e1) && !isTuple(e.e2)) foreach(e;toTupleRange(e.e1)) {  .... } 
+            // if src is an identifier, we need to resolve it
+            IdentifierExp ident = r.isIdentifierExp();
+            if (ident)
+                r = ident.expressionSemantic(sc);
 
+            // if sec is a TemplateInstance, we might expand...
+            ScopeExp s = r.isScopeExp();
+            if (s)
+            {
+                TemplateInstance ti = s.sds.isTemplateInstance();
+                if (ti && true) // do we need to do any further confirmation that ti is a tuple?
+                {
+                    if (ctx.anyTuples)
+                    {
+                        // COMPILE ERROR
+                        assert(ctx.tupLength == ti.tiargs.length);
+                    }
+                    else
+                    {
+                        ctx.tupLength = ti.tiargs.length;
+                        ctx.anyTuples = true;
+                    }
 
-            // we need to put a flag on the scope to not expand tuples now.
-/+
-            auto sc2 = sc.push(); // just create new scope
-            printf("flags before: %x\n", sc2.flags);
-            sc2.flags |= SCOPE.dotdotdot; // don't expand in the dotdotdot
+                    IndexExp index = new IndexExp(e.loc, r, new IntegerExp(e.loc, ctx.currentIndex, Type.tsize_t));
+                    return index.expressionSemantic(sc);
+                }
+            }
 
-            printf("flags before calling: %x\n", sc2.flags);
-+/
-            scope v = new DotDotDotExpandVisitor();
-            e.e1.accept(v);
+            // if r is a `...` expression, we need to resolve it
+            if (r.op == TOK.dotDotDot)
+            {
+                DotDotDotExp exp = cast(DotDotDotExp)r;
+                r = exp.expressionSemantic(sc);
+                assert(r.isTupleExp());
+            }
 
-            auto exp_tree = cast(Expression) v.result;
-            printf("exp_tree: %s\n", exp_tree.toChars());
-            exp_tree = exp_tree.expressionSemantic(sc);
-/+
-            printf("flags after calling: %x\n", sc2.flags);
+            // if sec is a TupleExp, we expand...
+            TupleExp tup = r.isTupleExp();
+            if (tup)
+            {
+                if (ctx.anyTuples)
+                {
+                    // COMPILE ERROR
+                    assert(ctx.tupLength == tup.exps.length);
+                }
+                else
+                {
+                    ctx.tupLength = tup.exps.length;
+                    ctx.anyTuples = true;
+                }
+                IndexExp index = new IndexExp(e.loc, r, new IntegerExp(e.loc, ctx.currentIndex, Type.tsize_t));
+                return index.expressionSemantic(sc);
+            }
 
-            sc = sc.pop();
-+/
-            //result = e;
-            result = (cast(Expression)e) = exp_tree;
-//            result = semanticString(sc, new StringExp(e.loc, "This is an unexpanded DotDotDotExp ... fix me please"), "...-expansion");
+            // for any expressions with children, recurse...
+            switch (e.op)
+            {
+                case TOK.add:
+                case TOK.min:
+                case TOK.concatenate:
+                case TOK.mul:
+                case TOK.div:
+                case TOK.mod:
+                case TOK.pow:
+                case TOK.leftShift:
+                case TOK.rightShift:
+                case TOK.unsignedRightShift:
+                case TOK.and:
+                case TOK.or:
+                case TOK.xor:
+                case TOK.andAnd:
+                case TOK.lessThan:
+                case TOK.in_:
+                case TOK.remove:
+                case TOK.equal:
+                case TOK.identity:
+                    BinExp bin = cast(BinExp)e;
+                    Expression e1 = duplicateTree(bin.e1);
+                    Expression e2 = duplicateTree(bin.e2);
+                    if (e1 || e2)
+                    {
+                        BinExp cpy = cast(BinExp)bin.copy();
+                        cpy.e1 = e1 ? e1 : bin.e1;
+                        cpy.e2 = e2 ? e2 : bin.e2;
+                        return cpy.expressionSemantic(sc);
+                    }
+                    break;
+
+                case TOK.address:
+                case TOK.star:
+                case TOK.negate:
+                case TOK.uadd:
+                case TOK.tilde:
+                case TOK.not:
+                case TOK.delete_:
+                case TOK.arrayLength:
+                    UnaExp una = cast(UnaExp)e;
+                    Expression e1 = duplicateTree(una.e1);
+                    if (e1)
+                    {
+                        UnaExp cpy = cast(UnaExp)una.copy();
+                        cpy.e1 = e1 ? e1 : una.e1;
+                        return cpy.expressionSemantic(sc);
+                    }
+                    break;
+
+                case TOK.cast_:
+                    CastExp cst = cast(CastExp)e;
+                    assert(false, "TODO: `to` map be a type identifier of a tuple which needs to be expanded");
+//                    Expression e1 = duplicateTree(cst.e1);
+//                    break;
+
+                case TOK.question:
+                case TOK.assert_:
+                case TOK.call:
+                case TOK.slice:
+                case TOK.array:
+                    assert(false, "TODO");
+//                    break;
+
+                default:
+                    assert(false, "Does this node have children?");
+            }
+
+            // we found no tuples beneath this node
+            if (r !is e)
+                return r;
+            return null;
         }
+
+        auto elements = new Expressions;
+
+        for (size_t i = 0; i < ctx.tupLength; ++i)
+        {
+            ctx.currentIndex = i;
+            Expression r = duplicateTree(e.e1);
+            elements.push(r ? r : e.e1);
+        }
+
+        result = new TupleExp(e.loc, elements);
+
+        // visit the new TupleExp
+        visit(result);
     }
 
     override void visit(DeclarationExp e)
