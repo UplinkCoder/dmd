@@ -5436,23 +5436,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 // TODO: what other things can a ScopeExp do???
                 
                 return ExpResult(n, null);
-                
-            case TOK.dotTemplateInstance:
-                // TODO: this one is super important!!!
-                // this one enabled `staticMap`
-                
-            case TOK.cast_:
-            case TOK.assert_:
-            case TOK.slice:
-            case TOK.array:
+
             case TOK.is_:
                 auto ise = cast(IsExp) e;
                 Expressions* res = new Expressions();
                 
                 ExpResult targ = duplicateTree(ise.targ, sc);
-                auto ttarg = typeSemantic(ise.targ, Loc.initial, sc);
-                import dmd.asttypename;
-                printf("ttag.astTypeName: %s\n", ttarg.astTypeName.ptr);
                 ExpResult tspec = duplicateTree(ise.tspec, sc);
                 size_t tupLen;
                 
@@ -5472,7 +5461,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 
                 res.reserve(tupLen);
                 res.length = tupLen;
-
+                
                 foreach(i; 0 .. tupLen)
                 {
                     IsExp cpy = cast(IsExp)ise.copy();
@@ -5482,6 +5471,53 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 }
                 
                 return ExpResult(null, res);
+
+            case TOK.cast_:
+                CastExp ce = cast(CastExp)e;
+                ExpResult e1 = duplicateTree(ce.e1, sc);
+                ExpResult to = duplicateTree(ce.to, sc);
+
+                Expressions* res = new Expressions();
+                size_t tupLen;
+                if (e1.etup && to.ttup)
+                {
+                    tupLen = e1.etup.length;
+                    if (e1.etup.length != to.ttup.length)
+                    {
+                        e.error("Tuples must have the same length for parallel expansion");
+                        return ExpResult(new ErrorExp());
+                    }
+                } else if (e1.etup)
+                {
+                    tupLen = e1.etup.length;
+                }
+                else if (to.ttup)
+                {
+                    tupLen = to.ttup.length;
+                }
+                else
+                {
+                    assert(0, "No tuple in castExp ... should we have caught already?");
+                }
+
+                res.reserve(tupLen);
+                res.length = tupLen;
+                foreach(i; 0 .. tupLen)
+                {
+                    CastExp cpy = cast(CastExp)ce.copy();
+                    cpy.e1 = e1.etup ? (*e1.etup)[i] : e1.e;
+                    cpy.to = to.ttup ? (*to.ttup)[i] : to.t;
+                    (*res)[i] = cpy;
+                }
+
+                return ExpResult(null, res);
+            case TOK.dotTemplateInstance:
+                // TODO: this one is super important!!!
+                // this one enabled `staticMap`
+                 
+            case TOK.assert_:
+            case TOK.slice:
+            case TOK.array:
             case TOK.arrayLiteral:
             case TOK.assocArrayLiteral:
             case TOK.structLiteral:
