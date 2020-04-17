@@ -5144,23 +5144,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             if (ident)
                 src = ident.expressionSemantic(sc);
 
-            // if sec is a TemplateInstance, we might expand...
-            ScopeExp s = src.isScopeExp();
-            if (s)
-            {
-                TemplateInstance ti = s.sds.isTemplateInstance();
-                if (ti && true) // do we need to do any further confirmation that ti is a tuple?
-                {
-                    Expressions* res = new Expressions(ti.tiargs.length);
-                    foreach (i; 0 .. ti.tiargs.length)
-                    {
-                        // use IndexExp because maybe there's special sauce?
-                        (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
-                    }
-                    return ExpResult(null, res);
-                }
-            }
-
             // if r is a `...` expression, we need to resolve it
             if (src.op == TOK.dotDotDot)
             {
@@ -5185,9 +5168,22 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 return ExpResult(null, res);
             }
 
-            // for any expressions with children, recurse...
-            switch (e.op)
+            // for any expressions with children, recurse and perform the expansion...
+            switch (src.op)
             {
+                case TOK.int64:
+                case TOK.float64:
+                case TOK.complex80:
+                case TOK.string_:
+                case TOK.this_:
+                case TOK.null_:
+                    // nodes with no children
+                    return ExpResult(src, null);
+
+                case TOK.type:
+                    // TODO: confirm that a TypeExp can NOT be a TypeTuple, otherwise this needs to be expanded
+                    return ExpResult(src, null);
+
                 case TOK.address:
                 case TOK.star:
                 case TOK.negate:
@@ -5196,19 +5192,22 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 case TOK.not:
                 case TOK.delete_:
                 case TOK.arrayLength:
-                    UnaExp una = cast(UnaExp)e;
-                    ExpResult e1 = duplicateTree(una.e1, sc);
+                case TOK.dotIdentifier:
+                case TOK.dotTemplateDeclaration:
+                case TOK.dotVariable:
+                    UnaExp n = cast(UnaExp)src;
+                    ExpResult e1 = duplicateTree(n.e1, sc);
 
                     if (!e1.tup)
                     {
-                        una.e1 = e1.s;
-                        return ExpResult(una, null);
+                        n.e1 = e1.s;
+                        return ExpResult(n, null);
                     }
 
                     Expressions* res = e1.tup;
                     foreach (i; 0 .. res.length)
                     {
-                        UnaExp cpy = cast(UnaExp)una.copy();
+                        UnaExp cpy = cast(UnaExp)n.copy();
                         cpy.e1 = (*e1.tup)[i];
                         (*res)[i] = cpy;
                     }
@@ -5233,15 +5232,15 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 case TOK.remove:
                 case TOK.equal:
                 case TOK.identity:
-                    BinExp bin = cast(BinExp)e;
-                    ExpResult e1 = duplicateTree(bin.e1, sc);
-                    ExpResult e2 = duplicateTree(bin.e2, sc);
+                    BinExp n = cast(BinExp)src;
+                    ExpResult e1 = duplicateTree(n.e1, sc);
+                    ExpResult e2 = duplicateTree(n.e2, sc);
 
                     if (!e1.tup && !e2.tup)
                     {
-                        bin.e1 = e1.s;
-                        bin.e2 = e2.s;
-                        return ExpResult(bin, null);
+                        n.e1 = e1.s;
+                        n.e2 = e2.s;
+                        return ExpResult(n, null);
                     }
 
                     if (e1.tup && e2.tup && e1.tup.length != e2.tup.length)
@@ -5253,7 +5252,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     Expressions* res = e1.tup ? e1.tup : e2.tup;
                     foreach (i; 0 .. res.length)
                     {
-                        BinExp cpy = cast(BinExp)bin.copy();
+                        BinExp cpy = cast(BinExp)n.copy();
                         cpy.e1 = e1.tup ? (*e1.tup)[i] : e1.s;
                         cpy.e2 = e2.tup ? (*e2.tup)[i] : e2.s;
                         (*res)[i] = cpy;
@@ -5261,17 +5260,17 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     return ExpResult(null, res);
 
                 case TOK.question:
-                    CondExp cnd = cast(CondExp)e;
-                    ExpResult e1 = duplicateTree(cnd.e1, sc);
-                    ExpResult e2 = duplicateTree(cnd.e2, sc);
-                    ExpResult econd = duplicateTree(cnd.econd, sc);
+                    CondExp n = cast(CondExp)src;
+                    ExpResult e1 = duplicateTree(n.e1, sc);
+                    ExpResult e2 = duplicateTree(n.e2, sc);
+                    ExpResult econd = duplicateTree(n.econd, sc);
 
                     if (!e1.tup && !e2.tup && !econd.tup)
                     {
-                        cnd.e1 = e1.s;
-                        cnd.e2 = e2.s;
-                        cnd.econd = econd.s;
-                        return ExpResult(cnd, null);
+                        n.e1 = e1.s;
+                        n.e2 = e2.s;
+                        n.econd = econd.s;
+                        return ExpResult(n, null);
                     }
 
                     if ((e1.tup && e2.tup && e1.tup.length != e2.tup.length) ||
@@ -5285,7 +5284,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     Expressions* res = e1.tup ? e1.tup : e2.tup ? e2.tup : econd.tup;
                     foreach (i; 0 .. res.length)
                     {
-                        CondExp cpy = cast(CondExp)cnd.copy();
+                        CondExp cpy = cast(CondExp)n.copy();
                         cpy.e1 = e1.tup ? (*e1.tup)[i] : e1.s;
                         cpy.e2 = e2.tup ? (*e2.tup)[i] : e2.s;
                         cpy.econd = econd.tup ? (*econd.tup)[i] : econd.s;
@@ -5294,7 +5293,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     return ExpResult(null, res);
 
                 case TOK.call:
-                    CallExp n = cast(CallExp)e;
+                    CallExp n = cast(CallExp)src;
                     ExpResult[] args = new ExpResult[n.arguments.length];
 
                     bool anyTuples = false;
@@ -5324,7 +5323,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                             (*n.arguments)[i] = args[i].s;
                         return ExpResult(n, null);
                     }
-                    
+
                     foreach (j; 0 .. res.length)
                     {
                         CallExp cpy = cast(CallExp)n.copy();
@@ -5334,6 +5333,38 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         (*res)[j] = cpy;
                     }
                     return ExpResult(null, res);
+
+                case TOK.scope_:
+                    ScopeExp n = cast(ScopeExp)src;
+
+                    TemplateInstance ti = n.sds.isTemplateInstance();
+                    if (ti)
+                    {
+                        // Thing!(Tup, x)  -->  Thing!(Tup[0], x), Thing!(Tup[1], x), ...
+
+                        // HOW DO WE KNOW WHAT `ti.tiargs` ARE?
+                        e.error("Template instance expansion still WIP");
+                        return ExpResult(new ErrorExp(), null);
+
+                        // if tiargs are all types, then we resolve a type list
+                        // if ANY tiargs are expressions, then we return a normal tuple, wrapping types in TypeExp?
+
+//                        Expressions* res = new Expressions(ti.tiargs.length);
+//                        foreach (i; 0 .. ti.tiargs.length)
+//                        {
+//                            // use IndexExp because maybe there's special sauce?
+//                            (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
+//                        }
+//                        return ExpResult(null, res);
+                    }
+
+                    // TODO: what other things can a ScopeExp do???
+
+                    return ExpResult(n, null);
+
+                case TOK.dotTemplateInstance:
+                    // TODO: this one is super important!!!
+                    // this one enabled `staticMap`
 
                 case TOK.cast_:
                 case TOK.assert_:
@@ -5348,25 +5379,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     e.error("Tuple expansion not yet supported for this expression");
                     return ExpResult(new ErrorExp(), null);
 
-                case TOK.type:
-                    // TODO: confirm that a TypeExp can NOT be a TypeTuple, otherwise this needs to be expanded
-                    return ExpResult(src, null);
-
-                case TOK.scope_:
-                    // TODO: what is even going on here?
-                    return ExpResult(src, null);
-
-                case TOK.int64:
-                case TOK.float64:
-                case TOK.complex80:
-                case TOK.string_:
-                case TOK.this_:
-                case TOK.null_:
-                    // nodes with no children
-                    return ExpResult(src, null);
-
                 default:
-                    assert(false, "TODO: Does this node have children?");
+                    assert(false, "TODO: What node is this? Does it have children?");
             }
             assert(false, "how did we get here?");
         }
