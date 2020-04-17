@@ -5242,6 +5242,32 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             // for any expressions with children, recurse...
             switch (e.op)
             {
+                case TOK.address:
+                case TOK.star:
+                case TOK.negate:
+                case TOK.uadd:
+                case TOK.tilde:
+                case TOK.not:
+                case TOK.delete_:
+                case TOK.arrayLength:
+                    UnaExp una = cast(UnaExp)e;
+                    ExpResult e1 = duplicateTree(una.e1, sc);
+
+                    if (!e1.tup)
+                    {
+                        una.e1 = e1.s;
+                        return ExpResult(una, null);
+                    }
+
+                    Expressions* res = e1.tup;
+                    foreach (i; 0 .. res.length)
+                    {
+                        UnaExp cpy = cast(UnaExp)una.copy();
+                        cpy.e1 = (*e1.tup)[i];
+                        (*res)[i] = cpy;
+                    }
+                    return ExpResult(null, res);
+
                 case TOK.add:
                 case TOK.min:
                 case TOK.concatenate:
@@ -5272,8 +5298,11 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         return ExpResult(bin, null);
                     }
 
-                    // TODO: it's a compile error if parallel expansions have different lengths
-                    assert (!(e1.tup && e2.tup) || e1.tup.length == e2.tup.length);
+                    if (e1.tup && e2.tup && e1.tup.length != e2.tup.length)
+                    {
+                        e.error("Tuples must have the same length for parallel expansion");
+                        return ExpResult(new ErrorExp(), null);
+                    }
 
                     Expressions* res = e1.tup ? e1.tup : e2.tup;
                     foreach (i; 0 .. res.length)
@@ -5284,38 +5313,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         (*res)[i] = cpy;
                     }
                     return ExpResult(null, res);
-
-                case TOK.address:
-                case TOK.star:
-                case TOK.negate:
-                case TOK.uadd:
-                case TOK.tilde:
-                case TOK.not:
-                case TOK.delete_:
-                case TOK.arrayLength:
-                    UnaExp una = cast(UnaExp)e;
-                    ExpResult e1 = duplicateTree(una.e1, sc);
-
-                    if (!e1.tup)
-                    {
-                        una.e1 = e1.s;
-                        return ExpResult(una, null);
-                    }
-
-                    Expressions* res = e1.tup;
-                    foreach (i; 0 .. res.length)
-                    {
-                        UnaExp cpy = cast(UnaExp)una.copy();
-                        cpy.e1 = (*e1.tup)[i];
-                        (*res)[i] = cpy;
-                    }
-                    return ExpResult(null, res);
-
-                case TOK.cast_:
-                    CastExp cst = cast(CastExp)e;
-                    assert(false, "TODO: `to` map be a type identifier of a tuple which needs to be expanded");
-//                    Expression e1 = duplicateTree(cst.e1);
-//                    break;
 
                 case TOK.question:
                     CondExp cnd = cast(CondExp)e;
@@ -5329,6 +5326,14 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         cnd.e2 = e2.s;
                         cnd.econd = econd.s;
                         return ExpResult(cnd, null);
+                    }
+
+                    if ((e1.tup && e2.tup && e1.tup.length != e2.tup.length) ||
+                        (e1.tup && econd.tup && e1.tup.length != econd.tup.length) ||
+                        (e2.tup && econd.tup && e2.tup.length != econd.tup.length) )
+                    {
+                        e.error("Tuples must have the same length for parallel expansion");
+                        return ExpResult(new ErrorExp(), null);
                     }
 
                     // TODO: it's a compile error if parallel expansions have different lengths
@@ -5345,19 +5350,39 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     }
                     return ExpResult(null, res);
 
+                case TOK.cast_:
                 case TOK.assert_:
                 case TOK.call:
                 case TOK.slice:
                 case TOK.array:
-                    assert(false, "TODO");
-//                    break;
+                case TOK.is_:
+                case TOK.arrayLiteral:
+                case TOK.assocArrayLiteral:
+                case TOK.structLiteral:
+                case TOK.new_:
+                case TOK.traits:
+                    e.error("Tuple expansion not yet supported for this expression");
+                    return ExpResult(new ErrorExp(), null);
+
+                case TOK.type:
+                    // TODO: confirm that a TypeExp can NOT be a TypeTuple, otherwise this needs to be expanded
+                    return ExpResult(src, null);
+
+                case TOK.scope_:
+                    // TODO: what is even going on here?
+                    return ExpResult(src, null);
 
                 case TOK.int64:
+                case TOK.float64:
+                case TOK.complex80:
+                case TOK.string_:
+                case TOK.this_:
+                case TOK.null_:
                     // nodes with no children
                     return ExpResult(src, null);
 
                 default:
-                    assert(false, "TODO: Does " ~ astTypeName(e) ~ " have children?");
+                    assert(false, "TODO: Does this node have children?");
             }
             assert(false, "how did we get here?");
 //            return ExpResult(null, null);
