@@ -5129,70 +5129,60 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     override void visit(DotDotDotExp e)
     {
-        struct ExpandCtx
+        struct ExpResult
         {
-            bool anyTuples = false;
-            size_t tupLength = 1;
-            size_t currentIndex = 0;
+            Expression s;
+            Expressions* tup;
         }
-        ExpandCtx ctx;
 
-        Expression duplicateTree(Expression e)
+        static ExpResult duplicateTree(Expression e, Scope* sc)
         {
-            Expression r = e;
+            Expression src = e;
 
             // if src is an identifier, we need to resolve it
-            IdentifierExp ident = r.isIdentifierExp();
+            IdentifierExp ident = src.isIdentifierExp();
             if (ident)
-                r = ident.expressionSemantic(sc);
+                src = ident.expressionSemantic(sc);
 
             // if sec is a TemplateInstance, we might expand...
-            ScopeExp s = r.isScopeExp();
+            ScopeExp s = src.isScopeExp();
             if (s)
             {
                 TemplateInstance ti = s.sds.isTemplateInstance();
                 if (ti && true) // do we need to do any further confirmation that ti is a tuple?
                 {
-                    if (ctx.anyTuples)
+                    Expressions* res = new Expressions(ti.tiargs.length);
+                    foreach (i; 0 .. ti.tiargs.length)
                     {
-                        // COMPILE ERROR
-                        assert(ctx.tupLength == ti.tiargs.length);
+                        // use IndexExp because maybe there's special sauce?
+                        (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
                     }
-                    else
-                    {
-                        ctx.tupLength = ti.tiargs.length;
-                        ctx.anyTuples = true;
-                    }
-
-                    IndexExp index = new IndexExp(e.loc, r, new IntegerExp(e.loc, ctx.currentIndex, Type.tsize_t));
-                    return index.expressionSemantic(sc);
+                    return ExpResult(null, res);
                 }
             }
 
             // if r is a `...` expression, we need to resolve it
-            if (r.op == TOK.dotDotDot)
+            if (src.op == TOK.dotDotDot)
             {
-                DotDotDotExp exp = cast(DotDotDotExp)r;
-                r = exp.expressionSemantic(sc);
-                assert(r.isTupleExp());
+                DotDotDotExp exp = cast(DotDotDotExp)src;
+                src = exp.expressionSemantic(sc);
+                assert(src.isTupleExp());
             }
 
             // if sec is a TupleExp, we expand...
-            TupleExp tup = r.isTupleExp();
+            TupleExp tup = src.isTupleExp();
             if (tup)
             {
-                if (ctx.anyTuples)
+                Expressions* res = new Expressions(tup.exps.length);
+                foreach (i; 0 .. tup.exps.length)
                 {
-                    // COMPILE ERROR
-                    assert(ctx.tupLength == tup.exps.length);
+//                    // use IndexExp because maybe there's special sauce?
+//                    (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
+
+                    // nar, just poach the element directly!
+                    (*res)[i] = (*tup.exps)[i];
                 }
-                else
-                {
-                    ctx.tupLength = tup.exps.length;
-                    ctx.anyTuples = true;
-                }
-                IndexExp index = new IndexExp(e.loc, r, new IntegerExp(e.loc, ctx.currentIndex, Type.tsize_t));
-                return index.expressionSemantic(sc);
+                return ExpResult(null, res);
             }
 
             // for any expressions with children, recurse...
@@ -5218,16 +5208,28 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 case TOK.equal:
                 case TOK.identity:
                     BinExp bin = cast(BinExp)e;
-                    Expression e1 = duplicateTree(bin.e1);
-                    Expression e2 = duplicateTree(bin.e2);
-                    if (e1 || e2)
+                    ExpResult e1 = duplicateTree(bin.e1, sc);
+                    ExpResult e2 = duplicateTree(bin.e2, sc);
+
+                    if (!e1.tup && !e2.tup)
+                    {
+                        bin.e1 = e1.s;
+                        bin.e2 = e2.s;
+                        return ExpResult(bin, null);
+                    }
+
+                    // TODO: it's a compile error if parallel expansions have different lengths
+                    assert (!(e1.tup && e2.tup) || e1.tup.length == e2.tup.length);
+
+                    Expressions* res = e1.tup ? e1.tup : e2.tup;
+                    foreach (i; 0 .. res.length)
                     {
                         BinExp cpy = cast(BinExp)bin.copy();
-                        cpy.e1 = e1 ? e1 : bin.e1;
-                        cpy.e2 = e2 ? e2 : bin.e2;
-                        return cpy.expressionSemantic(sc);
+                        cpy.e1 = e1.tup ? (*e1.tup)[i] : e1.s;
+                        cpy.e2 = e2.tup ? (*e2.tup)[i] : e2.s;
+                        (*res)[i] = cpy;
                     }
-                    break;
+                    return ExpResult(null, res);
 
                 case TOK.address:
                 case TOK.star:
@@ -5238,14 +5240,22 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 case TOK.delete_:
                 case TOK.arrayLength:
                     UnaExp una = cast(UnaExp)e;
-                    Expression e1 = duplicateTree(una.e1);
-                    if (e1)
+                    ExpResult e1 = duplicateTree(una.e1, sc);
+
+                    if (!e1.tup)
+                    {
+                        una.e1 = e1.s;
+                        return ExpResult(una, null);
+                    }
+
+                    Expressions* res = e1.tup;
+                    foreach (i; 0 .. res.length)
                     {
                         UnaExp cpy = cast(UnaExp)una.copy();
-                        cpy.e1 = e1 ? e1 : una.e1;
-                        return cpy.expressionSemantic(sc);
+                        cpy.e1 = (*e1.tup)[i];
+                        (*res)[i] = cpy;
                     }
-                    break;
+                    return ExpResult(null, res);
 
                 case TOK.cast_:
                     CastExp cst = cast(CastExp)e;
@@ -5261,29 +5271,25 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     assert(false, "TODO");
 //                    break;
 
+                case TOK.int64:
+                    // nodes with no children
+                    return ExpResult(src, null);
+
                 default:
                     assert(false, "Does this node have children?");
             }
-
-            // we found no tuples beneath this node
-            if (r !is e)
-                return r;
-            return null;
+            assert(false, "how did we get here?");
+//            return ExpResult(null, null);
         }
 
-        auto elements = new Expressions;
-
-        for (size_t i = 0; i < ctx.tupLength; ++i)
+        ExpResult res = duplicateTree(e.e1, sc);
+        if (!res.tup)
         {
-            ctx.currentIndex = i;
-            Expression r = duplicateTree(e.e1);
-            elements.push(r ? r : e.e1);
+            assert(res.s);
+            res.tup = new Expressions(1);
+            (*res.tup)[0] = res.s;
         }
-
-        result = new TupleExp(e.loc, elements);
-
-        // visit the new TupleExp
-        visit(result);
+        result = expressionSemantic(new TupleExp(e.loc, res.tup), sc);
     }
 
     override void visit(DeclarationExp e)
