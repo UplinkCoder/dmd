@@ -5318,6 +5318,33 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 //                    break;
 
                 case TOK.question:
+                    CondExp cnd = cast(CondExp)e;
+                    ExpResult e1 = duplicateTree(cnd.e1, sc);
+                    ExpResult e2 = duplicateTree(cnd.e2, sc);
+                    ExpResult econd = duplicateTree(cnd.econd, sc);
+
+                    if (!e1.tup && !e2.tup && !econd.tup)
+                    {
+                        cnd.e1 = e1.s;
+                        cnd.e2 = e2.s;
+                        cnd.econd = econd.s;
+                        return ExpResult(cnd, null);
+                    }
+
+                    // TODO: it's a compile error if parallel expansions have different lengths
+                    assert (!(e1.tup && e2.tup && econd.tup) || (e1.tup.length == e2.tup.length && e1.tup.length == econd.tup.length));
+
+                    Expressions* res = e1.tup ? e1.tup : e2.tup ? e2.tup : econd.tup;
+                    foreach (i; 0 .. res.length)
+                    {
+                        CondExp cpy = cast(CondExp)cnd.copy();
+                        cpy.e1 = e1.tup ? (*e1.tup)[i] : e1.s;
+                        cpy.e2 = e2.tup ? (*e2.tup)[i] : e2.s;
+                        cpy.econd = econd.tup ? (*econd.tup)[i] : econd.s;
+                        (*res)[i] = cpy;
+                    }
+                    return ExpResult(null, res);
+
                 case TOK.assert_:
                 case TOK.call:
                 case TOK.slice:
@@ -5330,7 +5357,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     return ExpResult(src, null);
 
                 default:
-                    assert(false, "Does this node have children?");
+                    assert(false, "TODO: Does " ~ astTypeName(e) ~ " have children?");
             }
             assert(false, "how did we get here?");
 //            return ExpResult(null, null);
