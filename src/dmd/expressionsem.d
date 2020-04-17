@@ -5415,11 +5415,59 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 TemplateInstance ti = n.sds.isTemplateInstance();
                 if (ti)
                 {
+                    e.error("Template instance expansion still WIP");
+
+                    //printf("\n\n\n---------tiargs: %s of astType: %s\n", (*ti.tiargs)[0].toChars(), astTypeName((*ti.tiargs)[0]).ptr);
                     // Thing!(Tup, x)  -->  Thing!(Tup[0], x), Thing!(Tup[1], x), ...
                     
-                    // HOW DO WE KNOW WHAT `ti.tiargs` ARE?
-                    e.error("Template instance expansion still WIP");
-                    return ExpResult(new ErrorExp(), null);
+                    // HOW DO WE KNOW WHAT `ti.tiargs` ARE? - we use isType and getType, or isExpression ... see how traits are handled.
+
+                    size_t verbatimcopy_pos = size_t.max;
+
+                    //auto tiargs = semanticTiargs(ti.tiargs);
+
+
+                    foreach(i, arg;*ti.tiargs)
+                    {
+                        // if the template takes a tuple here, we are done
+                        if (ti.tdtypes.length > i && getType(ti.tdtypes[i]).ty == Ttuple)
+                        {
+                            verbatimcopy_pos = i;
+                            break;
+                        }
+
+                        if (auto sym = getDsymbol(arg))
+                        {
+                            dsymbolSemantic(sym, sc);
+
+                            //assert(0, "TODO symbol path");
+
+                        } else if (auto type = isType(arg))
+                        {
+                            printf("WE've got a type\n and it is: %s\n", type.toChars());
+                            //assert(0);
+                            ///TODO doe the same is in callExp.
+                        }
+                        else if (auto exp = isExpression(arg))
+                        {
+                            printf("got a expression: %s\n", exp.toChars());
+                        }
+                    }
+
+                    if (!verbatimcopy_pos)
+                    {
+                        printf("Template takes a tuple or no template params\n");
+                    }
+                    if (verbatimcopy_pos != size_t.max)
+                    {
+                        foreach(i; 0 .. verbatimcopy_pos)
+                        {
+                            assert(0, "TODO verbatim copies");
+                        }
+                    }
+
+                    //e.error("Template instance expansion still WIP");
+                    //return ExpResult(new ErrorExp(), null);
                     
                     // if tiargs are all types, then we resolve a type list
                     // if ANY tiargs are expressions, then we return a normal tuple, wrapping types in TypeExp?
