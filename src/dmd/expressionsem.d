@@ -5336,9 +5336,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         return ExpResult(new ErrorExp(), null);
                     }
 
-                    // TODO: it's a compile error if parallel expansions have different lengths
-                    assert (!(e1.tup && e2.tup && econd.tup) || (e1.tup.length == e2.tup.length && e1.tup.length == econd.tup.length));
-
                     Expressions* res = e1.tup ? e1.tup : e2.tup ? e2.tup : econd.tup;
                     foreach (i; 0 .. res.length)
                     {
@@ -5350,9 +5347,50 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     }
                     return ExpResult(null, res);
 
+                case TOK.call:
+                    CallExp n = cast(CallExp)e;
+                    ExpResult[] args = new ExpResult[n.arguments.length];
+
+                    bool anyTuples = false;
+                    size_t tupLen;
+                    Expressions* res;
+                    foreach (i; 0 .. args.length)
+                    {
+                        args[i] = duplicateTree((*n.arguments)[i], sc);
+                        if (!args[i].tup)
+                            continue;
+                        if (!anyTuples)
+                        {
+                            anyTuples = true;
+                            tupLen = args[i].tup.length;
+                            res = args[i].tup;
+                        }
+                        else if (args[i].tup.length != tupLen)
+                        {
+                            e.error("Tuples must have the same length for parallel expansion");
+                            return ExpResult(new ErrorExp(), null);
+                        }
+                    }
+
+                    if (!anyTuples)
+                    {
+                        foreach (i; 0 .. args.length)
+                            (*n.arguments)[i] = args[i].s;
+                        return ExpResult(n, null);
+                    }
+                    
+                    foreach (j; 0 .. res.length)
+                    {
+                        CallExp cpy = cast(CallExp)n.copy();
+                        cpy.arguments = new Expressions(args.length);
+                        foreach (i; 0 .. args.length)
+                            (*cpy.arguments)[i] = args[i].tup ? (*args[i].tup)[j] : args[i].s;
+                        (*res)[j] = cpy;
+                    }
+                    return ExpResult(null, res);
+
                 case TOK.cast_:
                 case TOK.assert_:
-                case TOK.call:
                 case TOK.slice:
                 case TOK.array:
                 case TOK.is_:
@@ -5385,17 +5423,16 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     assert(false, "TODO: Does this node have children?");
             }
             assert(false, "how did we get here?");
-//            return ExpResult(null, null);
         }
 
         ExpResult res = duplicateTree(e.e1, sc);
-        if (!res.tup)
+        if (res.tup)
+            result = expressionSemantic(new TupleExp(e.loc, res.tup), sc);
+        else
         {
-            assert(res.s);
-            res.tup = new Expressions(1);
-            (*res.tup)[0] = res.s;
+            e.error("No tuple was found beneath `...` expression");
+            result = expressionSemantic(new ErrorExp(), sc);
         }
-        result = expressionSemantic(new TupleExp(e.loc, res.tup), sc);
     }
 
     override void visit(DeclarationExp e)
