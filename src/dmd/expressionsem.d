@@ -5096,7 +5096,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     static ExpandResult duplicateTree(Expression e, Scope* sc)
     {
+
         import dmd.asttypename; // debug remove before PR
+        printf("Incoming: %s (%s)\n", e.toChars(), astTypeName(e).ptr);
         Expression src = e;
 
         // if src is an identifier, we need to resolve it
@@ -5106,6 +5108,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
         if (DotIdExp dotId = src.isDotIdExp)
         {
+            //src = expressionSemantic(e, sc);
             if (dotId.ident == Id._tupleof)
             {
                 // we need to let the tupleof expand
@@ -5153,6 +5156,22 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
             case TOK.type:
                 // TODO: confirm that a TypeExp can NOT be a TypeTuple, otherwise this needs to be expanded
+                TypeExp n = cast (TypeExp) src;
+                // - of course it can be a type tuple :)
+                if (n.type.ty == Ttuple)
+                {
+                    Expressions* res = new Expressions();
+                    ExpandResult type = duplicateTree(n.type, sc);
+                    res.setDim(type.ttup.length);
+                    // let's sneakly wrap the result in a TypeExp ... that's why we have that strange thing ;)
+                    foreach(i;0 .. type.ttup.length)
+                    {
+                        (*res)[i] = new TypeExp(n.loc, (*type.ttup)[i]);
+                    }
+
+                    return ExpandResult(null, res);
+                }
+
                 return ExpandResult(src, null);
 
             case TOK.address:
@@ -5168,7 +5187,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.dotVariable:
                 UnaExp n = cast(UnaExp)src;
                 ExpandResult e1 = duplicateTree(n.e1, sc);
-
+/+
+                if (e1.ttup)
+                {
+                    Expressions* res = new Expressions();
+                    res.setDim(e1.ttup.length);
+                    foreach (i; 0 .. res.length)
+                    {
+                        UnaExp cpy = cast(UnaExp)n.copy();
+                        auto type = (*e1.ttup)[i];
+                        cpy.e1 = new TypeExp(n.loc, type);
+                        (*res)[i] = cpy;
+                    }
+                    return ExpandResult(null, res);
+                }
++/
                 if (!e1.etup)
                 {
                     n.e1 = e1.e;
@@ -5573,7 +5606,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
     override void visit(DotDotDotExp e)
     {
         ExpandResult res = duplicateTree(e.e1, sc);
-        if (res.etup)
+        if (res.etup || res.ttup)
             result = expressionSemantic(new TupleExp(e.loc, res.etup), sc);
         else
         {
