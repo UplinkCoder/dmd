@@ -5147,6 +5147,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.this_:
             case TOK.null_:
             case TOK.variable :
+            case TOK.error :
                 // nodes with no children
                 return ExpandResult(src, null);
 
