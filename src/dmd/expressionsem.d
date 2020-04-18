@@ -5166,7 +5166,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             if (dotId.ident == Id._tupleof)
             {
                 // we need to let the tupleof expand
-                src = expressionSemantic(e, sc);
+                // src = expressionSemantic(e, sc);
             }
         }
 
@@ -5668,6 +5668,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
                 if (!tupLen)
                 {
+                    printf("tupLen Zero!\n");
                     return ExpandResult(n, null);
                 }
 
