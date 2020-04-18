@@ -8514,7 +8514,6 @@ final class Parser(AST) : Lexer
             switch (token.value)
             {
                 case TOK.dotDotDot : 
-                    printf("PARSER: saw a tuple expand on %s\n", e.toChars());
                     e = new AST.DotDotDotExp(loc, e);
                     break;
             case TOK.dot:
