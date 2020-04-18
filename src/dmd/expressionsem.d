@@ -5103,6 +5103,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         IdentifierExp ident = src.isIdentifierExp();
         if (ident)
             src = ident.expressionSemantic(sc);
+
         if (DotIdExp dotId = src.isDotIdExp)
         {
             if (dotId.ident == Id._tupleof)
@@ -5145,6 +5146,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.string_:
             case TOK.this_:
             case TOK.null_:
+            case TOK.variable :
                 // nodes with no children
                 return ExpandResult(src, null);
 
@@ -5502,6 +5504,51 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 // TODO: what other things can a ScopeExp do???
 
                 return ExpandResult(n, null);
+            case TOK.array:
+                ArrayExp n = cast(ArrayExp)src;
+                ExpandResult e1 = duplicateTree(n.e1, sc);
+                ExpandResult[] args = new ExpandResult[n.arguments.length];
+                Expressions* res;
+                size_t tupLen;
+
+                tupLen = (e1.etup) ? e1.etup.length : 0;
+                res = e1.etup ? e1.etup : null;
+
+                foreach (i; 0 .. args.length)
+                {
+                    args[i] = duplicateTree((*n.arguments)[i], sc);
+                    if (!args[i].etup)
+                        continue;
+                    if (!tupLen)
+                    {
+                        tupLen = args[i].etup.length;
+                        res = args[i].etup;
+                    }
+                    else if (args[i].etup.length != tupLen)
+                    {
+                        e.error("Tuples must have the same length for parallel expansion");
+                        return ExpandResult(new ErrorExp(), null);
+                    }
+                }
+
+                if (!tupLen)
+                {
+                    n.e1 = e1.e;
+                    return ExpandResult(n, null);
+                }
+
+                foreach (j; 0 .. res.length)
+                {
+                    ArrayExp cpy = cast(ArrayExp)n.copy();
+                    cpy.e1 = e1.etup ? (*e1.etup)[j] : e1.e;
+                    foreach(i; 0 .. args.length)
+                        (*cpy.arguments)[i] = args[i].etup ? (*args[i].etup)[j] : args[i].e;
+                    // if we don't call expresion semantic
+                    // on the copy for some reason we only
+                    // get the last tuple_element ...
+                    (*res)[j] = cpy.expressionSemantic(sc);
+                }
+                return ExpandResult(null, res);
 
             case TOK.dotTemplateInstance:
                 // TODO: this one is super important!!!
@@ -5509,7 +5556,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
             case TOK.assert_:
             case TOK.slice:
-            case TOK.array:
             case TOK.arrayLiteral:
             case TOK.assocArrayLiteral:
             case TOK.structLiteral:
@@ -5518,7 +5564,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 return ExpandResult(new ErrorExp(), null);
 
             default:
-                assert(false, "TODO: What node is this? Does it have children?");
+                assert(false, "TODO: What node is " ~ astTypeName(src) ~ "? Does it have children?" );
         }
         assert(false, "how did we get here?");
     }
