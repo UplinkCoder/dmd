@@ -5067,67 +5067,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
     }
 
-    extern(C++) class DotDotDotExpandVisitor : Visitor
-    {
-        TupleExp result;
-        alias visit = Visitor.visit;
-
-        override void visit(AddExp e)
-        {
-            if (!result)
-            {
-                auto exps = new Expressions;
-                result = new TupleExp(e.loc, exps);
-            }
-            else
-            {
-                assert(0, "At this point there better not be a result");
-            }
-
-            e.e1 = e.e1.expressionSemantic(sc);
-            e.e2 = e.e2.expressionSemantic(sc);
-
-            if (e.e1.isTupleExp() && e.e2.isTupleExp())
-            {
-                auto te1 = e.e1.isTupleExp();
-                auto te2 = e.e2.isTupleExp();
-
-                assert(te1.exps.length == te1.exps.length);
-
-
-                foreach(telem;*te1.exps)
-                {
-                    foreach(telem2;*te2.exps)
-                    {
-                        result.exps.push(new AddExp(e.loc, telem, telem2));
-                    }
-                }
-            }
-            else if (e.e1.isTupleExp())
-            {
-                auto te1 = e.e1.isTupleExp();
-
-                foreach(telem;*te1.exps)
-                {
-                    result.exps.push(new AddExp(e.loc, telem, e.e2));
-                }
-            }
-            else if (e.e2.isTupleExp())
-            {
-                auto te2 = e.e2.isTupleExp();
-                foreach(telem;*te2.exps)
-                {
-                    result.exps.push(new AddExp(e.loc, e.e1, telem));
-                }
-            }
-            else
-            {
-                printf("looks like someone expandend an + expression without a tuple in it ... we live in strange times ...\n");
-            }
-        }
-    }
-
-    struct ExpResult
+    struct ExpandResult
     {
         Expression e;
         Expressions* etup;
@@ -5135,36 +5075,34 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         Types* ttup;
     }
 
-    static ExpResult duplicateTree(Type t_, Scope* sc)
+    static ExpandResult duplicateTree(Type t, Scope* sc)
     {
-        auto t = typeSemantic(t_, Loc.initial, sc);
+        // TODO: if `t` is an identifier of a TupleExp (ie, not a TypeTuple), we need to produce a better error message
 
-        Types* tres;
+        Type src = typeSemantic(t, Loc.initial, sc);
 
-        if (auto ttuple = t.isTypeTuple())
+        if (TypeTuple tup = src.isTypeTuple())
         {
-            tres = new Types();
-            tres.reserve(ttuple.arguments.length);
-            tres.length = ttuple.arguments.length;
-            foreach(i, a;*ttuple.arguments)
+            Types* tres = new Types(tup.arguments.length);
+            foreach(i, a; *tup.arguments)
             {
                 assert(a.type);
                 (*tres)[i] = a.type;
             }
+            return ExpandResult(null, null, null, tres);
         }
-
-        return ExpResult(null, null, t, tres);
+        return ExpandResult(null, null, src, null);
     }
 
-    static ExpResult duplicateTree(Expression e, Scope* sc)
+    static ExpandResult duplicateTree(Expression e, Scope* sc)
     {
         Expression src = e;
-        
+
         // if src is an identifier, we need to resolve it
         IdentifierExp ident = src.isIdentifierExp();
         if (ident)
             src = ident.expressionSemantic(sc);
-        
+
         // if r is a `...` expression, we need to resolve it
         if (src.op == TOK.dotDotDot)
         {
@@ -5172,7 +5110,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             src = exp.expressionSemantic(sc);
             assert(src.isTupleExp());
         }
-        
+
         // if sec is a TupleExp, we expand...
         TupleExp tup = src.isTupleExp();
         if (tup)
@@ -5180,15 +5118,15 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             Expressions* res = new Expressions(tup.exps.length);
             foreach (i; 0 .. tup.exps.length)
             {
-                //                    // use IndexExp because maybe there's special sauce?
-                //                    (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
-                
+//                // use IndexExp because maybe there's special sauce?
+//                (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
+
                 // nar, just poach the element directly!
                 (*res)[i] = (*tup.exps)[i];
             }
-            return ExpResult(null, res);
+            return ExpandResult(null, res);
         }
-        
+
         // for any expressions with children, recurse and perform the expansion...
         switch (src.op)
         {
@@ -5199,12 +5137,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.this_:
             case TOK.null_:
                 // nodes with no children
-                return ExpResult(src, null);
-                
+                return ExpandResult(src, null);
+
             case TOK.type:
                 // TODO: confirm that a TypeExp can NOT be a TypeTuple, otherwise this needs to be expanded
-                return ExpResult(src, null);
-                
+                return ExpandResult(src, null);
+
             case TOK.address:
             case TOK.star:
             case TOK.negate:
@@ -5217,14 +5155,14 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.dotTemplateDeclaration:
             case TOK.dotVariable:
                 UnaExp n = cast(UnaExp)src;
-                ExpResult e1 = duplicateTree(n.e1, sc);
-                
+                ExpandResult e1 = duplicateTree(n.e1, sc);
+
                 if (!e1.etup)
                 {
                     n.e1 = e1.e;
-                    return ExpResult(n, null);
+                    return ExpandResult(n, null);
                 }
-                
+
                 Expressions* res = e1.etup;
                 foreach (i; 0 .. res.length)
                 {
@@ -5232,8 +5170,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     cpy.e1 = (*e1.etup)[i];
                     (*res)[i] = cpy;
                 }
-                return ExpResult(null, res);
-                
+                return ExpandResult(null, res);
+
             case TOK.add:
             case TOK.min:
             case TOK.concatenate:
@@ -5254,22 +5192,22 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.equal:
             case TOK.identity:
                 BinExp n = cast(BinExp)src;
-                ExpResult e1 = duplicateTree(n.e1, sc);
-                ExpResult e2 = duplicateTree(n.e2, sc);
-                
+                ExpandResult e1 = duplicateTree(n.e1, sc);
+                ExpandResult e2 = duplicateTree(n.e2, sc);
+
                 if (!e1.etup && !e2.etup)
                 {
                     n.e1 = e1.e;
                     n.e2 = e2.e;
-                    return ExpResult(n, null);
+                    return ExpandResult(n, null);
                 }
-                
+
                 if (e1.etup && e2.etup && e1.etup.length != e2.etup.length)
                 {
                     e.error("Tuples must have the same length for parallel expansion");
-                    return ExpResult(new ErrorExp(), null);
+                    return ExpandResult(new ErrorExp(), null);
                 }
-                
+
                 Expressions* res = e1.etup ? e1.etup : e2.etup;
                 foreach (i; 0 .. res.length)
                 {
@@ -5278,30 +5216,88 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     cpy.e2 = e2.etup ? (*e2.etup)[i] : e2.e;
                     (*res)[i] = cpy;
                 }
-                return ExpResult(null, res);
-                
+                return ExpandResult(null, res);
+
+            case TOK.cast_:
+                CastExp n = cast(CastExp)e;
+                ExpandResult e1 = duplicateTree(n.e1, sc);
+                ExpandResult to = duplicateTree(n.to, sc);
+
+                if (!e1.etup && !to.ttup)
+                {
+                    n.e1 = e1.e;
+                    n.to = to.t;
+                    return ExpandResult(n, null);
+                }
+
+                if (e1.etup && to.ttup && e1.etup.length != to.ttup.length)
+                {
+                    e.error("Tuples must have the same length for parallel expansion");
+                    return ExpandResult(new ErrorExp(), null);
+                }
+
+                Expressions* res = e1.etup ? e1.etup : new Expressions(to.ttup.length);
+                foreach (i; 0 .. res.length)
+                {
+                    CastExp cpy = cast(CastExp)n.copy();
+                    cpy.e1 = e1.etup ? (*e1.etup)[i] : e1.e;
+                    cpy.to = to.ttup ? (*to.ttup)[i] : to.t;
+                    (*res)[i] = cpy;
+                }
+                return ExpandResult(null, res);
+
+            case TOK.is_:
+                auto n = cast(IsExp)e;
+                ExpandResult targ = duplicateTree(n.targ, sc);
+                ExpandResult tspec = duplicateTree(n.tspec, sc);
+
+                // TODO: I think there's work to do with `n.parameters`...
+
+                if (!targ.ttup && !tspec.ttup)
+                {
+                    n.targ = targ.t;
+                    n.tspec = tspec.t;
+                    return ExpandResult(n, null);
+                }
+
+                if (targ.ttup && tspec.ttup && targ.ttup.length != tspec.ttup.length)
+                {
+                    e.error("Tuples must have the same length for parallel expansion");
+                    return ExpandResult(new ErrorExp(), null);
+                }
+
+                Expressions* res = new Expressions(targ.ttup ? targ.ttup.length : tspec.ttup.length);
+                foreach (i; 0 .. res.length)
+                {
+                    IsExp cpy = cast(IsExp)n.copy();
+                    cpy.targ = targ.ttup ? (*targ.ttup)[i] : targ.t;
+                    cpy.tspec = tspec.ttup ? (*tspec.ttup)[i] : tspec.t;
+                    (*res)[i] = cpy;
+                }
+                return ExpandResult(null, res);
+
             case TOK.question:
                 CondExp n = cast(CondExp)src;
-                ExpResult e1 = duplicateTree(n.e1, sc);
-                ExpResult e2 = duplicateTree(n.e2, sc);
-                ExpResult econd = duplicateTree(n.econd, sc);
-                
+                ExpandResult e1 = duplicateTree(n.e1, sc);
+                ExpandResult e2 = duplicateTree(n.e2, sc);
+                ExpandResult econd = duplicateTree(n.econd, sc);
+
                 if (!e1.etup && !e2.etup && !econd.etup)
                 {
                     n.e1 = e1.e;
                     n.e2 = e2.e;
                     n.econd = econd.e;
-                    return ExpResult(n, null);
+                    return ExpandResult(n, null);
                 }
-                
+
                 if ((e1.etup && e2.etup && e1.etup.length != e2.etup.length) ||
                     (e1.etup && econd.etup && e1.etup.length != econd.etup.length) ||
                     (e2.etup && econd.etup && e2.etup.length != econd.etup.length) )
                 {
                     e.error("Tuples must have the same length for parallel expansion");
-                    return ExpResult(new ErrorExp(), null);
+                    return ExpandResult(new ErrorExp(), null);
                 }
-                
+
                 Expressions* res = e1.etup ? e1.etup : e2.etup ? e2.etup : econd.etup;
                 foreach (i; 0 .. res.length)
                 {
@@ -5311,12 +5307,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     cpy.econd = econd.etup ? (*econd.etup)[i] : econd.e;
                     (*res)[i] = cpy;
                 }
-                return ExpResult(null, res);
-                
+                return ExpandResult(null, res);
+
             case TOK.call:
                 CallExp n = cast(CallExp)src;
-                ExpResult[] args = new ExpResult[n.arguments.length];
-                
+                ExpandResult[] args = new ExpandResult[n.arguments.length];
+
                 bool anyTuples = false;
                 size_t tupLen;
                 Expressions* res;
@@ -5334,17 +5330,17 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     else if (args[i].etup.length != tupLen)
                     {
                         e.error("Tuples must have the same length for parallel expansion");
-                        return ExpResult(new ErrorExp(), null);
+                        return ExpandResult(new ErrorExp(), null);
                     }
                 }
-                
+
                 if (!anyTuples)
                 {
                     foreach (i; 0 .. args.length)
                         (*n.arguments)[i] = args[i].e;
-                    return ExpResult(n, null);
+                    return ExpandResult(n, null);
                 }
-                
+
                 foreach (j; 0 .. res.length)
                 {
                     CallExp cpy = cast(CallExp)n.copy();
@@ -5353,19 +5349,81 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         (*cpy.arguments)[i] = args[i].etup ? (*args[i].etup)[j] : args[i].e;
                     (*res)[j] = cpy;
                 }
-                return ExpResult(null, res);
-                
+                return ExpandResult(null, res);
+
+            case TOK.traits:
+                TraitsExp n = cast(TraitsExp)src;
+                ExpandResult[] args = new ExpandResult[n.args.length];
+
+                bool anyTuples = false;
+                size_t tupLen;
+                Expressions* res;
+                foreach (i, arg; *n.args)
+                {
+                    if (arg.dyncast() == DYNCAST.expression)
+                        args[i] = duplicateTree(cast(Expression)arg, sc);
+                    else if (arg.dyncast() == DYNCAST.type)
+                        args[i] = duplicateTree(cast(Type)arg, sc);
+                    else
+                    {
+                        e.error("Unexpected __traits argument during tuple expansion");
+                        return ExpandResult(new ErrorExp(), null);
+                    }
+
+                    if (!args[i].etup && !args[i].ttup)
+                        continue;
+                    if (!anyTuples)
+                    {
+                        anyTuples = true;
+                        tupLen = args[i].etup ? args[i].etup.length : args[i].ttup.length;
+                        if (args[i].etup)
+                            res = args[i].etup;
+                    }
+                    else if ((args[i].etup && args[i].etup.length != tupLen) || (args[i].ttup && args[i].ttup.length != tupLen))
+                    {
+                        e.error("Tuples must have the same length for parallel expansion");
+                        return ExpandResult(new ErrorExp(), null);
+                    }
+                }
+
+                if (!anyTuples)
+                {
+                    foreach (i; 0 .. args.length)
+                        (*n.args)[i] = args[i].e ? args[i].e : args[i].t;
+                    return ExpandResult(n, null);
+                }
+
+                if (!res)
+                    res = new Expressions(tupLen);
+
+                foreach (j; 0 .. res.length)
+                {
+                    TraitsExp cpy = cast(TraitsExp)n.copy();
+                    cpy.args = new Objects(args.length);
+                    foreach (i; 0 .. args.length)
+                    {
+                        if (args[i].etup)
+                            (*cpy.args)[i] = (*args[i].etup)[j];
+                        else if (args[i].ttup)
+                            (*cpy.args)[i] = (*args[i].ttup)[j];
+                        else
+                            (*cpy.args)[i] = args[i].e ? args[i].e : args[i].t;
+                    }
+                    (*res)[j] = cpy;
+                }
+                return ExpandResult(null, res);
+
             case TOK.scope_:
                 ScopeExp n = cast(ScopeExp)src;
-                
+
                 TemplateInstance ti = n.sds.isTemplateInstance();
                 if (ti)
                 {
-                    e.error("Template instance expansion still WIP");
+                    ExpandResult[] tiargs = new ExpandResult[ti.tiargs.length];
 
                     //printf("\n\n\n---------tiargs: %s of astType: %s\n", (*ti.tiargs)[0].toChars(), astTypeName((*ti.tiargs)[0]).ptr);
                     // Thing!(Tup, x)  -->  Thing!(Tup[0], x), Thing!(Tup[1], x), ...
-                    
+
                     // HOW DO WE KNOW WHAT `ti.tiargs` ARE? - we use isType and getType, or isExpression ... see how traits are handled.
 
                     size_t verbatimcopy_pos = size_t.max;
@@ -5373,7 +5431,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     //auto tiargs = semanticTiargs(ti.tiargs);
 
 
-                    foreach(i, arg;*ti.tiargs)
+                    foreach(i, arg; *ti.tiargs)
                     {
                         // if the template takes a tuple here, we are done
                         if (ti.tdtypes.length > i && getType(ti.tdtypes[i]).ty == Ttuple)
@@ -5388,9 +5446,14 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
                             //assert(0, "TODO symbol path");
 
-                        } else if (auto type = isType(arg))
+                        }
+                        else if (auto type = isType(arg))
                         {
                             printf("WE've got a type\n and it is: %s\n", type.toChars());
+
+                            auto s = typeSemantic(type, Loc.initial, sc);
+                            assert(s);
+
                             //assert(0);
                             ///TODO doe the same is in callExp.
                         }
@@ -5413,102 +5476,28 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     }
 
                     //e.error("Template instance expansion still WIP");
-                    //return ExpResult(new ErrorExp(), null);
-                    
+                    //return ExpandResult(new ErrorExp(), null);
+
                     // if tiargs are all types, then we resolve a type list
                     // if ANY tiargs are expressions, then we return a normal tuple, wrapping types in TypeExp?
-                    
-                    //                        Expressions* res = new Expressions(ti.tiargs.length);
-                    //                        foreach (i; 0 .. ti.tiargs.length)
-                    //                        {
-                    //                            // use IndexExp because maybe there's special sauce?
-                    //                            (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
-                    //                        }
-                    //                        return ExpResult(null, res);
+
+//                    Expressions* res = new Expressions(ti.tiargs.length);
+//                    foreach (i; 0 .. ti.tiargs.length)
+//                    {
+//                        // use IndexExp because maybe there's special sauce?
+//                        (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
+//                    }
+//                    return ExpandResult(null, res);
                 }
-                
+
                 // TODO: what other things can a ScopeExp do???
-                
-                return ExpResult(n, null);
 
-            case TOK.is_:
-                auto ise = cast(IsExp) e;
-                Expressions* res = new Expressions();
-                
-                ExpResult targ = duplicateTree(ise.targ, sc);
-                ExpResult tspec = duplicateTree(ise.tspec, sc);
-                size_t tupLen;
-                
-                if (targ.ttup && tspec.ttup)
-                {
-                    assert(targ.ttup.length == tspec.ttup.length);
-                    tupLen = targ.ttup.length;
-                }
-                else if (targ.ttup)
-                {
-                    tupLen = targ.ttup.length;
-                }
-                else if (tspec.ttup)
-                {
-                    tupLen = tspec.ttup.length;
-                }
-                
-                res.reserve(tupLen);
-                res.length = tupLen;
-                
-                foreach(i; 0 .. tupLen)
-                {
-                    IsExp cpy = cast(IsExp)ise.copy();
-                    cpy.targ = targ.ttup ? (*targ.ttup)[i] : targ.t;
-                    cpy.tspec = tspec.ttup ? (*tspec.ttup)[i] : tspec.t;
-                    (*res)[i] = cpy;
-                }
-                
-                return ExpResult(null, res);
+                return ExpandResult(n, null);
 
-            case TOK.cast_:
-                CastExp ce = cast(CastExp)e;
-                ExpResult e1 = duplicateTree(ce.e1, sc);
-                ExpResult to = duplicateTree(ce.to, sc);
-
-                Expressions* res = new Expressions();
-                size_t tupLen;
-                if (e1.etup && to.ttup)
-                {
-                    tupLen = e1.etup.length;
-                    if (e1.etup.length != to.ttup.length)
-                    {
-                        e.error("Tuples must have the same length for parallel expansion");
-                        return ExpResult(new ErrorExp());
-                    }
-                } else if (e1.etup)
-                {
-                    tupLen = e1.etup.length;
-                }
-                else if (to.ttup)
-                {
-                    tupLen = to.ttup.length;
-                }
-                else
-                {
-                    assert(0, "No tuple in castExp ... should we have caught already?");
-                }
-
-                res.reserve(tupLen);
-                res.length = tupLen;
-                foreach(i; 0 .. tupLen)
-                {
-                    CastExp cpy = cast(CastExp)ce.copy();
-                    cpy.e1 = e1.etup ? (*e1.etup)[i] : e1.e;
-                    cpy.to = to.ttup ? (*to.ttup)[i] : to.t;
-                    (*res)[i] = cpy;
-                }
-
-                return ExpResult(null, res);
             case TOK.dotTemplateInstance:
                 // TODO: this one is super important!!!
                 // this one enabled `staticMap`
-                 
+
             case TOK.assert_:
             case TOK.slice:
             case TOK.array:
@@ -5516,10 +5505,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.assocArrayLiteral:
             case TOK.structLiteral:
             case TOK.new_:
-            case TOK.traits:
                 e.error("Tuple expansion not yet supported for this expression");
-                return ExpResult(new ErrorExp(), null);
-                
+                return ExpandResult(new ErrorExp(), null);
+
             default:
                 assert(false, "TODO: What node is this? Does it have children?");
         }
@@ -5528,7 +5516,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     override void visit(DotDotDotExp e)
     {
-        ExpResult res = duplicateTree(e.e1, sc);
+        ExpandResult res = duplicateTree(e.e1, sc);
         if (res.etup)
             result = expressionSemantic(new TupleExp(e.loc, res.etup), sc);
         else
