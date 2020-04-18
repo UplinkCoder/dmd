@@ -5150,12 +5150,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     static ExpandResult duplicateTree(Expression e, Scope* sc)
     {
+        import dmd.asttypename; // debug remove before PR
         Expression src = e;
 
         // if src is an identifier, we need to resolve it
         IdentifierExp ident = src.isIdentifierExp();
         if (ident)
             src = ident.expressionSemantic(sc);
+        if (DotIdExp dotId = src.isDotIdExp)
+        {
+            if (dotId.ident == Id._tupleof)
+            {
+                // we need to let the tupleof expand
+                src = expressionSemantic(e, sc);
+            }
+        }
 
         // if r is a `...` expression, we need to resolve it
         if (src.op == TOK.dotDotDot)
@@ -5559,7 +5568,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.assocArrayLiteral:
             case TOK.structLiteral:
             case TOK.new_:
-                e.error("Tuple expansion not yet supported for this expression");
+                e.error("Tuple expansion not yet supported for this expression %s", astTypeName(e).ptr);
                 return ExpandResult(new ErrorExp(), null);
 
             default:
