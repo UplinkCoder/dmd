@@ -5121,6 +5121,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         {
             DotDotDotExp exp = cast(DotDotDotExp)src;
             src = exp.expressionSemantic(sc);
+            if (src.op == TOK.error)
+            {
+                return ExpandResult(src, null);
+            }
             assert(src.isTupleExp());
         }
 
@@ -5584,13 +5588,57 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 }
                 return ExpandResult(null, res);
 
+            case TOK.arrayLiteral:
+                // every element, if a tuple, needs to be a tuple of the same length
+                ArrayLiteralExp n = cast(ArrayLiteralExp) src;
+                ExpandResult[] elems = new ExpandResult[n.elements.length];
+                Expressions* res;
+                size_t tupLen;
+
+                foreach (i; 0 .. elems.length)
+                {
+                    elems[i] = duplicateTree((*n.elements)[i], sc);
+                    if (!elems[i].etup)
+                        continue;
+                    if (!tupLen)
+                    {
+                        tupLen = elems[i].etup.length;
+                        res = elems[i].etup;
+                    }
+                    else if (elems[i].etup.length != tupLen)
+                    {
+                        e.error("Tuples must have the same length for parallel expansion");
+                        return ExpandResult(new ErrorExp(), null);
+                    }
+                }
+
+                if (!tupLen)
+                {
+                    return ExpandResult(n, null);
+                }
+
+                foreach (j; 0 .. res.length)
+                {
+                    ArrayLiteralExp cpy = cast(ArrayLiteralExp)n.copy();
+                    foreach(i; 0 .. elems.length)
+                        (*cpy.elements)[i] = elems[i].etup ? (*elems[i].etup)[j] : elems[i].e;
+                    // if we don't call expresion semantic
+                    // on the copy for some reason we only
+                    // get the last tuple_element ...
+                    (*res)[j] = cpy.expressionSemantic(sc);
+                }
+                bool true_ = false;
+                if (true_) assert(0);
+                printf("[%s]res: %s of node: %s\n", Token.toChars(src.op), res.toChars, e.toChars());
+                return ExpandResult(null, res);
+
+
             case TOK.dotTemplateInstance:
                 // TODO: this one is super important!!!
                 // this one enabled `staticMap`
 
             case TOK.assert_:
             case TOK.slice:
-            case TOK.arrayLiteral:
             case TOK.assocArrayLiteral:
             case TOK.structLiteral:
             case TOK.new_:

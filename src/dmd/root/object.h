@@ -34,6 +34,8 @@ enum DYNCAST
  */
 class RootObject
 {
+
+	size_t serial;
 public:
     RootObject() { }
 

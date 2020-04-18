@@ -23,8 +23,22 @@ alias structs = Seq!(S, S1);
 
 static assert([structs.sizeof...] == [5, 4]);
 static assert([__traits(identifier, structs)...] == ["S", "S1"]);
+//pragma(msg, ((structs.tupleof)...).stringof...);
 
-// pragma(msg, ([ __traits(identifier, structs)...], [ __traits(identifier, (structs.tupleof)...)]...));
+struct MetaInfo
+{
+    string[] struct_names;
+    string[][] struct_members;
+    uint[]     number_of_members;  
+    size_t[] struct_size;
+}
+pragma(msg, "(structs.tupleof...)", (structs.tupleof...).stringof);
+
+static immutable info = MetaInfo(   [ __traits(identifier, structs)...],
+                                    [ [(structs.tupleof...).stringof]...],
+                                    [ structs.tupleof.length... ],
+                                    [structs.sizeof...]  ); 
+pragma(msg, info);
 
 
 static assert ([(SC.tupleof.sizeof...)] == 
