@@ -5098,7 +5098,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
     {
 
         import dmd.asttypename; // debug remove before PR
-        printf("Incoming: %s (%s)\n", e.toChars(), astTypeName(e).ptr);
+        // printf("Incoming: %s (%s)\n", e.toChars(), astTypeName(e).ptr);
         Expression src = e;
 
         // if src is an identifier, we need to resolve it

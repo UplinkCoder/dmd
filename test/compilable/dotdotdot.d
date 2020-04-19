@@ -24,7 +24,6 @@ alias structs = Seq!(S, S1);
 
 static assert([structs.sizeof...] == [12, 4]);
 static assert([__traits(identifier, structs)...] == ["S", "S1"]);
-// pragma(msg, [structs.tupleof....stringof...]); 
 
 struct MetaInfo
 {
