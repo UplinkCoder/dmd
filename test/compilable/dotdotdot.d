@@ -28,24 +28,51 @@ static assert([__traits(identifier, structs)...] == ["S", "S1"]);
 
 struct MetaInfo
 {
-    string[] struct_names;
-//    string[][] struct_members;
-    uint[]     number_of_members;  
-    size_t[] struct_size;
+    string struct_name;
+    uint    number_of_members; 
+    string[] struct_members;
+    uint[] struct_member_offsets;
+    size_t struct_size;
 }
-// pragma(msg, "(structs.tupleof...)", (structs.tupleof...).stringof);
 
-static immutable info = MetaInfo(   [ __traits(identifier, structs)...],
-//                                    [ [ (structs.tupleof...).stringof]...],
-                                    [ structs.tupleof.length... ],
-                                    [structs.sizeof...]  ); 
-pragma(msg, info);
+template GetMetaInfo(T)
+{
+    enum GetMetaInfo = MetaInfo(
+        __traits(identifier, T),
+        T.tupleof.length,
+        [T.tupleof.stringof...],
+        [T.tupleof.offsetof...],
+        T.sizeof
+    );
+}
 
-static assert(__ArrayEq(info.struct_names, ["S", "S1"]));  // can't do == because life's not nice
-static assert(info.number_of_members == [3,1]);
-static assert(info.struct_size == [12,4]);
+string structToString(T) (T _struct)
+{
+    import std.conv : to;
+    string result;
+    static immutable MetaInfo info = GetMetaInfo!(T);
+    result = info.struct_name ~ " :: {\n";
+    foreach(i, m; _struct.tupleof)
+    {
+        result ~= "    " ~ info.struct_members[i] ~ " : "  ~ to!string(m) ~ "\n";
+    }
+    result ~= "}";
+    return result;
+}
 
-/+ broken by not calling semantic directly on tupleof...
+pragma(msg, GetMetaInfo!S.structToString);
+pragma(msg, GetMetaInfo!S1.structToString);
+static assert (GetMetaInfo!(S1).structToString ==
+q{MetaInfo :: {
+    struct_name : S1
+    number_of_members : 1
+    struct_members : ["b"]
+    struct_member_offsets : [0]
+    struct_size : 4
+}});
+
+
+/+
 static assert ([(SC.tupleof....sizeof...)] == 
                                [1,      1,              1,      1,      4]);
 static assert ([(SC.tupleof....stringof...)] == 
