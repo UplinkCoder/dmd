@@ -716,11 +716,11 @@ else
 }
 __gshared uint codegenQueueNextEntry;
 __gshared uint codegenQueueCount;
-__gshared FuncDeclaration_toObjFile_work[512]* frontQueuePtr;
-__gshared FuncDeclaration_toObjFile_work[512]* backQueuePtr;
+__gshared FuncDeclaration_toObjFile_work[4096]* frontQueuePtr;
+__gshared FuncDeclaration_toObjFile_work[4096]* backQueuePtr;
 
-__gshared FuncDeclaration_toObjFile_work[512] codegenFrontQueue;
-__gshared FuncDeclaration_toObjFile_work[512] codegenBackQueue;
+__gshared FuncDeclaration_toObjFile_work[4096] codegenFrontQueue;
+__gshared FuncDeclaration_toObjFile_work[4096] codegenBackQueue;
 __gshared bool codegenQueueIsLocked;
 
 enum MAX_WORKER_THREADS = 1;
@@ -882,7 +882,7 @@ wait_handle enqueue_FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
             {
                 mixin(LockQueue("codegenQueueLocked"));
                 codegenQueueIsLocked = true;
-                assert(codegenQueueCount < 480, "Queue got too full");
+                assert(codegenQueueCount < 3000, "Queue got too full");
                 {
                     result = codegenQueueCount;
                     (*backQueuePtr)[codegenQueueCount++] = FuncDeclaration_toObjFile_work(fd, multiobj);

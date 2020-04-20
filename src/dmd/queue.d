@@ -11,7 +11,7 @@ version (linux)
 static immutable string __mmPause = "asm nothrow pure { rep; nop; }";
 immutable string readFence = ``;
 immutable string writeFence = ``;
-enum debug_threading = 1;
+enum debug_threading = 0;
 
 extern(C) uint GetThreadId()
 {
