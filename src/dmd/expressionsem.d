@@ -5146,7 +5146,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             size_t len = (*childList).length;
             assert(len > 0); // confirm an assumption that childList length > 0 of not `null` (enables an optimization)
             // attempt to use stack memory for temp results rather than spamming garbage
-            if (len < NumStackNodes - childNodes.length)
+            if (len <= NumStackNodes - childNodes.length)
                 listExp = exp[$ - len .. $];
             else
                 listExp = new ExpandResult[len];
@@ -5323,6 +5323,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.remove:
             case TOK.equal:
             case TOK.identity:
+            case TOK.assign:
                 BinExp n = cast(BinExp)src;
                 return expandExprNode((bool copy, Expression[] e, typeof(null)) {
                     BinExp res = copy ? cast(BinExp)n.copy() : n;
