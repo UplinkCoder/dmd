@@ -11,18 +11,19 @@ align(1)
 struct S
 {
    int a;
-   char c;
+   char c = 'x';
    int h;
 }
 
 struct S1
 {
    int b;
+   S s;
 }
 
 alias structs = Seq!(S, S1);
 
-static assert([structs.sizeof...] == [12, 4]);
+static assert([structs.sizeof...] == [12, 16]);
 static assert([__traits(identifier, structs)...] == ["S", "S1"]);
 
 struct MetaInfo
@@ -45,17 +46,27 @@ template GetMetaInfo(T)
     );
 }
 
-string structToString(T) (T _struct)
+string structToString(T) (T _struct, uint indent = 1)
 {
     import std.conv : to;
     string result;
+    const string indent_string =
+        () { char[] result; result.length = indent * 4; result[] = ' '; return cast(string)result; } ();
     static immutable MetaInfo info = GetMetaInfo!(T);
     result = info.struct_name ~ " :: {\n";
     foreach(i, m; _struct.tupleof)
     {
-        result ~= "    " ~ info.struct_members[i] ~ " : "  ~ to!string(m) ~ "\n";
+        result ~= indent_string;
+        static if (is(typeof(m) == struct))
+        {
+            result ~= info.struct_members[i] ~ " : " ~ structToString(m, indent + 1);
+        }
+        else
+        {
+            result ~= info.struct_members[i] ~ " : "  ~ to!string(m) ~ "\n";
+        }
     }
-    result ~= "}";
+    result ~= indent_string[4 .. $] ~ "}\n";
     return result;
 }
 
@@ -64,12 +75,13 @@ pragma(msg, GetMetaInfo!S1.structToString);
 static assert (GetMetaInfo!(S1).structToString ==
 q{MetaInfo :: {
     struct_name : S1
-    number_of_members : 1
-    struct_members : ["b"]
-    struct_member_offsets : [0]
-    struct_size : 4
-}});
-
+    number_of_members : 2
+    struct_members : ["b", "s"]
+    struct_member_offsets : [0, 4]
+    struct_size : 16
+}
+});
+pragma(msg, structToString(S1.init));
 
 /+
 static assert ([(SC.tupleof....sizeof...)] == 
