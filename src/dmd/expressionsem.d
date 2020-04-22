@@ -5109,10 +5109,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         ExpandResult[] listExp = void;
 
         bool anyTuples = false;
-        size_t tupLen = void;
-        Expressions* recycleTup = void;
+        size_t tupLen;
+        Expressions* recycleTup;
 
-        // track if we found a tuple, and validates tuples are matching lengths
+        /// track if we found a tuple, and validates tuples are matching lengths
         bool validateTuple(ref ExpandResult expResult)
         {
             if ((IsTypeList || !expResult.etup) && (IsExprList || !expResult.ttup))
@@ -5219,13 +5219,11 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         Expression src = e;
 
         // if src is an identifier, we need to resolve it
-        IdentifierExp ident = src.isIdentifierExp();
-        if (ident)
+        if (auto ident = src.isIdentifierExp)
             src = ident.expressionSemantic(sc);
 
         if (DotIdExp dotId = src.isDotIdExp)
         {
-            //src = expressionSemantic(e, sc);
             if (dotId.ident == Id._tupleof)
             {
                 // we need to let the tupleof expand
