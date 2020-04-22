@@ -51,7 +51,7 @@ string structToString(T) (T _struct, uint indent = 1)
     import std.conv : to;
     string result;
     const string indent_string =
-        () { char[] result; result.length = indent * 4; result[] = ' '; return cast(string)result; } ();
+        (uint indent) { char[] result; result.length = indent * 4; result[] = ' '; return cast(string)result; } (indent);
     static immutable MetaInfo info = GetMetaInfo!(T);
     result = info.struct_name ~ " :: {\n";
     foreach(i, m; _struct.tupleof)
