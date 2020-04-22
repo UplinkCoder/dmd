@@ -5490,29 +5490,67 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                             Type realType;
                             Expression ex;
                             Dsymbol sym;
+                            printf("type before resolve astTypeName: %s\n", astTypeName(type).ptr);
                             resolve(type, ti.loc, sc, &ex, &realType, &sym);
-                            printf("astTypeName: %s\n", astTypeName(type).ptr);
                             auto s = type;
-                            printf("WE've got a type\n and it is: %s\n", astTypeName(sym).ptr);
+                            //printf("WE've got a type\n and it is: %s\n", astTypeName(sym).ptr);
 
-                            if (TupleDeclaration tupdecl = sym.isTupleDeclaration())
+                            if (sym)
                             {
-                                dsymbolSemantic(tupdecl, sc);
-                                auto t = tupdecl.tupletype;
-
-                                printf("TupleDeclarartion %s\n", tupdecl.toChars());
-                                printf("TupleDeclarartion.tupletype %x\n", tupdecl.tupletype);
-
-                                //if (!t)
+                                if (TupleDeclaration tupdecl = sym.isTupleDeclaration())
                                 {
-                                    tupleObjs[i] = tupdecl.objects;
-                                    tupLen = tupdecl.objects.length;
-                                    foreach(o;*tupdecl.objects)
+                                    dsymbolSemantic(tupdecl, sc);
+                                    auto t = tupdecl.tupletype;
+
+                                    printf("TupleDeclarartion %s\n", tupdecl.toChars());
+                                    printf("TupleDeclarartion.tupletype %x\n", tupdecl.tupletype);
+
+                                    //if (!t)
                                     {
-                                        printf("o = %s\n", o.toChars());
-                                        printf("o.astTypeName: %s\n", astTypeName(o).ptr);
+                                        tupleObjs[i] = tupdecl.objects;
+                                        tupLen = tupdecl.objects.length;
+                                        foreach(o;*tupdecl.objects)
+                                        {
+                                            printf("o = %s\n", o.toChars());
+                                            printf("o.astTypeName: %s\n", astTypeName(o).ptr);
+                                        }
                                     }
                                 }
+                            }
+                            else if (realType)
+                            {
+                                printf("realType: astTypeName: %s\n", astTypeName(realType).ptr);
+                                printf("It's a type for real\n");
+
+                                if (realType.ty == Terror)
+                                    return ExpandResult(null, null, realType, null);
+
+                                auto tt = realType.isTypeTuple();
+                                if (tt)
+                                {
+                                    Types* types = new Types();
+                                    types.setDim(tt.arguments.length);
+                                    tt = cast(TypeTuple) typeSemantic(tt, ti.loc, sc);
+                                    tupLen = tt.arguments.length;
+                                    printf("tupletype: %x\n", tt);
+                                    foreach(j;0 .. tt.arguments.length)
+                                    {
+                                        (*types)[j] = (*tt.arguments)[j].type;
+                                    }
+                                    tupleObjs[i] = cast(Objects*) types;
+                                }
+                                else
+                                    assert(0, "Expected TypeTuple");
+                            }
+                            else if (ex)
+                            {
+                                printf("It's an expression \n");
+                                printf("ex: %s\n", ex.toChars());
+                                if (TupleExp te = ex.isTupleExp())
+                                {
+                                    tupleObjs[i] = cast(Objects*)te.exps;
+                                }
+
                             }
 
                             // auto s = typeSemantic(type, Loc.initial, sc);
@@ -5521,18 +5559,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
                             // tiargs[i] = duplicateTree(s, sc);
 
-                            if (tupletype)
-                            {
-                                printf("It's a tuple\n");
-                                if (!tupLen)
-                                {
-                                    tupLen = tiargs[i].ttup.length;
-                                }
-                                else
-                                {
-                                    assert(tiargs[i].ttup.length == tupLen);
-                                }
-                            }
                             //assert(0);
                             ///TODO doe the same is in callExp.
                         }
@@ -5579,6 +5605,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         auto newTI = cast(TemplateInstance) se.sds.syntaxCopy(null);
                         newTI.tiargs = tiargObjs;
                         se.sds = newTI;
+                        //printf("before printing se\n");
+                        //printf("se.sds: %s\n", se.sds.toChars());
                         printf("se: %s\n", se.toChars());
                         (*res)[i] = se;
                     }
