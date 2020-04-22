@@ -41,7 +41,7 @@ template GetMetaInfo(T)
         __traits(identifier, T),
         T.tupleof.length,
         [T.tupleof.stringof...],
-        [T.tupleof.offsetof...],
+        [GetMetaInfo!(typeof(T.tupleof))...],
         T.sizeof
     );
 }
