@@ -5451,8 +5451,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 TemplateInstance ti = n.sds.isTemplateInstance();
                 if (ti)
                 {
-                    ExpandResult[] tiargs = new ExpandResult[ti.tiargs.length];
 
+                    size_t tupLen = 1;
+                    ExpandResult[] tiargs = new ExpandResult[ti.tiargs.length];
+                    Objects*[] tupleObjs = new Objects*[ti.tiargs.length];
                     //printf("\n\n\n---------tiargs: %s of astType: %s\n", (*ti.tiargs)[0].toChars(), astTypeName((*ti.tiargs)[0]).ptr);
                     // Thing!(Tup, x)  -->  Thing!(Tup[0], x), Thing!(Tup[1], x), ...
 
@@ -5481,17 +5483,63 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         }
                         else if (auto type = isType(arg))
                         {
-                            printf("WE've got a type\n and it is: %s\n", type.toChars());
+                            TypeTuple tupletype;
 
-                            auto s = typeSemantic(type, Loc.initial, sc);
+                            import dmd.asttypename;
+                            import dmd.mtype;
+                            Type realType;
+                            Expression ex;
+                            Dsymbol sym;
+                            resolve(type, ti.loc, sc, &ex, &realType, &sym);
+                            printf("astTypeName: %s\n", astTypeName(type).ptr);
+                            auto s = type;
+                            printf("WE've got a type\n and it is: %s\n", astTypeName(sym).ptr);
+
+                            if (TupleDeclaration tupdecl = sym.isTupleDeclaration())
+                            {
+                                dsymbolSemantic(tupdecl, sc);
+                                auto t = tupdecl.tupletype;
+
+                                printf("TupleDeclarartion %s\n", tupdecl.toChars());
+                                printf("TupleDeclarartion.tupletype %x\n", tupdecl.tupletype);
+
+                                //if (!t)
+                                {
+                                    tupleObjs[i] = tupdecl.objects;
+                                    tupLen = tupdecl.objects.length;
+                                    foreach(o;*tupdecl.objects)
+                                    {
+                                        printf("o = %s\n", o.toChars());
+                                        printf("o.astTypeName: %s\n", astTypeName(o).ptr);
+                                    }
+                                }
+                            }
+
+                            // auto s = typeSemantic(type, Loc.initial, sc);
+                            printf("type: %s\n", type.toChars());
                             assert(s);
 
+                            // tiargs[i] = duplicateTree(s, sc);
+
+                            if (tupletype)
+                            {
+                                printf("It's a tuple\n");
+                                if (!tupLen)
+                                {
+                                    tupLen = tiargs[i].ttup.length;
+                                }
+                                else
+                                {
+                                    assert(tiargs[i].ttup.length == tupLen);
+                                }
+                            }
                             //assert(0);
                             ///TODO doe the same is in callExp.
                         }
                         else if (auto exp = isExpression(arg))
                         {
                             printf("got a expression: %s\n", exp.toChars());
+
                         }
                     }
 
@@ -5513,13 +5561,31 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     // if tiargs are all types, then we resolve a type list
                     // if ANY tiargs are expressions, then we return a normal tuple, wrapping types in TypeExp?
 
-//                    Expressions* res = new Expressions(ti.tiargs.length);
-//                    foreach (i; 0 .. ti.tiargs.length)
-//                    {
-//                        // use IndexExp because maybe there's special sauce?
-//                        (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
-//                    }
-//                    return ExpandResult(null, res);
+                    TemplateInstance nx = cast(TemplateInstance)src;
+
+                    Expressions* res = new Expressions(tupLen);
+
+
+                    //Objects* res = new Objects(ti.tiargs.length);
+                    printf("tuplen: %d\n", tupLen);
+                    foreach (i; 0 .. tupLen)
+                    {
+                        auto tiargObjs = new Objects (ti.tiargs.length);
+                        foreach(j; 0 .. ti.tiargs.length)
+                        {
+                            (*tiargObjs)[j] = tupleObjs[j] ? (*tupleObjs[j])[i] : tiargs[j].t;
+                        }
+                        auto se = cast(ScopeExp)src.copy();
+                        auto newTI = cast(TemplateInstance) se.sds.syntaxCopy(null);
+                        newTI.tiargs = tiargObjs;
+                        se.sds = newTI;
+                        printf("se: %s\n", se.toChars());
+                        (*res)[i] = se;
+                    }
+
+
+                    //printf("res: %s\n", res.toChars());
+                    return ExpandResult(null, res);
                 }
 
                 // TODO: what other things can a ScopeExp do???
@@ -5549,7 +5615,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             result = expressionSemantic(new TupleExp(e.loc, res.etup), sc);
         else
         {
-            e.error("No tuple was found beneath `...` expression");
+            e.error("No tuple was found beneath `...` expression %s", e.toChars());
             result = expressionSemantic(new ErrorExp(), sc);
         }
     }
