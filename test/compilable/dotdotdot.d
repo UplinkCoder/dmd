@@ -83,10 +83,10 @@ q{MetaInfo :: {
 });
 pragma(msg, structToString(S1.init));
 
-/+
+
 static assert ([(SC.tupleof....sizeof...)] == 
                                [1,      1,              1,      1,      4]);
 static assert ([(SC.tupleof....stringof...)] == 
                                   ["x",        "y",         "z",    "w",     "f"]);
 extern(C) align(4) struct SC { char x = 4; char y = 12; char z; char w; float f = 84.3; }
-+/
+
