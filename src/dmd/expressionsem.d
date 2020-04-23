@@ -5097,6 +5097,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
     static extern(D) ExpandResult expandExprNode(ListType)(scope Expression delegate(bool copy, Expression[] childNodes, ListType childNodeList) copyNode,
                                                  Scope* sc, Expression node, ListType childList, Expression[] childNodes ...)
     {
+
         enum HasList = !is(ListType == typeof(null));
         enum IsExprList = is(ListType == Expressions*);
         enum IsTypeList = is(ListType == Types*);
@@ -5491,6 +5492,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                             Expression ex;
                             Dsymbol sym;
                             printf("type before resolve astTypeName: %s\n", astTypeName(type).ptr);
+                            printf("sc: %x\n", sc);
                             resolve(type, ti.loc, sc, &ex, &realType, &sym);
                             auto s = type;
                             //printf("WE've got a type\n and it is: %s\n", astTypeName(sym).ptr);
@@ -5628,8 +5630,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.assocArrayLiteral:
             case TOK.structLiteral:
             case TOK.new_:
-                e.error("Tuple expansion not supported for this expression");// %s", astTypeName(e).ptr);
+            {
+                import dmd.asttypename;
+                e.error("Tuple expansion not supported for this expression %s", astTypeName(e).ptr);
                 return ExpandResult(new ErrorExp(), null);
+
+            }
 
             default:
                 assert(false, "TODO: What node is this? Does it have children?" );
