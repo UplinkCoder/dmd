@@ -5131,19 +5131,87 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     static ExpandResult duplicateTree(Type t, Scope* sc)
     {
-        // TODO: if `t` is an identifier of a TupleExp (ie, not a TypeTuple), we need to produce a better error message
+        // needs to receive as argument!!
+        Loc locHack = Loc.initial;
 
-        Type src = typeSemantic(t, Loc.initial, sc);
+        Type src = t;
+
+        // it is possible that types are not actually types!
+        Expression expr;
+        Type actualType;
+        Dsymbol sym;
+        src.resolve(locHack, sc, &expr, &actualType, &sym);
+        if (sym)
+        {
+            if (TupleDeclaration tup = sym.isTupleDeclaration())
+            {
+                dsymbolSemantic(tup, sc);
+                assert(!tup.tupletype, "Should be impossible? `actualType` should be non-null instead.");
+
+                Expressions* eres;
+                Types* tres;
+                foreach(i, obj; *tup.objects)
+                {
+                    if (Expression ex = obj.isExpression())
+                    {
+                        if (!eres)
+                        {
+                            eres = new Expressions(tup.objects.length);
+                            (*eres)[][] = null;
+                        }
+                        (*eres)[i] = ex;
+                    }
+                    else if (Type ty = obj.isType())
+                    {
+                        if (!tres)
+                        {
+                            tres = new Types(tup.objects.length);
+                            (*tres)[][] = null;
+                        }
+                        (*tres)[i] = ty;
+                    }
+                    else
+                        assert(false, "what is?");
+                }
+                return ExpandResult(null, eres, null, tres);
+            }
+
+            // TODO: what to return? O_o
+            // we can return the original `src`, but I hope `resolve` didn't mess with it!
+            return ExpandResult(null, null, src, null);
+        }
+        else if (expr)
+        {
+            // TODO: how to expose this case?
+            // needs a unit-test to prove this path works...
+
+            if (TupleExp tup = expr.isTupleExp())
+            {
+                Expressions* res = new Expressions(tup.exps.length);
+                foreach (i; 0 .. tup.exps.length)
+                {
+//                    // use IndexExp because maybe there's special sauce?
+//                    (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
+
+                    // nar, just poach the element directly!
+                    (*res)[i] = (*tup.exps)[i];
+                }
+                return ExpandResult(null, res);
+            }
+            return ExpandResult(expr, null);
+        }
+
+        src = typeSemantic(actualType, Loc.initial, sc);
 
         if (TypeTuple tup = src.isTypeTuple())
         {
-            Types* tres = new Types(tup.arguments.length);
+            Types* res = new Types(tup.arguments.length);
             foreach(i, a; *tup.arguments)
             {
                 assert(a.type);
-                (*tres)[i] = a.type;
+                (*res)[i] = a.type;
             }
-            return ExpandResult(null, null, null, tres);
+            return ExpandResult(null, null, null, res);
         }
         return ExpandResult(null, null, src, null);
     }
@@ -5167,7 +5235,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         size_t tupLen;
         Expressions* recycleTup;
 
-        /// track if we found a tuple, and validates tuples are matching lengths
+        // track if we found a tuple, and validates tuples are matching lengths
         bool validateTuple(ref ExpandResult expResult)
         {
             if ((IsTypeList || !expResult.etup) && (IsExprList || !expResult.ttup))
@@ -5253,7 +5321,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 list = new List(listExp.length);
                 foreach (i; 0 .. listExp.length)
                 {
-                    if (!IsTypeList && listExp[i].etup)
+                    if (!IsTypeList && listExp[i].etup && (*listExp[i].etup)[j])
                         (*list)[i] = cast(ListNode)(*listExp[i].etup)[j];
                     else if (!IsExprList && listExp[i].ttup)
                         (*list)[i] = cast(ListNode)(*listExp[i].ttup)[j];
@@ -5506,170 +5574,20 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 TemplateInstance ti = n.sds.isTemplateInstance();
                 if (ti)
                 {
-
-                    size_t tupLen = 1;
-                    ExpandResult[] tiargs = new ExpandResult[ti.tiargs.length];
-                    Objects*[] tupleObjs = new Objects*[ti.tiargs.length];
-                    //printf("\n\n\n---------tiargs: %s of astType: %s\n", (*ti.tiargs)[0].toChars(), astTypeName((*ti.tiargs)[0]).ptr);
-                    // Thing!(Tup, x)  -->  Thing!(Tup[0], x), Thing!(Tup[1], x), ...
-
-                    // HOW DO WE KNOW WHAT `ti.tiargs` ARE? - we use isType and getType, or isExpression ... see how traits are handled.
-
-                    size_t verbatimcopy_pos = size_t.max;
-
-                    //auto tiargs = semanticTiargs(ti.tiargs);
-
-
-                    foreach(i, arg; *ti.tiargs)
-                    {
-                        // if the template takes a tuple here, we are done
-                        if (ti.tdtypes.length > i && getType(ti.tdtypes[i]).ty == Ttuple)
+                    return expandExprNode((bool copy, Expression[] e, Objects* list) {
+                        ScopeExp res = n;
+                        TemplateInstance resTi = ti;
+                        if (copy)
                         {
-                            verbatimcopy_pos = i;
-                            break;
+                            res = cast(ScopeExp)res.copy();
+                            // not clear how to shallow-copy a TemplateInstance...?
+                            resTi.tiargs = null;
+                            resTi = cast(TemplateInstance)resTi.syntaxCopy(null);
+                            res.sds = resTi;
                         }
-
-                        if (auto sym = getDsymbol(arg))
-                        {
-                            dsymbolSemantic(sym, sc);
-
-                            //assert(0, "TODO symbol path");
-
-                        }
-                        else if (auto type = isType(arg))
-                        {
-                            TypeTuple tupletype;
-
-                            import dmd.asttypename;
-                            import dmd.mtype;
-                            Type realType;
-                            Expression ex;
-                            Dsymbol sym;
-                            printf("type before resolve astTypeName: %s\n", astTypeName(type).ptr);
-                            printf("sc: %x\n", sc);
-                            resolve(type, ti.loc, sc, &ex, &realType, &sym);
-                            auto s = type;
-                            //printf("WE've got a type\n and it is: %s\n", astTypeName(sym).ptr);
-
-                            if (sym)
-                            {
-                                if (TupleDeclaration tupdecl = sym.isTupleDeclaration())
-                                {
-                                    dsymbolSemantic(tupdecl, sc);
-                                    auto t = tupdecl.tupletype;
-
-                                    printf("TupleDeclarartion %s\n", tupdecl.toChars());
-                                    printf("TupleDeclarartion.tupletype %x\n", tupdecl.tupletype);
-
-                                    //if (!t)
-                                    {
-                                        tupleObjs[i] = tupdecl.objects;
-                                        tupLen = tupdecl.objects.length;
-                                        foreach(o;*tupdecl.objects)
-                                        {
-                                            printf("o = %s\n", o.toChars());
-                                            printf("o.astTypeName: %s\n", astTypeName(o).ptr);
-                                        }
-                                    }
-                                }
-                            }
-                            else if (realType)
-                            {
-                                printf("realType: astTypeName: %s\n", astTypeName(realType).ptr);
-                                printf("It's a type for real\n");
-
-                                if (realType.ty == Terror)
-                                    return ExpandResult(null, null, realType, null);
-
-                                auto tt = realType.isTypeTuple();
-                                if (tt)
-                                {
-                                    Types* types = new Types();
-                                    types.setDim(tt.arguments.length);
-                                    tt = cast(TypeTuple) typeSemantic(tt, ti.loc, sc);
-                                    tupLen = tt.arguments.length;
-                                    printf("tupletype: %x\n", tt);
-                                    foreach(j;0 .. tt.arguments.length)
-                                    {
-                                        (*types)[j] = (*tt.arguments)[j].type;
-                                    }
-                                    tupleObjs[i] = cast(Objects*) types;
-                                }
-                                else
-                                    assert(0, "Expected TypeTuple");
-                            }
-                            else if (ex)
-                            {
-                                printf("It's an expression \n");
-                                printf("ex: %s\n", ex.toChars());
-                                if (TupleExp te = ex.isTupleExp())
-                                {
-                                    tupleObjs[i] = cast(Objects*)te.exps;
-                                }
-
-                            }
-
-                            // auto s = typeSemantic(type, Loc.initial, sc);
-                            printf("type: %s\n", type.toChars());
-                            assert(s);
-
-                            // tiargs[i] = duplicateTree(s, sc);
-
-                            //assert(0);
-                            ///TODO doe the same is in callExp.
-                        }
-                        else if (auto exp = isExpression(arg))
-                        {
-                            printf("got a expression: %s\n", exp.toChars());
-
-                        }
-                    }
-
-                    if (!verbatimcopy_pos)
-                    {
-                        printf("Template takes a tuple or no template params\n");
-                    }
-                    if (verbatimcopy_pos != size_t.max)
-                    {
-                        foreach(i; 0 .. verbatimcopy_pos)
-                        {
-                            assert(0, "TODO verbatim copies");
-                        }
-                    }
-
-                    //e.error("Template instance expansion still WIP");
-                    //return ExpandResult(new ErrorExp(), null);
-
-                    // if tiargs are all types, then we resolve a type list
-                    // if ANY tiargs are expressions, then we return a normal tuple, wrapping types in TypeExp?
-
-                    TemplateInstance nx = cast(TemplateInstance)src;
-
-                    Expressions* res = new Expressions(tupLen);
-
-
-                    //Objects* res = new Objects(ti.tiargs.length);
-                    printf("tuplen: %d\n", tupLen);
-                    foreach (i; 0 .. tupLen)
-                    {
-                        auto tiargObjs = new Objects (ti.tiargs.length);
-                        foreach(j; 0 .. ti.tiargs.length)
-                        {
-                            (*tiargObjs)[j] = tupleObjs[j] ? (*tupleObjs[j])[i] : tiargs[j].t;
-                        }
-                        auto se = cast(ScopeExp)src.copy();
-                        auto newTI = cast(TemplateInstance) se.sds.syntaxCopy(null);
-                        newTI.tiargs = tiargObjs;
-                        se.sds = newTI;
-                        //printf("before printing se\n");
-                        //printf("se.sds: %s\n", se.sds.toChars());
-                        printf("se: %s\n", se.toChars());
-                        (*res)[i] = se;
-                    }
-
-
-                    //printf("res: %s\n", res.toChars());
-                    return ExpandResult(null, res);
+                        resTi.tiargs = list;
+                        return res;
+                    }, sc, n, ti.tiargs);
                 }
 
                 // TODO: what other things can a ScopeExp do???
