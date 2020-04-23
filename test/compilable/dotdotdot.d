@@ -26,24 +26,37 @@ alias structs = Seq!(S, S1);
 static assert([structs.sizeof...] == [12, 16]);
 static assert([__traits(identifier, structs)...] == ["S", "S1"]);
 
+template M(alias F, args...)
+{
+    enum M = F!(args)...;
+}
+
 struct MetaInfo
 {
     string struct_name;
     uint    number_of_members; 
     string[] struct_members;
-    uint[] struct_member_offsets;
+    MetaInfo[] struct_member_info;
     size_t struct_size;
 }
 
 template GetMetaInfo(T)
 {
+    static if (is(T == struct) && is (typeof(T.tupleof)) && T.tupleof.length)
+    {
+    pragma(msg, T);
     enum GetMetaInfo = MetaInfo(
         __traits(identifier, T),
         T.tupleof.length,
         [T.tupleof.stringof...],
-        [GetMetaInfo!(typeof(T.tupleof))...],
+        [.GetMetaInfo!(T.tupleof)...],
         T.sizeof
     );
+    }
+    else
+    {
+        enum GetMetaInfo = MetaInfo(T.stringof, 0, [],[], T.sizeof);
+    }
 }
 
 string structToString(T) (T _struct, uint indent = 1)
@@ -52,7 +65,7 @@ string structToString(T) (T _struct, uint indent = 1)
     string result;
     const string indent_string =
         (uint indent) { char[] result; result.length = indent * 4; result[] = ' '; return cast(string)result; } (indent);
-    static immutable MetaInfo info = GetMetaInfo!(T);
+    enum MetaInfo info = GetMetaInfo!(T);
     result = info.struct_name ~ " :: {\n";
     foreach(i, m; _struct.tupleof)
     {
