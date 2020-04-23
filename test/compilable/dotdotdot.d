@@ -36,7 +36,7 @@ struct MetaInfo
     string struct_name;
     uint    number_of_members; 
     string[] struct_members;
-    MetaInfo[] struct_member_info;
+    uint[] struct_member_offsets;
     size_t struct_size;
 }
 
@@ -49,7 +49,7 @@ template GetMetaInfo(T)
         __traits(identifier, T),
         T.tupleof.length,
         [T.tupleof.stringof...],
-        [.GetMetaInfo!(T.tupleof)...],
+        [T.tupleof.offsetof],
         T.sizeof
     );
     }
