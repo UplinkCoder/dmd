@@ -5141,6 +5141,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         Type actualType;
         Dsymbol sym;
         src.resolve(locHack, sc, &expr, &actualType, &sym);
+
         if (sym)
         {
             if (TupleDeclaration tup = sym.isTupleDeclaration())
@@ -5180,26 +5181,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             // we can return the original `src`, but I hope `resolve` didn't mess with it!
             return ExpandResult(null, null, src, null);
         }
-        else if (expr)
-        {
-            // TODO: how to expose this case?
-            // needs a unit-test to prove this path works...
 
-            if (TupleExp tup = expr.isTupleExp())
-            {
-                Expressions* res = new Expressions(tup.exps.length);
-                foreach (i; 0 .. tup.exps.length)
-                {
-//                    // use IndexExp because maybe there's special sauce?
-//                    (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
-
-                    // nar, just poach the element directly!
-                    (*res)[i] = (*tup.exps)[i];
-                }
-                return ExpandResult(null, res);
-            }
-            return ExpandResult(expr, null);
-        }
+        // TODO: we need to find a test to exercise this path...
+        if (expr)
+            return duplicateTree(expr, sc);
 
         src = typeSemantic(actualType, Loc.initial, sc);
 
@@ -5219,7 +5204,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
     static extern(D) ExpandResult expandExprNode(ListType)(scope Expression delegate(bool copy, Expression[] childNodes, ListType childNodeList) copyNode,
                                                  Scope* sc, Expression node, ListType childList, Expression[] childNodes ...)
     {
-
         enum HasList = !is(ListType == typeof(null));
         enum IsExprList = is(ListType == Expressions*);
         enum IsTypeList = is(ListType == Types*);
@@ -5619,7 +5603,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 import dmd.asttypename;
                 e.error("Tuple expansion not supported for this expression %s", astTypeName(e).ptr);
                 return ExpandResult(new ErrorExp(), null);
-
             }
 
             default:
