@@ -5570,7 +5570,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
             case TOK.scope_:
                 ScopeExp n = cast(ScopeExp)src;
-
                 TemplateInstance ti = n.sds.isTemplateInstance();
                 if (ti)
                 {
@@ -5595,8 +5594,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 return ExpandResult(n, null);
 
             case TOK.dotTemplateInstance:
-                // TODO: this one is super important!!!
-                // this one enabled `staticMap`
+                DotTemplateInstanceExp n = cast(DotTemplateInstanceExp)src;
+                return expandExprNode((bool copy, Expression[] e, Objects* list) {
+                    DotTemplateInstanceExp res = n;
+                    TemplateInstance resTi = n.ti;
+                    if (copy)
+                    {
+                        res = cast(DotTemplateInstanceExp)res.copy();
+                        // not clear how to shallow-copy a TemplateInstance...?
+                        resTi.tiargs = null;
+                        resTi = cast(TemplateInstance)resTi.syntaxCopy(null);
+                        res.ti = resTi;
+                    }
+                    resTi.tiargs = list;
+                    return res;
+                }, sc, n, n.ti.tiargs);
 
             case TOK.slice:
             case TOK.assocArrayLiteral:
