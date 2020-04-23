@@ -5553,8 +5553,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                         res.ti = resTi;
                     }
                     resTi.tiargs = list;
+                    res.e1 = e[0];
                     return res;
-                }, sc, n, n.ti.tiargs);
+                }, sc, n, n.ti.tiargs, n.e1);
 
             case TOK.slice:
             case TOK.assocArrayLiteral:
