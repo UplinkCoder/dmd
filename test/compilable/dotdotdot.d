@@ -13,6 +13,8 @@ static assert([ Seq!(Tup, (Tup2...))... ] == [ 0, 4, 5, 6, 1, 4, 5, 6, 2, 4, 5, 
 // TODO: the `...` grammar can't appear in a tempalte argument list...
 //static assert([ Seq!(Tup2...) ] == [ 4, 5, 6 ]);
 
+static assert([ Seq!(Tup2)... ] == [ 4, 5, 6 ]);
+
 
 align(1)
 struct S
@@ -74,7 +76,15 @@ string structToString(T) (T _struct, uint indent = 1)
     const string indent_string =
         (uint indent) { char[] result; result.length = indent * 4; result[] = ' '; return cast(string)result; } (indent);
 		enum MetaInfo info = GetMetaInfo!(T);
-		result = info.struct_name ~ " :: {\n";
+        version (Windows)
+        {
+            string nl = "\r\n";
+        }
+        else
+        {
+            string nl = "\n";
+        }
+		result = info.struct_name ~ " :: {" ~ nl;
 		foreach(i, m; _struct.tupleof)
 		{
 			result ~= indent_string;
@@ -84,24 +94,24 @@ string structToString(T) (T _struct, uint indent = 1)
 			}
 			else
 			{
-				result ~= info.struct_members[i] ~ " : "  ~ to!string(m) ~ "\n";
+				result ~= info.struct_members[i] ~ " : "  ~ to!string(m) ~ nl;
 			}
 		}
-		result ~= indent_string[4 .. $] ~ "}\n";
+		result ~= indent_string[4 .. $] ~ "}" ~ nl;
 		return result;
 }
 
 pragma(msg, GetMetaInfo!S.structToString);
 pragma(msg, GetMetaInfo!S1.structToString);
-//static assert (GetMetaInfo!(S1).structToString ==
-//q{MetaInfo :: {
-//    struct_name : S1
-//    number_of_members : 2
-//    struct_members : ["b", "s"]
-//    struct_member_offsets : [0, 4]
-//    struct_size : 16
-//}
-//});
+static assert (GetMetaInfo!(S1).structToString ==
+q{MetaInfo :: {
+    struct_name : S1
+    number_of_members : 2
+    struct_members : ["b", "s"]
+    struct_member_offsets : [0, 4]
+    struct_size : 16
+}
+});
 pragma(msg, structToString(S1.init));
 
 
