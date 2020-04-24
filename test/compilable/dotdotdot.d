@@ -46,7 +46,7 @@ struct MetaInfo
     string struct_name;
     uint    number_of_members; 
     string[] struct_members;
-    uint[] struct_member_offsets;
+    MetaInfo[] struct_member_infos;
     size_t struct_size;
 }
 
@@ -59,7 +59,7 @@ template GetMetaInfo(T)
 									__traits(identifier, T),
 									T.tupleof.length,
 									[T.tupleof.stringof...],
-									[T.tupleof.offsetof],
+									[.GetMetaInfo!(typeof(T.tupleof))...],
 									T.sizeof
 										);
     }
@@ -108,7 +108,7 @@ q{MetaInfo :: {
     struct_name : S1
     number_of_members : 2
     struct_members : ["b", "s"]
-    struct_member_offsets : [0, 4]
+    struct_member_infos : [MetaInfo("int", 0, [], [], 4), MetaInfo("S", 3, ["a", "c", "h"], [MetaInfo("int", 0, [], [], 4), MetaInfo("char", 0, [], [], 1), MetaInfo("int", 0, [], [], 4)], 12)]
     struct_size : 16
 }
 });
