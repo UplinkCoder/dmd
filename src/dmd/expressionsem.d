@@ -5326,36 +5326,32 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         Expression src = e;
 
         // if src is an identifier, we need to resolve it
-        if (auto ident = src.isIdentifierExp)
-            src = ident.expressionSemantic(sc);
+        if (src.isIdentifierExp())
+            src = src.expressionSemantic(sc);
 
-        if (DotIdExp dotId = src.isDotIdExp)
+        if (DotIdExp dotId = src.isDotIdExp())
         {
+            // we need to let `tupleof` expand
             if (dotId.ident == Id._tupleof)
-            {
-                // we need to let the tupleof expand
-                src = expressionSemantic(e, sc);
-            }
-        }
-
-        // if sec is a TupleExp, we expand...
-        if (TupleExp tup = src.isTupleExp())
-        {
-            Expressions* res = new Expressions(tup.exps.length);
-            foreach (i; 0 .. tup.exps.length)
-            {
-//                // use IndexExp because maybe there's special sauce?
-//                (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
-
-                // nar, just poach the element directly!
-                (*res)[i] = (*tup.exps)[i];
-            }
-            return ExpandResult(null, res);
+                src = src.expressionSemantic(sc);
         }
 
         // for any expressions with children, recurse and perform the expansion...
         switch (src.op)
         {
+            case TOK.tuple:
+                TupleExp n = cast(TupleExp)src;
+                Expressions* res = new Expressions(n.exps.length);
+                foreach (i; 0 .. n.exps.length)
+                {
+//                    // use IndexExp because maybe there's special sauce?
+//                    (*res)[i] = new IndexExp(e.loc, src, new IntegerExp(e.loc, i, Type.tsize_t));
+
+                    // nar, just poach the element directly!
+                    (*res)[i] = (*n.exps)[i];
+                }
+                return ExpandResult(null, res);
+
             case TOK.int64:
             case TOK.float64:
             case TOK.complex80:
@@ -5424,6 +5420,15 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     res.e2 = e[1];
                     return res;
                 }, sc, n, null, n.e1, n.e2);
+
+            case TOK.interval:
+                IntervalExp n = cast(IntervalExp)src;
+                return expandExprNode((bool copy, Expression[] e, typeof(null)) {
+                    IntervalExp res = copy ? cast(IntervalExp)n.copy() : n;
+                    res.lwr = e[0];
+                    res.upr = e[1];
+                    return res;
+                }, sc, n, null, n.lwr, n.upr);
 
             case TOK.question:
                 CondExp n = cast(CondExp)src;
@@ -5546,12 +5551,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     n.ident == Id.getUnitTests)
                 {
                     src = n.expressionSemantic(sc);
-                    TupleExp tup = src.isTupleExp();
-                    assert(tup);
-                    Expressions* res = new Expressions(tup.exps.length);
-                    foreach (i, exp; *tup.exps)
-                        (*res)[i] = exp;
-                    return ExpandResult(null, res);
+                    goto case TOK.tuple;
                 }
 
                 // non-tuple traits expand normally
@@ -5610,7 +5610,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.new_:
             {
                 import dmd.asttypename;
-                e.error("Tuple expansion not supported for this expression %s", astTypeName(e).ptr);
+                e.error("Tuple expansion not supported for this expression: %s", astTypeName(e).ptr);
                 return ExpandResult(new ErrorExp(), null);
             }
 
