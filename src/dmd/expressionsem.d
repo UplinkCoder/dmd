@@ -5146,8 +5146,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         {
             if (TupleDeclaration tup = sym.isTupleDeclaration())
             {
-                dsymbolSemantic(tup, sc);
-                assert(!tup.tupletype, "Should be impossible? `actualType` should be non-null instead.");
+//                dsymbolSemantic(tup, sc);
+//                assert(!tup.tupletype, "Should be impossible? `actualType` should be non-null instead.");
 
                 Expressions* eres;
                 Types* tres;
@@ -5338,18 +5338,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             }
         }
 
-        // if r is a `...` expression, we need to resolve it
-        if (src.op == TOK.dotDotDot)
-        {
-            DotDotDotExp exp = cast(DotDotDotExp)src;
-            src = exp.expressionSemantic(sc);
-            if (src.op == TOK.error)
-            {
-                return ExpandResult(src, null);
-            }
-            assert(src.isTupleExp());
-        }
-
         // if sec is a TupleExp, we expand...
         TupleExp tup = src.isTupleExp();
         if (tup)
@@ -5375,8 +5363,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             case TOK.string_:
             case TOK.this_:
             case TOK.null_:
-            case TOK.variable :
-            case TOK.error :
+            case TOK.variable:
+            case TOK.error:
+            case TOK.dotDotDot:
                 // nodes with no children
                 return ExpandResult(src, null);
 
