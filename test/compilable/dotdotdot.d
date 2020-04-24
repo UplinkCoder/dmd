@@ -7,6 +7,11 @@ static assert([ (Tup + 3)... ] == [ 3, 4, 5 ]);
 static assert([ (x[Tup])... ] == [ 10, 20, 30 ]);
 static assert([ (Tup + (Tup2 + Tup3))... ] == [ 0 + 4 + 7, 1 + 5 + 8, 2 + 6 + 9 ]);
 static assert([ [ Tup, Tup2... ]... ] == [[ 0, 4, 5, 6], [1, 4, 5, 6], [2, 4, 5, 6 ]]);
+static assert([ Seq!(Tup, (Tup2...))... ] == [ 0, 4, 5, 6, 1, 4, 5, 6, 2, 4, 5, 6 ]);
+
+// TODO: the `...` grammar can't appear in a tempalte argument list...
+//static assert([ Seq!(Tup2...) ] == [ 4, 5, 6 ]);
+
 
 align(1)
 struct S
@@ -26,6 +31,7 @@ alias structs = Seq!(S, S1);
 
 static assert([structs.sizeof...] == [12, 16]);
 static assert([__traits(identifier, structs)...] == ["S", "S1"]);
+static assert([(__traits(allMembers, S1) ~ "x")...] == ["bx", "sx"]);
 
 template M(alias F, args...)
 {
