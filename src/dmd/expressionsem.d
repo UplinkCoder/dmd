@@ -5339,8 +5339,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
 
         // if sec is a TupleExp, we expand...
-        TupleExp tup = src.isTupleExp();
-        if (tup)
+        if (TupleExp tup = src.isTupleExp())
         {
             Expressions* res = new Expressions(tup.exps.length);
             foreach (i; 0 .. tup.exps.length)
@@ -5535,6 +5534,27 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
             case TOK.traits:
                 TraitsExp n = cast(TraitsExp)src;
+
+                // special cases for tuple traits
+                if (n.ident == Id.allMembers ||
+                    n.ident == Id.derivedMembers ||
+                    n.ident == Id.getAttributes ||
+                    n.ident == Id.getFunctionAttributes ||
+                    n.ident == Id.getOverloads ||
+                    n.ident == Id.getParameterStorageClasses ||
+                    n.ident == Id.getVirtualMethods ||
+                    n.ident == Id.getUnitTests)
+                {
+                    src = n.expressionSemantic(sc);
+                    TupleExp tup = src.isTupleExp();
+                    assert(tup);
+                    Expressions* res = new Expressions(tup.exps.length);
+                    foreach (i, exp; *tup.exps)
+                        (*res)[i] = exp;
+                    return ExpandResult(null, res);
+                }
+
+                // non-tuple traits expand normally
                 return expandExprNode((bool copy, Expression[] e, Objects* list) {
                     TraitsExp res = copy ? cast(TraitsExp)n.copy() : n;
                     res.args = list;
