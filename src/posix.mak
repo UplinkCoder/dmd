@@ -232,7 +232,7 @@ endif
 DFLAGS=
 override DFLAGS += -version=MARS $(PIC) -J$G
 # Enable D warnings
-override DFLAGS += -w -de
+override DFLAGS += -w
 
 # Append different flags for debugging, profiling and release.
 ifdef ENABLE_DEBUG

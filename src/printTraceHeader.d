@@ -24,13 +24,15 @@ void main(string[] args)
     auto traceFile = originalFile.setExtension(".trace");
     auto symbolFile = originalFile.setExtension(".symbol");
 
-    if (!exists(traceFile))
+    auto mode = args[2];
+
+    if (mode != "Header" && !exists(traceFile))
     {
         writeln(`TraceFile: "`, traceFile, `" does not exist.`);
         return;
     }
 
-    auto mode = args[2];
+
 
     TraceFileHeader header;
     void[] fileBytes = read(originalFile);
@@ -46,6 +48,7 @@ void main(string[] args)
         writeln("Tracefile does not have the correct magic number.");
         return;
     }
+
     string[] kinds;
     string[] phases;
 

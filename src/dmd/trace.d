@@ -460,6 +460,7 @@ char* copyAndPointPastEnd(char* dst, const char * src)
     auto n = strlen(src); // len including the zero terminator
     return cast(char*)memcpy(dst, src, n) + n;
 }
+
 static if (COMPRESSED_TRACE)
 void writeSymInfos(ref char* bufferPos, const char* fileBuffer)
 {
@@ -606,19 +607,17 @@ pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFi
             fprintf(stderr, "profile_records size: %dk\n", (bufferPos - fileBuffer) / 1024);
             // after writing the records we know how many symbols infos we have
 
-
-            // we write a symbolInfo file only
-            // therefore no records
-
             // write phases
             header.offset_phases = currentOffset32();
             assert(align4(currentOffset32()) == currentOffset32());
             writeStrings(bufferPos, fileBuffer, phases);
+            header.n_phases = cast(uint) phases.length;
 
             // write kinds
             header.offset_kinds = currentOffset32();
             assert(align4(currentOffset32()) == currentOffset32());
             writeStrings(bufferPos, fileBuffer, kinds);
+            header.n_kinds = cast(uint) kinds.length;
             sw.reset();
             sw.start();
 
@@ -639,8 +638,10 @@ pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFi
             bufferPos += TraceFileHeader.sizeof;
             
             copyAndPointPastEnd(cast(char*)&symHeader.magic_number, "DMDTRACE".ptr);
-            symHeader.FileVersion = 3;
+            symHeader.FileVersion = fVersion;
 
+            // we write a symbolInfo file only
+            // therefore no records
             symHeader.n_records = 0;
             symHeader.n_kinds = 0;
             symHeader.n_phases = 0;

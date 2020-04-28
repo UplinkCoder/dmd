@@ -7,7 +7,7 @@ enum bitmask_upper_16 = 0xFFFFUL << 32UL;
 enum bitmask_upper_32 = 0xFFFF_FFFFUL << 16UL;
 enum bitmask_upper_48 = 0xFFFF_FFFF_FFFFUL << 16UL;
 
-extern(C) struct SymbolProfileRecord
+extern(C) struct SymbolProfileRecord ///
 {
     ulong begin_ticks;
     ulong end_ticks;
@@ -22,8 +22,8 @@ extern(C) struct SymbolProfileRecord
 
 extern(C) struct SymbolProfileRecordV2
 {
-    // represents 4 48 bit values
-    ulong[3] begin_ticks_48_end_ticks_48_begin_memomry_48_end_memory_48;
+    ulong[3] begin_ticks_48_end_ticks_48_begin_memomry_48_end_memory_48; /// represents 4 48 bit values
+
 
     uint symbol_id;
     ushort kind_id_9_phase_id_7;
