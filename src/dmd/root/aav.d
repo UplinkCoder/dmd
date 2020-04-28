@@ -64,8 +64,7 @@ private size_t dmd_aaLen(const AA* aa) pure nothrow @nogc @safe
 private Value* dmd_aaGet(AA** paa, Key key) nothrow
 {
     //printf("paa = %p\n", paa);
-	AA* aa = *paa;
-    if (!aa)
+    if (!*paa)
     {
         AA* a = cast(AA*)mem.xmalloc(AA.sizeof);
         a.b = cast(aaA**)a.binit;
@@ -75,14 +74,13 @@ private Value* dmd_aaGet(AA** paa, Key key) nothrow
         a.binit[1] = null;
         a.binit[2] = null;
         a.binit[3] = null;
-        aa = a;
-        assert((aa).b_length == 4);
+        *paa = a;
+        assert((*paa).b_length == 4);
     }
-
     //printf("paa = %p, *paa = %p\n", paa, *paa);
-    assert((aa).b_length);
-    size_t i = hash(cast(size_t)key) & ((aa).b_length - 1);
-    aaA** pe = &aa.b[i];
+    assert((*paa).b_length);
+    size_t i = hash(cast(size_t)key) & ((*paa).b_length - 1);
+    aaA** pe = &(*paa).b[i];
     aaA* e;
     while ((e = *pe) !is null)
     {
@@ -92,16 +90,15 @@ private Value* dmd_aaGet(AA** paa, Key key) nothrow
     }
     // Not found, create new elem
     //printf("create new one\n");
-    size_t nodes = ++(aa).nodes;
-    e = (nodes != 1) ? cast(aaA*)mem.xmalloc(aaA.sizeof) : &(aa).aafirst;
+    size_t nodes = ++(*paa).nodes;
+    e = (nodes != 1) ? cast(aaA*)mem.xmalloc(aaA.sizeof) : &(*paa).aafirst;
     //e = new aaA();
     e.next = null;
     e.key = key;
     e.value = null;
     *pe = e;
     //printf("length = %d, nodes = %d\n", (*paa)->b_length, nodes);
-	*paa = aa;
-    if (nodes > aa.b_length * 2)
+    if (nodes > (*paa).b_length * 2)
     {
         //printf("rehash\n");
         dmd_aaRehash(paa);

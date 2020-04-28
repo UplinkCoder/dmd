@@ -19,7 +19,7 @@ import dmd.root.rootobject;
 
 import dmd.arraytypes : Strings;
 
-enum SYMBOL_TRACE = false;
+enum SYMBOL_TRACE = true;
 enum COMPRESSED_TRACE = true;
 
 import dmd.trace_file;
@@ -381,7 +381,7 @@ void writeRecord(SymbolProfileEntry dp, ref char* bufferPos, uint FileVersion = 
             break;
             case ProfileNodeType.Type :
                 name = dp.type.toChars();
-                loc = dp.type.toDsymbol(null).loc;
+                loc = dp.type.toDsymbol().loc;
             break;
             // we should probably assert here.
             case ProfileNodeType.Invalid:
