@@ -97,7 +97,7 @@ string traceString(string vname, string fn = null)
     alias v_type = typeof(v_);
     auto insert_pos = dsymbol_profile_array_count++;
 
-    enum asttypename_build = false;
+    enum asttypename_build = true;
     static if (asttypename_build && __traits(compiles, () { import dmd.asttypename; astTypeName(Dsymbol.init); }))
     {
         import dmd.asttypename;

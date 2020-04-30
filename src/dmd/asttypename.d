@@ -40,6 +40,7 @@ import dmd.statement;
 import dmd.staticassert;
 import dmd.nspace;
 import dmd.visitor;
+import dmd.ast_node;
 
 /// Returns: the typename of the dynamic ast-node-type
 /// (this is a development tool, do not use in actual code)
@@ -80,7 +81,7 @@ mixin
     {
         static if (is(typeof(ov) P == function))
         {
-            static if (is(P[0] S == super) && is(S[0] == RootObject))
+            static if (is(P[0] S == super) && is(S[0] == ASTNode))
             {
                 astTypeNameFunctions ~= `
 string astTypeName(` ~ P[0].stringof ~ ` node)

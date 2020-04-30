@@ -7,7 +7,7 @@ void main(string[] args)
 
     string[] supportedModes = [
         "Tree", "Toplist", "Header", "PhaseHist", "KindHist", "Symbol", "Kind",
-        "Phase", "RandSample" ,"OutputSelfStats", "OutputParentTable"
+        "Phase", "RandSample" ,"OutputSelfStats", "OutputParentTable", "Parent"
     ];
 
     if (args.length < 3)
@@ -198,7 +198,7 @@ void main(string[] args)
         foreach (st; sorted_selfTimes[0 .. (header.n_records > 2000 ? 2000 : header.n_records)])
         {
             const r = records[st[0]];
-            writeln(st[1], "|", kinds[r.kind_id - 1], "|", getSymbolLocation(fileBytes, r));
+            writeln(st[1], "|", kinds[r.kind_id - 1], "|", /*getSymbolLocation(fileBytes, r)*/r.symbol_id);
         }
     }
     else if (mode == "Toplist")
@@ -289,6 +289,23 @@ void main(string[] args)
 
         writeln("{name: ", getSymbolName(fileBytes, sNumber), 
             "\nlocation: " ~ getSymbolLocation(fileBytes, sNumber) ~ "}");
+
+    }
+    else if (mode == "Symbol")
+    {
+        import std.conv : to;
+        uint sNumber = to!uint(args[3]);
+
+        writeln("{name: ", getSymbolName(fileBytes, sNumber), 
+            "\nlocation: " ~ getSymbolLocation(fileBytes, sNumber) ~ "}");
+
+    }
+    else if (mode == "Parent")
+    {
+        import std.conv : to;
+        uint sNumber = to!uint(args[3]);
+
+        writeln("{parentId: ", parents[sNumber - 1], "}");
 
     }
     else if (mode == "Phase")
