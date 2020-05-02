@@ -5774,6 +5774,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
     Dsymbol tempdecl;           // referenced by foo.bar.abc
     Dsymbol enclosing;          // if referencing local symbols, this is the context
     Dsymbol aliasdecl;          // !=null if instance is an alias for its sole member
+
     TemplateInstance inst;      // refer to existing instance
     ScopeDsymbol argsym;        // argument symbol table
     int inuse;                  // for recursive expansion detection
@@ -6230,7 +6231,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
             // Do codegen because this is not included in non-root instances.
             return true;
-        }
+         }
     }
 
     /**********************************************
@@ -6243,7 +6244,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
      *      any members of this object won't be modified, and repetition call will
      *      reproduce same error.
      */
-    extern (D) final bool findTempDecl(Scope* sc, WithScopeSymbol* pwithsym)
+    extern (D) final bool findTempDecl(Scope* sc, WithScopeSymbol* pwithsym, uint line = __LINE__, string file = __FILE__)
     {
         if (pwithsym)
             *pwithsym = null;
@@ -6301,6 +6302,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
             if (!updateTempDecl(sc, s))
             {
+                printf("[" ~ __FUNCTION__ ~ "] We are probably a type function ... called by: +%d %s\n", line, file.ptr);
                 return false;
             }
         }
@@ -6351,7 +6353,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
      * Returns:
      *      true if updating succeeds.
      */
-    extern (D) final bool updateTempDecl(Scope* sc, Dsymbol s)
+    extern (D) final bool updateTempDecl(Scope* sc, Dsymbol s, string file = __FILE__, uint line = __LINE__)
     {
         if (!s)
             return tempdecl !is null;
@@ -6440,6 +6442,11 @@ extern (C++) class TemplateInstance : ScopeDsymbol
                 td = td.overroot; // then get the start
             tempdecl = td;
             return true;
+        }
+        else if (auto fd = s.isFuncDeclaration())
+        {
+            printf("A type function made it updateTemplateDecl from: %s:%d\n", file.ptr, line);
+            return false;
         }
         else
         {

@@ -465,7 +465,10 @@ private Expression searchUFCS(Scope* sc, UnaExp ue, Identifier ident)
         DotTemplateInstanceExp dti = cast(DotTemplateInstanceExp)ue;
         auto ti = new TemplateInstance(loc, s.ident, dti.ti.tiargs);
         if (!ti.updateTempDecl(sc, s))
+        {
+            printf("We are type function ?\n");
             return new ErrorExp();
+        }
         return new ScopeExp(loc, ti);
     }
     else
@@ -3210,11 +3213,22 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         result = e;
     }
 
+    Expression typeFunctionSemantic(FuncDeclaration fd, Objects* tiargs, Scope* sc)
+    {
+        if (tiargs) foreach(arg;*tiargs)
+        {
+            printf("we should now resolve: %s\n", arg.toChars());
+            typeSemantic(arg);
+        }
+
+        return null;
+    }
+
     override void visit(ScopeExp exp)
     {
         static if (LOGSEMANTIC)
         {
-            printf("+ScopeExp::semantic(%p '%s')\n", exp, exp.toChars());
+            printf("+ScopeExp::semantic(%p '%s', serial=%llu)\n", exp, exp.toChars(), exp.serial);
         }
         if (exp.type)
         {
@@ -3224,6 +3238,51 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
         ScopeDsymbol sds2 = exp.sds;
         TemplateInstance ti = sds2.isTemplateInstance();
+        FuncDeclaration typefunc;
+
+        if (ti) 
+        // if (isTFunction(ti, sc))
+        {
+            printf("Checking for `%s` type function\n", ti.name.toChars());
+            Dsymbol scopesym;
+            Dsymbol s = sc.search(ti.loc, ti.name, &scopesym);
+            if (s)
+            {
+                if (auto fd = s.isFuncDeclaration())
+                {
+                    auto tf = fd.type.toTypeFunction();
+
+                    bool hasAliasInDecl = false;
+
+                    if (tf.nextOf && tf.nextOf.ty == Talias)
+                        hasAliasInDecl = true;
+
+                    if (!hasAliasInDecl) foreach(p;*tf.parameterList)
+                    {
+                        if (p.type.ty == Talias)
+                        {
+                            hasAliasInDecl = true;
+                            break;
+                        }
+                    }
+
+                    if (hasAliasInDecl)
+                    {
+                        printf("%s is a typefunction\n", fd.toPrettyChars());
+                        typefunc = fd;
+                    }                  
+                }
+            }
+        }
+        if (typefunc)
+        {
+            result = typeFunctionSemantic(typefunc, ti.tiargs, sc);
+
+            result = new StringExp(exp.loc, "We should call TypeFunctionSemantic for " ~ ti.name.toString() ~ " here");
+            result = result.expressionSemantic(sc);
+            return ;
+        }
+
         while (ti)
         {
             WithScopeSymbol withsym;
