@@ -3213,13 +3213,30 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         result = e;
     }
 
-    Expression typeFunctionSemantic(FuncDeclaration fd, Objects* tiargs, Scope* sc)
+    Expression typeFunctionSemantic(FuncDeclaration fd,  Objects* tiargs, Loc loc, Scope* sc)
     {
-        if (tiargs) foreach(arg;*tiargs)
+        Types *type_args = new Types();
+        type_args.setDim(tiargs.length);
+
+        Scope* tfscope = sc.push(); 
+
+        if (tiargs) foreach(i, arg;*tiargs)
         {
             printf("we should now resolve: %s\n", arg.toChars());
-            typeSemantic(arg);
+            if (auto type = arg.isType())
+            {
+                printf("isType: true\n");
+                Dsymbol sym;
+                Type actualType;
+                Expression exp;
+                type.resolve(loc, tfscope, &exp, &actualType, &sym);
+                import dmd.asttypename;
+                if (actualType) printf("As Expected you called this type-function with a type .. astTypeName: %s\n", astTypeName(actualType).ptr);
+                (*type_args)[i] = actualType;
+            }
         }
+
+        sc = tfscope.pop();
 
         return null;
     }
@@ -3276,7 +3293,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
         if (typefunc)
         {
-            result = typeFunctionSemantic(typefunc, ti.tiargs, sc);
+            result = typeFunctionSemantic(typefunc, ti.tiargs, exp.loc, sc);
 
             result = new StringExp(exp.loc, "We should call TypeFunctionSemantic for " ~ ti.name.toString() ~ " here");
             result = result.expressionSemantic(sc);
