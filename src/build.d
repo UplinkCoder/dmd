@@ -1013,7 +1013,7 @@ void processEnvironment()
     env.getNumberedBool("ENABLE_WARNINGS");
     string[] warnings;
 
-    string[] dflags = ["-version=MARS", "-w", "-de", env["PIC_FLAG"], env["MODEL_FLAG"], "-J"~env["G"]];
+    string[] dflags = ["-version=MARS", "-de", env["PIC_FLAG"], env["MODEL_FLAG"], "-J"~env["G"]];
     if (env["HOST_DMD_KIND"] != "gdc")
         dflags ~= ["-dip25"]; // gdmd doesn't support -dip25
 

@@ -1600,7 +1600,7 @@ private bool preFunctionParameters(Scope* sc, Expressions* exps, const bool repo
             {
                 // for static alias this: https://issues.dlang.org/show_bug.cgi?id=17684
                 arg = resolveAliasThis(sc, arg);
-
+                /*
                 if (arg.op == TOK.type)
                 {
                     if (reportErrors)
@@ -1609,7 +1609,7 @@ private bool preFunctionParameters(Scope* sc, Expressions* exps, const bool repo
                         arg = new ErrorExp();
                     }
                     err = true;
-                }
+                }*/
             }
             else if (arg.type.toBasetype().ty == Tfunction)
             {
@@ -3215,8 +3215,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     Expression typeFunctionSemantic(FuncDeclaration fd,  Objects* tiargs, Loc loc, Scope* sc)
     {
-        Types *type_args = new Types();
+        Types* type_args = new Types();
+        Expressions* wrapped_args = new Expressions();
         type_args.setDim(tiargs.length);
+        wrapped_args.setDim(tiargs.length);
 
         Scope* tfscope = sc.push(); 
 
@@ -3233,12 +3235,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 import dmd.asttypename;
                 if (actualType) printf("As Expected you called this type-function with a type .. astTypeName: %s\n", astTypeName(actualType).ptr);
                 (*type_args)[i] = actualType;
+                (*wrapped_args)[i] = new TypeExp(Loc.initial, actualType);
             }
         }
-
+        printf("fd.fbody: %s\n", fd.fbody.toChars());
+        import dmd.dinterpret;
+        auto fl = new FuncLiteralDeclaration(fd.loc, fd.endloc, fd.type, TOK.function_, null, fd.ident);
+        fl.fbody = fd.fbody;
+        auto call = new CallExp(loc, new FuncExp(loc, fl), wrapped_args);
+        tfscope.flags |= SCOPE.ctfe;
+        call = cast(CallExp)call.expressionSemantic(tfscope);
+        auto result = ctfeInterpret(call);
+        printf("result: %s\n", result.toChars());
         sc = tfscope.pop();
 
-        return null;
+        return result;
     }
 
     override void visit(ScopeExp exp)
@@ -5375,7 +5386,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
          * is(targ id :  tok2)
          * is(targ id == tok2)
          */
-        static if (LOGSEMANTIC)
+        //static if (LOGSEMANTIC)
         {
             printf("IsExp::semantic(%s)\n", e.toChars());
         }
@@ -5597,8 +5608,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
              * is(targ : tspec)
              */
             e.tspec = e.tspec.typeSemantic(e.loc, sc);
-            //printf("targ  = %s, %s\n", targ.toChars(), targ.deco);
-            //printf("tspec = %s, %s\n", tspec.toChars(), tspec.deco);
+            //printf("targ  = %s, %s\n", e.targ.toChars(), e.targ.deco);
+            //printf("tspec = %s, %s\n", e.tspec.toChars(), e.tspec.deco);
 
             if (e.tok == TOK.colon)
             {
@@ -5626,6 +5637,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
              * is(targ id == tspec, tpl)
              * is(targ id : tspec, tpl)
              */
+
+            printf("Gwaak\n");
             Identifier tid = e.id ? e.id : Identifier.generateId("__isexp_id");
             e.parameters.insert(0, new TemplateTypeParameter(e.loc, tid, null, null));
 
@@ -11564,7 +11577,9 @@ Expression semanticX(DotIdExp exp, Scope* sc)
 // If flag == 1, stop "not a property" error and return NULL.
 Expression semanticY(DotIdExp exp, Scope* sc, int flag)
 {
-    //printf("DotIdExp::semanticY(this = %p, '%s')\n", exp, exp.toChars());
+    if (sc.flags & SCOPE.ctfe)
+        return exp;
+    printf("DotIdExp::semanticY(this = %p, '%s')\n", exp, exp.toChars());
 
     //{ static int z; fflush(stdout); if (++z == 10) *(char*)0=0; }
 

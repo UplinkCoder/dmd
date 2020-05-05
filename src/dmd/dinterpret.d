@@ -225,7 +225,7 @@ alias ctfeNeedRvalue = CtfeGoal.ctfeNeedRvalue;
 alias ctfeNeedLvalue = CtfeGoal.ctfeNeedLvalue;
 alias ctfeNeedNothing = CtfeGoal.ctfeNeedNothing;
 
-//debug = LOG;
+debug = LOG;
 //debug = LOGASSIGN;
 //debug = LOGCOMPILE;
 //debug = SHOWPERFORMANCE;
@@ -406,7 +406,7 @@ private struct InterState
  * result expression if successful, TOK.cantExpression if not,
  * or CTFEExp if function returned void.
  */
-private Expression interpretFunction(UnionExp* pue, FuncDeclaration fd, InterState* istate, Expressions* arguments, Expression thisarg)
+Expression interpretFunction(UnionExp* pue, FuncDeclaration fd, InterState* istate, Expressions* arguments, Expression thisarg)
 {
     debug (LOG)
     {
@@ -5697,6 +5697,11 @@ public:
         {
             result = CTFEExp.voidexp;
             return;
+        }
+        if (e.to.ty == Talias)
+        {
+            result = e1;
+            return ;
         }
         if (e.to.ty == Tpointer && e1.op != TOK.null_)
         {
