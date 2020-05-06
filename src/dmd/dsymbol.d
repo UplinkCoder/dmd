@@ -271,7 +271,10 @@ extern (C++) class Dsymbol : ASTNode
 
     override const(char)* toChars() const
     {
-        return ident ? ident.toChars() : "__anonymous";
+        char* result = cast(char*)malloc(64);
+        auto tmp = ident ? ident.toChars() : "__anonymous";
+        sprintf(result, "('%s' serial=%d)", tmp, this.serial);
+        return result;
     }
 
     // helper to print fully qualified (template) arguments

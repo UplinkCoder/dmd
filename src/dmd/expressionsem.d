@@ -3215,6 +3215,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     Expression typeFunctionSemantic(FuncDeclaration fd,  Objects* tiargs, Loc loc, Scope* sc)
     {
+        assert(fd.type_function);
+
         Types* type_args = new Types();
         Expressions* wrapped_args = new Expressions();
         type_args.setDim(tiargs.length);
@@ -3241,12 +3243,15 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         printf("fd.fbody: %s\n", fd.fbody.toChars());
         import dmd.dinterpret;
         auto fl = new FuncLiteralDeclaration(fd.loc, fd.endloc, fd.type, TOK.function_, null, fd.ident);
-        fl.fbody = fd.fbody;
-        auto call = new CallExp(loc, new FuncExp(loc, fl), wrapped_args);
+        fl.fbody = fd.fbody.syntaxCopy();
+        tfscope = tfscope.startCTFE();
         tfscope.flags |= SCOPE.ctfe;
+        auto call = new CallExp(loc, new FuncExp(loc, fl), wrapped_args);
+        
         call = cast(CallExp)call.expressionSemantic(tfscope);
         auto result = ctfeInterpret(call);
         printf("result: %s\n", result.toChars());
+    tfscope = tfscope.endCTFE();
         sc = tfscope.pop();
 
         return result;
@@ -3304,9 +3309,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
         if (typefunc)
         {
+            typefunc.type_function = 1;
             result = typeFunctionSemantic(typefunc, ti.tiargs, exp.loc, sc);
 
-            result = new StringExp(exp.loc, "We should call TypeFunctionSemantic for " ~ ti.name.toString() ~ " here");
+            //result = new StringExp(exp.loc, "We should call TypeFunctionSemantic for " ~ ti.name.toString() ~ " here");
             result = result.expressionSemantic(sc);
             return ;
         }
@@ -11577,8 +11583,8 @@ Expression semanticX(DotIdExp exp, Scope* sc)
 // If flag == 1, stop "not a property" error and return NULL.
 Expression semanticY(DotIdExp exp, Scope* sc, int flag)
 {
-    if (sc.flags & SCOPE.ctfe)
-        return exp;
+    //if (sc.flags & SCOPE.ctfe)
+    //    return exp;
     printf("DotIdExp::semanticY(this = %p, '%s')\n", exp, exp.toChars());
 
     //{ static int z; fflush(stdout); if (++z == 10) *(char*)0=0; }
@@ -11607,6 +11613,17 @@ Expression semanticY(DotIdExp exp, Scope* sc, int flag)
     Expression e = semanticX(exp, sc);
     if (e != exp)
         return e;
+    if (exp.e1.type && exp.e1.type.ty == Talias)
+    {
+        printf("resloving %s on a type-variable\n", exp.ident.toChars());
+        if (exp.ident == Id.stringof)
+        {
+            exp.type = Type.tchar.arrayOf().immutableOf();
+        }
+        import dmd.asttypename;
+        printf("exp.e1.asttypename: %s\n", exp.e1.astTypeName().ptr);
+        return exp;
+    }
 
     Expression eleft;
     Expression eright;

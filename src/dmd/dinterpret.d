@@ -312,6 +312,7 @@ public:
 
     extern (C++) Expression getValue(VarDeclaration v)
     {
+        printf("v.ctfeAdrOnStack: %d\n", v.ctfeAdrOnStack);
         if ((v.isDataseg() || v.storage_class & STC.manifest) && !v.isCTFE())
         {
             assert(v.ctfeAdrOnStack < globalValues.dim);
@@ -330,15 +331,18 @@ public:
 
     extern (C++) void push(VarDeclaration v)
     {
+        printf("callin' push(%s)\n", v.toChars());
         assert(!v.isDataseg() || v.isCTFE());
         if (v.ctfeAdrOnStack != VarDeclaration.AdrOnStackNone && v.ctfeAdrOnStack >= framepointer)
         {
+            printf("%s was already in stack Frame\n", v.toChars());
             // Already exists in this frame, reuse it.
             values[v.ctfeAdrOnStack] = null;
             return;
         }
         savedId.push(cast(void*)cast(size_t)v.ctfeAdrOnStack);
         v.ctfeAdrOnStack = cast(uint)values.dim;
+        printf("%s.ctfeAdrOnStack=%d\n", v.toChars(), v.ctfeAdrOnStack);
         vars.push(v);
         values.push(null);
     }
@@ -905,6 +909,7 @@ public:
      */
     static bool stopPointersEscaping(const ref Loc loc, Expression e)
     {
+        printf("Calling stopPointerEscpaing on: %s\n", e.toChars());
         if (!e.type.hasPointers())
             return true;
         if (isPointer(e.type))
@@ -2130,7 +2135,15 @@ public:
             result = e;
             return;
         }
-
+        if (e.type.ty == Talias)
+        {
+            import dmd.asttypename;
+            printf("Visiting Type variable exp\n");
+            auto type_val = getValue(e.var.isVarDeclaration());
+            assert(type_val.isTypeExp());
+            result = type_val;
+            return ;
+        }
         if (goal == ctfeNeedLvalue)
         {
             VarDeclaration v = e.var.isVarDeclaration();
@@ -2852,6 +2865,28 @@ public:
         }
         e.error("cannot interpret `%s` at compile time", e.toChars());
         result = CTFEExp.cantexp;
+    }
+
+    override void visit(DotIdExp die)
+    {
+        assert(die.e1.type.ty == Talias, "only type variables can enter here!");
+        if (die.ident == Id.stringof)
+        {
+            import dmd.asttypename;
+            auto ve = die.e1.isVarExp();
+            auto e1 = ctfeInterpret(die.e1);
+            printf("e1.asttypename: %s\n", e1.astTypeName().ptr);
+            
+            auto e = new StringExp(die.loc, e1.toString());
+            e.type = Type.tstring;
+            //result = ctfeInterpret(e);
+            result = e;
+            //result = interpretRegion(e, null);
+            return ;
+        }
+        die.error(".%s cannot be resolved on a type (yet ?)", die.ident.toChars());
+        result = new ErrorExp();
+
     }
 
     override void visit(UnaExp e)
