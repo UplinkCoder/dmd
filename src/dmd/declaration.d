@@ -961,6 +961,22 @@ extern (C++) final class AliasDeclaration : Declaration
 }
 
 /***********************************************************
+ * alias x; // which is a type variable
+ */
+extern (C++) final class AliasVariableDeclaration : Declaration
+{
+    extern (D) this(const ref Loc loc, Identifier ident)
+    {
+        super(loc, ident);
+        //printf("AliasDeclaration(id = '%s', type = %p)\n", id.toChars(), type);
+        //printf("type = '%s'\n", type.toChars());
+        this.type = new TypeBasic(Talias);
+        assert(type);
+    }
+
+}
+
+/***********************************************************
  */
 extern (C++) final class OverDeclaration : Declaration
 {

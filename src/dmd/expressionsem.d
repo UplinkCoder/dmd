@@ -3169,6 +3169,11 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
     override void visit(TypeExp exp)
     {
+        if (!exp.type)
+        {
+            printf("Empty type exp found ... serial=%llu\n", exp.serial);
+            return ;
+        }
         if (exp.type.ty == Terror)
             return setError();
 
@@ -3190,7 +3195,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 // printf("apply fix for issue 9490: add `this.` to `%s`...\n", e.toChars());
                 e = new DotVarExp(exp.loc, new ThisExp(exp.loc), ve.var, false);
             }
-            //printf("e = %s %s\n", Token::toChars(e.op), e.toChars());
+            //printf("e = %s %s\n", Token.toChars(e.op), e.toChars());
             e = e.expressionSemantic(sc);
         }
         else if (t)
@@ -3235,9 +3240,20 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 Expression exp;
                 type.resolve(loc, tfscope, &exp, &actualType, &sym);
                 import dmd.asttypename;
-                if (actualType) printf("As Expected you called this type-function with a type .. astTypeName: %s\n", astTypeName(actualType).ptr);
-                (*type_args)[i] = actualType;
-                (*wrapped_args)[i] = new TypeExp(Loc.initial, actualType);
+                printf("exp: %p, actualType: %p, sym:%p\n", exp, actualType, sym);
+
+                if (exp)
+                {
+                    printf("You called this type-function with an expression(%s) .. astTypeName: %s\n", exp.toChars(), astTypeName(exp).ptr);
+                    (*wrapped_args)[i] = exp;
+                }
+
+                if (actualType)
+                {
+                    printf("As Expected you called this type-function with a type .. astTypeName: %s\n", astTypeName(actualType).ptr);
+                    (*type_args)[i] = actualType;
+                    (*wrapped_args)[i] = new TypeExp(Loc.initial, actualType);
+                }
             }
         }
         printf("fd.fbody: %s\n", fd.fbody.toChars());
@@ -11615,10 +11631,15 @@ Expression semanticY(DotIdExp exp, Scope* sc, int flag)
         return e;
     if (exp.e1.type && exp.e1.type.ty == Talias)
     {
-        printf("resloving %s on a type-variable\n", exp.ident.toChars());
+        printf("resloving %s on a type-variable '%s'.type(%s)\n", exp.ident.toChars(), exp.e1.toChars(), exp.e1.type.toChars());
         if (exp.ident == Id.stringof)
         {
-            exp.type = Type.tchar.arrayOf().immutableOf();
+            exp.type = Type.tstring;
+        }
+        else if (exp.ident == Id.__sizeof
+            || exp.ident == Id.length)
+        {
+            exp.type = Type.tsize_t;
         }
         import dmd.asttypename;
         printf("exp.e1.asttypename: %s\n", exp.e1.astTypeName().ptr);

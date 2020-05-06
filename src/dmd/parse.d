@@ -4401,6 +4401,20 @@ final class Parser(AST) : Lexer
                 }
             }
             /* Look for:
+             * alias identifier;
+             */ 
+
+            if (token.value == TOK.identifier && peekNext() == TOK.semicolon)
+            {
+                auto ident = token.ident;
+                nextToken();
+                import dmd.declaration : AliasVariableDeclaration;
+                AliasVariableDeclaration s = new AliasVariableDeclaration(loc, ident);
+                addComment(s, comment);
+                nextToken();
+            }
+
+            /* Look for:
              *  alias identifier = type;
              *  alias identifier(...) = type;
              */

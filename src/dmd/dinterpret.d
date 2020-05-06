@@ -312,7 +312,7 @@ public:
 
     extern (C++) Expression getValue(VarDeclaration v)
     {
-        printf("v.ctfeAdrOnStack: %d\n", v.ctfeAdrOnStack);
+        printf("getValue(%s), %s.ctfeAdrOnStack=%d\n", v.toChars(), v.toChars(), v.ctfeAdrOnStack);
         if ((v.isDataseg() || v.storage_class & STC.manifest) && !v.isCTFE())
         {
             assert(v.ctfeAdrOnStack < globalValues.dim);
@@ -331,18 +331,15 @@ public:
 
     extern (C++) void push(VarDeclaration v)
     {
-        printf("callin' push(%s)\n", v.toChars());
         assert(!v.isDataseg() || v.isCTFE());
         if (v.ctfeAdrOnStack != VarDeclaration.AdrOnStackNone && v.ctfeAdrOnStack >= framepointer)
         {
-            printf("%s was already in stack Frame\n", v.toChars());
             // Already exists in this frame, reuse it.
             values[v.ctfeAdrOnStack] = null;
             return;
         }
         savedId.push(cast(void*)cast(size_t)v.ctfeAdrOnStack);
         v.ctfeAdrOnStack = cast(uint)values.dim;
-        printf("%s.ctfeAdrOnStack=%d\n", v.toChars(), v.ctfeAdrOnStack);
         vars.push(v);
         values.push(null);
     }
@@ -1998,6 +1995,8 @@ public:
         Expression e = CTFEExp.cantexp;
         if (VarDeclaration v = d.isVarDeclaration())
         {
+            printf("GetVarExp(%s), %s.ctfeAdrOnStack=%d\n", v.toChars(), v.toChars(), v.ctfeAdrOnStack);
+
             /* Magic variable __ctfe always returns true when interpreting
              */
             if (v.ident == Id.ctfe)
@@ -2877,11 +2876,19 @@ public:
             auto e1 = ctfeInterpret(die.e1);
             printf("e1.asttypename: %s\n", e1.astTypeName().ptr);
             
-            auto e = new StringExp(die.loc, e1.toString());
+            auto e = new StringExp(e1.loc, e1.toString());
             e.type = Type.tstring;
             //result = ctfeInterpret(e);
             result = e;
             //result = interpretRegion(e, null);
+            return ;
+        }
+        else if (die.ident == Id.__sizeof)
+        {
+            auto ve = die.e1.isVarExp();
+            auto e1 = ctfeInterpret(die.e1);
+            auto e = new IntegerExp(e1.loc, e1.type.size(), Type.tsize_t);
+            result = e;
             return ;
         }
         die.error(".%s cannot be resolved on a type (yet ?)", die.ident.toChars());
@@ -5724,6 +5731,8 @@ public:
         {
             printf("%s CastExp::interpret() %s\n", e.loc.toChars(), e.toChars());
         }
+        import dmd.asttypename;
+        printf("CastExp: %s\n", astTypeName(e.e1).ptr);
         Expression e1 = interpretRegion(e.e1, istate, goal);
         if (exceptionOrCant(e1))
             return;
@@ -5733,10 +5742,16 @@ public:
             result = CTFEExp.voidexp;
             return;
         }
-        if (e.to.ty == Talias)
+        if (e.to.ty == Talias && !e.e1.isVarExp())
         {
+            import dmd.asttypename;
+            printf("e1: %s e1.astTypeExp = %s\n", e.e1.toChars(), astTypeName(e.e1).ptr);
             result = e1;
             return ;
+        }
+        if (e.to.ty == Talias)
+        {
+            assert(0, "BoomBox!");
         }
         if (e.to.ty == Tpointer && e1.op != TOK.null_)
         {
