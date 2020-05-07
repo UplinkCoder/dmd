@@ -5725,6 +5725,21 @@ public:
         result = CTFEExp.voidexp;
     }
 
+    override void visit(IsExp e)
+    {
+        auto targ = e.targ;
+        import dmd.typesem;
+        import dmd.asttypename;
+        Expression exp;
+        Type type;
+        Dsymbol sym;
+        printf("sc:%p\n", sc);
+        printf("earg.astTypeName: %s\n", targ.astTypeName().ptr);
+        resolve(targ, e.loc, sc, &exp, &type, &sym);
+        printf("exp:%p, type:%p, sym:%p\n", exp,type,sym);
+        assert(0, "Gotta do da IsExp");
+    }
+
     override void visit(CastExp e)
     {
         debug (LOG)
@@ -5732,7 +5747,14 @@ public:
             printf("%s CastExp::interpret() %s\n", e.loc.toChars(), e.toChars());
         }
         import dmd.asttypename;
-        printf("CastExp: %s\n", astTypeName(e.e1).ptr);
+        // if we are casting to alias we want to forward the exp as is
+        if (e.to.ty == Talias)
+        {
+            printf("e1: %s e1.astTypeExp = %s\n", e.e1.toChars(), astTypeName(e.e1).ptr);
+            result = e.e1;
+            return ;
+        }
+
         Expression e1 = interpretRegion(e.e1, istate, goal);
         if (exceptionOrCant(e1))
             return;
@@ -5742,17 +5764,7 @@ public:
             result = CTFEExp.voidexp;
             return;
         }
-        if (e.to.ty == Talias && !e.e1.isVarExp())
-        {
-            import dmd.asttypename;
-            printf("e1: %s e1.astTypeExp = %s\n", e.e1.toChars(), astTypeName(e.e1).ptr);
-            result = e1;
-            return ;
-        }
-        if (e.to.ty == Talias)
-        {
-            assert(0, "BoomBox!");
-        }
+
         if (e.to.ty == Tpointer && e1.op != TOK.null_)
         {
             Type pointee = (cast(TypePointer)e.type).next;

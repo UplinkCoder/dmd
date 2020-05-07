@@ -5409,6 +5409,24 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
          * is(targ id == tok2)
          */
         //static if (LOGSEMANTIC)
+
+        // we don't touch an alias
+        Type type;
+        Expression exp;
+        Dsymbol symv;
+        printf("e: %s .. e.targ=%s\n", e.toChars, e.targ.toChars());
+
+        resolve(e.targ, e.loc, sc, &exp, &type, &symv, false);
+        printf("type:%p exp:%p, symv:%p\n", type, exp, symv);
+        if ((exp && exp.type.ty == Talias) || (type && type.ty == Talias))
+        {
+            //e.type = new TypeBasic(Talias);
+            printf("[IsExp] Don't touch the alias \n");
+            e.type = Type.tbool;
+            result = e;
+            return ;
+        }
+
         {
             printf("IsExp::semantic(%s)\n", e.toChars());
         }
@@ -10731,7 +10749,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
 
         exp.setNoderefOperands();
-
+        if ((exp.e1.type && exp.e1.type.ty == Talias)
+            || (exp.e2.type && exp.e2.type.ty == Talias))
+        {
+            result = exp;
+            return ;
+        }
         Expression e1x = exp.e1.expressionSemantic(sc);
 
         // for static alias this: https://issues.dlang.org/show_bug.cgi?id=17684

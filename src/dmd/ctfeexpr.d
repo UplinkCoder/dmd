@@ -1977,7 +1977,7 @@ void showCtfeExpr(Expression e, int level = 0)
     {
         printf("VAR %p %s\n", e, e.toChars());
         VarDeclaration v = (cast(VarExp)e).var.isVarDeclaration();
-        if (v && getValue(v))
+        if (v && (!v.type.ty == Talias) && getValue(v))
             showCtfeExpr(getValue(v), level + 1);
     }
     else if (e.op == TOK.address)
