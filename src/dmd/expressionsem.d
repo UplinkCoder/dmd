@@ -3265,7 +3265,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         auto call = new CallExp(loc, new FuncExp(loc, fl), wrapped_args);
         
         call = cast(CallExp)call.expressionSemantic(tfscope);
+        Scope* oldctfe_sc = ctfeGlobals.sc;
+        ctfeGlobals.sc = sc;
         auto result = ctfeInterpret(call);
+        ctfeGlobals.sc = oldctfe_sc;
         printf("result: %s\n", result.toChars());
     tfscope = tfscope.endCTFE();
         sc = tfscope.pop();

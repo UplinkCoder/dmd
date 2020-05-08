@@ -47,6 +47,7 @@ import dmd.tokens;
 import dmd.utf;
 import dmd.visitor;
 
+import dmd.dscope;
 /*************************************
  * Entry point for CTFE.
  * A compile-time result is required. Give an error if not possible.
@@ -191,7 +192,6 @@ void incArrayAllocs()
 
 /* ================================================ Implementation ======================================= */
 
-private:
 
 /***************
  * Collect together globals used by CTFE
@@ -201,6 +201,7 @@ struct CtfeGlobals
     Region region;
 
     CtfeStack stack;
+    Scope* sc;
 
     int callDepth = 0;        // current number of recursive calls
 
@@ -214,6 +215,7 @@ struct CtfeGlobals
 
 __gshared CtfeGlobals ctfeGlobals;
 
+private:
 enum CtfeGoal : int
 {
     ctfeNeedRvalue,     // Must return an Rvalue (== CTFE value)
@@ -5733,11 +5735,11 @@ public:
         Expression exp;
         Type type;
         Dsymbol sym;
-        printf("sc:%p\n", sc);
         printf("earg.astTypeName: %s\n", targ.astTypeName().ptr);
-        resolve(targ, e.loc, sc, &exp, &type, &sym);
+        resolve(targ, e.loc, ctfeGlobals.sc, &exp, &type, &sym);
         printf("exp:%p, type:%p, sym:%p\n", exp,type,sym);
-        assert(0, "Gotta do da IsExp");
+        assert(type, "type excpted in isExp");
+        printf("type: %s\n", type.toChars());
     }
 
     override void visit(CastExp e)
