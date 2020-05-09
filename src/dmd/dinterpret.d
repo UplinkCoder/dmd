@@ -2262,8 +2262,12 @@ public:
             if (!(v.isDataseg() || v.storage_class & STC.manifest) || v.isCTFE())
             {
                 ctfeGlobals.stack.push(v);
-                Scope* sc =ctfeGlobals.sc;
-                sc.insert(v);
+                // only type functions play with this scope ;)
+                if (istate.fd.type_function)
+                {
+                    Scope* sc =ctfeGlobals.sc;
+                    sc.insert(v);
+                }
             }
             if (v._init)
             {
@@ -5806,10 +5810,9 @@ public:
         Expression exp;
         Type type;
         Dsymbol sym;
-        //auto oldGagged = global.startGagging();
+        auto oldGagged = global.startGagging();
         printf("earg.astTypeName: %s\n", targ.astTypeName().ptr);
         resolve(targ, e.loc, ctfeGlobals.sc, &exp, &type, &sym);
-        //global.endGagging(oldGagged);
         printf("exp:%p, type:%p, sym:%p\n", exp,type,sym);
         printf("exp:%s, type:%s, sym:%s\n", exp ? exp.toChars : null, type ? type.toChars() : null , sym ? sym.toChars() : null);
 
@@ -5832,6 +5835,7 @@ public:
             type = typeofexp.type;
 
         }
+        global.endGagging(oldGagged);
 
         result = IntegerExp.createBool(type !is null && type.ty != Terror);
     }

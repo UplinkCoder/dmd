@@ -24,7 +24,6 @@ string fqn(alias t)
     alias p;
     p = t;
     bool good = is(typeof(__traits(parent, p)));
-//    bool good = false;
     while(good)
     {
         p = __traits(parent, p);
@@ -41,12 +40,8 @@ struct S
 {
     struct X
     {
-        int xx;
-        
-        // pragma(msg, fullyQualifiedName!xx);
-        pragma(msg, fqn!xx);
-        // should be __MODULE__ ~ ".S.X.xx";
-
+        int xx;        
+        static assert( fqn!xx == "module " ~ __MODULE__ ~ ".S.X.xx" );
     }
 }
 
