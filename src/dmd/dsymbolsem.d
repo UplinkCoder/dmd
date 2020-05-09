@@ -1272,6 +1272,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             fd &&
             (!(dsym.storage_class & (STC.field | STC.in_ | STC.foreach_ | STC.parameter | STC.result)) ||
              (dsym.storage_class & STC.out_)) &&
+            (dsym.type != Type.talias) &&
             (sz = dsym.type.size()) != 0)
         {
             // Provide a default initializer

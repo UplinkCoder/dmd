@@ -2141,7 +2141,9 @@ public:
             import dmd.asttypename;
             printf("Visiting Type variable exp\n");
             auto type_val = getValue(e.var.isVarDeclaration());
-            assert(type_val.isTypeExp());
+            printf("type_val: %s ... typename: %s\n", type_val.toChars(), astTypeName(type_val).ptr);
+            printf("Got: %p\n", type_val);
+            //assert(type_val.isTypeExp());
             result = type_val;
             return ;
         }
@@ -2205,6 +2207,8 @@ public:
             printf("%s DeclarationExp::interpret() %s\n", e.loc.toChars(), e.toChars());
         }
         Dsymbol s = e.declaration;
+        printf("s: %s\n", s.toChars());
+
         if (VarDeclaration v = s.isVarDeclaration())
         {
             if (TupleDeclaration td = v.toAlias().isTupleDeclaration())
@@ -2250,12 +2254,17 @@ public:
             }
             if (v.isStatic())
             {
+                printf("Got into static case");
                 // Just ignore static variables which aren't read or written yet
                 result = null;
                 return;
             }
             if (!(v.isDataseg() || v.storage_class & STC.manifest) || v.isCTFE())
+            {
                 ctfeGlobals.stack.push(v);
+                Scope* sc =ctfeGlobals.sc;
+                sc.insert(v);
+            }
             if (v._init)
             {
                 if (ExpInitializer ie = v._init.isExpInitializer())
@@ -2275,7 +2284,7 @@ public:
                     result = CTFEExp.cantexp;
                 }
             }
-            else if (v.type.size() == 0)
+            else if (v.type == Type.talias || v.type.size() == 0)
             {
                 // Zero-length arrays don't need an initializer
                 result = v.type.defaultInitLiteral(e.loc);
@@ -2285,6 +2294,7 @@ public:
                 e.error("variable `%s` cannot be modified at compile time", v.toChars());
                 result = CTFEExp.cantexp;
             }
+          
             return;
         }
         if (s.isAttribDeclaration() || s.isTemplateMixin() || s.isTupleDeclaration())
@@ -3218,7 +3228,7 @@ public:
 
     extern (D) private void interpretAssignCommon(BinExp e, fp_t fp, int post = 0)
     {
-        debug (LOG)
+        //debug (LOG)
         {
             printf("%s BinExp::interpretAssignCommon() %s\n", e.loc.toChars(), e.toChars());
         }
@@ -3453,6 +3463,17 @@ public:
         else
         {
         L1:
+            if (e1.type.ty == Talias)
+            {
+                auto avd = e1.isVarExp().var.isVarDeclaration();
+                printf("evaluating (e2=%s)\n", e.e2.toChars());
+                auto newval = interpretRegion(e.e2, istate);
+                printf("cold setting alias variable avd %s = %s\n" , avd.toChars(), newval.toChars()); 
+                // cold set the value 
+                setValueWithoutChecking(avd, newval);
+                result = newval;
+                return ;
+            }
             e1 = interpretRegion(e1, istate, ctfeNeedLvalue);
             if (exceptionOrCant(e1))
                 return;
@@ -3619,14 +3640,18 @@ public:
 
         if (!isBlockAssignment)
         {
+            import dmd.asttypename;
+            printf("e1:%s\n", e1.toChars());
+            printf("newval:%s astTypeName= %s\n", newval.toChars(), astTypeName(newval).ptr);
+
             newval = ctfeCast(pue, e.loc, e.type, e.type, newval);
+
             if (exceptionOrCant(newval))
                 return;
             if (newval == pue.exp())
                 newval = pue.copy();
-
             // Determine the return value
-            if (goal == ctfeNeedLvalue) // https://issues.dlang.org/show_bug.cgi?id=14371
+            if (goal == ctfeNeedLvalue || e.type.ty == Talias) // https://issues.dlang.org/show_bug.cgi?id=14371
                 result = e1;
             else
             {
@@ -5727,6 +5752,52 @@ public:
         result = CTFEExp.voidexp;
     }
 
+    override void visit(TraitsExp e)
+    {
+        import dmd.asttypename;
+        import dmd.traits;
+        printf("TraitsExp: %s\n", e.toChars());
+        if (e.ident == Id.parent)
+        {
+            assert(e.args.dim == 1);
+            auto o = (*e.args)[0];
+            assert(o.getType().ty == Talias);
+            printf("o = %s.astTypeName: %s\n", o.toChars, astTypeName(o).ptr);
+            import dmd.templateparamsem;
+            import dmd.dtemplate;
+            auto s = getDsymbolWithoutExpCtx(o);
+            printf("s = %s.astTypeName: %s\n", s.toChars, astTypeName(s).ptr);
+            auto v = getValue(cast(VarDeclaration)s);
+            printf("v = %s.astTypeName: %s\n", v.toChars, astTypeName(v).ptr);
+            Dsymbol s2;
+            if (auto te = v.isTypeExp())
+            {
+                s2 = te.type.toDsymbol(null);
+                // we need to get the decl out of the type exp
+
+            }
+            else
+            {
+                s2 = getDsymbolWithoutExpCtx(v);
+            }
+            assert(s2, "Could not get Symbol from: " ~ v.toString());
+            printf("s2 = %s.astTypeName: %s\n", s2.toChars, astTypeName(s2).ptr);
+            auto p = s2.toParent();
+            if (!p || p.isImport())
+            {
+                e.error("argument `%s` has no parent", v.toChars());
+                result = new ErrorExp();
+                return;
+            }
+
+            printf("p = %s.astTypeName: %s\n", p.toChars, astTypeName(p).ptr);
+            auto pv = symbolToExp(p, e.loc, ctfeGlobals.sc, false);
+            printf("pv = %s.astTypeName: %s\n", pv.toChars, astTypeName(pv).ptr);
+            result = pv;
+        
+        }
+    }
+
     override void visit(IsExp e)
     {
         auto targ = e.targ;
@@ -5735,11 +5806,34 @@ public:
         Expression exp;
         Type type;
         Dsymbol sym;
+        //auto oldGagged = global.startGagging();
         printf("earg.astTypeName: %s\n", targ.astTypeName().ptr);
         resolve(targ, e.loc, ctfeGlobals.sc, &exp, &type, &sym);
+        //global.endGagging(oldGagged);
         printf("exp:%p, type:%p, sym:%p\n", exp,type,sym);
-        assert(type, "type excpted in isExp");
-        printf("type: %s\n", type.toChars());
+        printf("exp:%s, type:%s, sym:%s\n", exp ? exp.toChars : null, type ? type.toChars() : null , sym ? sym.toChars() : null);
+
+        //assert(type, "type excpted in isExp");
+        //printf("type: %s\n", type.toChars());
+
+        if (type && type.ty == Talias)
+        {
+            printf("Onto the second round!\n");
+            // in case of an alias we expect a type expression
+            // which contains a typeof expression
+            // which is what we have to interpret.
+            // and then check if the result is a type.
+            assert(exp && exp.op == TOK.type);
+            TypeExp te = exp.isTypeExp();
+            TypeTypeof typeoftype = te.type.isTypeTypeof();
+            assert(typeoftype, "typeof expected but got: " ~ te.type.toString());
+            auto typeofexp = interpretRegion(typeoftype.exp, istate);
+            // printf("resulting exp: %s\n", typeofexp.toChars());
+            type = typeofexp.type;
+
+        }
+
+        result = IntegerExp.createBool(type !is null && type.ty != Terror);
     }
 
     override void visit(CastExp e)
@@ -5753,7 +5847,18 @@ public:
         if (e.to.ty == Talias)
         {
             printf("e1: %s e1.astTypeExp = %s\n", e.e1.toChars(), astTypeName(e.e1).ptr);
-            result = e.e1;
+            if (e.e1.op == TOK.variable)
+            {
+                VarExp ve = cast(VarExp) e.e1; 
+                printf("Making a symbol exp");
+                result = ve.copy();
+                result.type = Type.talias;
+                ctfeGlobals.stack.push(ve.var.isVarDeclaration());
+            }
+            else
+            {
+                result = e.e1;
+            }
             return ;
         }
 
@@ -6332,6 +6437,7 @@ public:
 
 Expression interpret(UnionExp* pue, Expression e, InterState* istate, CtfeGoal goal = ctfeNeedRvalue)
 {
+    if (e) printf("interpret: %s\n", e.toChars());
     if (!e)
         return null;
     scope Interpreter v = new Interpreter(pue, istate, goal);
@@ -6739,7 +6845,7 @@ private Expression copyRegionExp(Expression e)
             be.e2 = copyRegionExp(be.e2);
             break;
         }
-
+        case TOK.scope_:
         case TOK.this_:
         case TOK.super_:
         case TOK.variable:

@@ -10,7 +10,7 @@ size_t SO(alias y)
 }
 
 //static assert(F!(ulong) == "ulong");
-//static assert(F!(uint) == "uint");
+static assert(F!(uint) == "uint");
 //static assert(F!(float) == "uint");
 
 //pragma(msg, SO!(real));
@@ -20,13 +20,18 @@ size_t SO(alias y)
 
 string fqn(alias t)
 {
-    char[] result;
-    alias parent;
-    parent = t;
-    while(is(parent) || is(typeof(parent)))
+    string result = t.stringof;
+    alias p;
+    p = t;
+    bool good = is(typeof(__traits(parent, p)));
+//    bool good = false;
+    while(good)
     {
-        result = __traits(identifier, parent) ~ "." ~ result;
-        // parent = __traits(parent, parent);
+        p = __traits(parent, p);
+        result = p.stringof ~ "." ~ result;
+//        result = __traits(identifier, parent) ~ "." ~ result;
+        good = is(typeof(__traits(parent, p)));
+
     }
 
     return cast(string) result;

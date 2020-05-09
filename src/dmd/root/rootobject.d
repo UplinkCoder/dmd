@@ -45,6 +45,7 @@ extern (C++) class RootObject
     this() nothrow @nogc
     {
         this.serial = atomicFetchAdd(nextSerial, 1);
+        // assert(serial != 20511);
     }
 
     bool equals(const RootObject o) const

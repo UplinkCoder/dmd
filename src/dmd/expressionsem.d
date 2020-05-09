@@ -834,7 +834,7 @@ Lagain:
     Expression e;
 
     //printf("DsymbolExp:: %p '%s' is a symbol\n", this, toChars());
-    //printf("s = '%s', s.kind = '%s'\n", s.toChars(), s.kind());
+    printf("s = '%s', s.kind = '%s'\n", s.toChars(), s.kind());
     Dsymbol olds = s;
     Declaration d = s.isDeclaration();
     if (d && (d.storage_class & STC.templateparameter))
@@ -968,6 +968,7 @@ Lagain:
 
     if (Type t = s.getType())
     {
+        printf("THis here h Fire\n");
         return (new TypeExp(loc, t)).expressionSemantic(sc);
     }
 

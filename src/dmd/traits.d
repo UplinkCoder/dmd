@@ -75,7 +75,7 @@ enum LOGSEMANTIC = false;
  * Returns:
  *      Dsymbol  the corresponding symbol for oarg
  */
-private Dsymbol getDsymbolWithoutExpCtx(RootObject oarg)
+Dsymbol getDsymbolWithoutExpCtx(RootObject oarg)
 {
     if (auto e = isExpression(oarg))
     {
@@ -830,6 +830,13 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
             return dimError(1);
 
         auto o = (*e.args)[0];
+        auto t = getType(o);
+        if (t && t.ty == Talias)
+        {
+            // we don't do anything here
+            e.type = Type.talias;
+            return e;
+        }
         auto s = getDsymbolWithoutExpCtx(o);
         if (s)
         {

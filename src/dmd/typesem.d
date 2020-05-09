@@ -2838,7 +2838,7 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, Expression* pe, Type* pt, Ds
 
     void visitTypeof(TypeTypeof mt)
     {
-        //printf("TypeTypeof::resolve(this = %p, sc = %p, idents = '%s')\n", mt, sc, mt.toChars());
+        printf("TypeTypeof::resolve(this = %p, sc = %p, idents = '%s')\n", mt, sc, mt.toChars());
         //static int nest; if (++nest == 50) *(char*)0=0;
         if (sc is null)
         {
@@ -2879,6 +2879,17 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, Expression* pe, Type* pt, Ds
             goto Lerr;
         }
         mt.exp = exp2;
+
+        if (exp2.type.ty == Talias)
+        {
+            printf("Triggering on %s", exp2.toChars());
+            // Talias come back as half resolved TypeTypeof
+            *pt = Type.talias;
+            *pe = new TypeExp(mt.loc, mt);
+            mt.inuse--;
+            return;
+        }
+
 
         if (mt.exp.op == TOK.type ||
             mt.exp.op == TOK.scope_)
@@ -2969,6 +2980,7 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, Expression* pe, Type* pt, Ds
                 auto e = typeToExpressionHelper(mt, new TypeExp(loc, t));
                 e = e.expressionSemantic(sc);
                 resolveExp(e, pt, pe, ps);
+                printf("Got an expression inside a typeof\n");
             }
             if (*pt)
                 (*pt) = (*pt).addMod(mt.mod);
@@ -4394,6 +4406,9 @@ Expression defaultInit(Type mt, const ref Loc loc)
         case Tvoid:
             error(loc, "`void` does not have a default initializer");
             return new ErrorExp();
+
+        case Talias:
+            return new TypeExp(loc, mt);
 
         default:
             break;

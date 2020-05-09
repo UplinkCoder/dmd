@@ -4408,10 +4408,14 @@ final class Parser(AST) : Lexer
             {
                 auto ident = token.ident;
                 nextToken();
-                import dmd.declaration : AliasVariableDeclaration;
-                AliasVariableDeclaration s = new AliasVariableDeclaration(loc, ident);
+                import dmd.declaration : VarDeclaration;
+                import dmd.mtype : Type;
+                VarDeclaration s = new VarDeclaration(loc, Type.talias, ident, null);
                 addComment(s, comment);
-                nextToken();
+                auto a = new AST.Dsymbols();
+                a.push(s);
+                check(TOK.semicolon);
+                return a;
             }
 
             /* Look for:

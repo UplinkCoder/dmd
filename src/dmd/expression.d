@@ -1656,7 +1656,7 @@ extern (C++) final class IntegerExp : Expression
         assert(type);
         if (!type.isscalar())
         {
-            //printf("%s, loc = %d\n", toChars(), loc.linnum);
+            // printf("%s, loc=%d\n", toChars(), loc.linnum);
             if (type.ty != Terror)
                 error("integral constant must be scalar type, not `%s`", type.toChars());
             type = Type.terror;
@@ -3938,6 +3938,7 @@ extern (C++) final class DeclarationExp : Expression
 
     override Expression syntaxCopy()
     {
+        printf("declaration: %s ... declaration.serial: %d\n", declaration.toChars(), declaration.serial);
         return new DeclarationExp(loc, declaration.syntaxCopy(null));
     }
 

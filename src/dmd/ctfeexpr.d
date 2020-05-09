@@ -1581,8 +1581,10 @@ Expression ctfeCast(UnionExp* pue, const ref Loc loc, Type type, Type to, Expres
             return pue.exp();
         }
     }
-
+    printf("e.op: %s\n", Token.toChars(e.op));
     // Allow TypeInfo type painting
+
+
     if (isTypeInfo_Class(e.type) && e.type.implicitConvTo(to))
         return paint();
 
@@ -1608,6 +1610,18 @@ Expression ctfeCast(UnionExp* pue, const ref Loc loc, Type type, Type to, Expres
     {
         *pue = Cast(loc, type, to, e);
         r = pue.exp();
+    }
+        
+    if (to.ty == Talias)
+    {
+        // when a variable is cast to
+        // alias this means we want the symbol.
+        
+        if (e.op == TOK.variable)
+        {
+            r = e;
+            e.type = Type.talias;
+        }
     }
 
     if (CTFEExp.isCantExp(r))
@@ -1893,6 +1907,10 @@ bool isCtfeValueValid(Expression newval)
 
         case TOK.void_:
             return true; // uninitialized value
+
+        case TOK.variable:
+//            auto ve = cast(VarExp)newval;
+            return true; // this can happen in type function, todo assert we are in a type function
 
         default:
             newval.error("CTFE internal error: illegal CTFE value `%s`", newval.toChars());
