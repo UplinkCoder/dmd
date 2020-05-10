@@ -419,7 +419,17 @@ UnionExp copyLiteral(Expression e)
         emplaceExp!(UnionExp)(&ue, e);
         return ue;
     }
-    e.error("CTFE internal error: literal `%s`", e.toChars());
+    if (TypeFunctionsEnabled)
+    {
+        if (auto te = e.isTypeExp())
+        {
+            emplaceExp!(TypeExp)(&ue, e.loc, te.type);
+            return ue;
+        }
+    }
+
+    import dmd.asttypename;
+    e.error("CTFE internal error: literal `%s` (type: `%s`)", e.toChars(), e.astTypeName.ptr);
     assert(0);
 }
 

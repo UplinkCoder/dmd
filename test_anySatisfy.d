@@ -12,6 +12,7 @@ bool anySatisfy(bool function (alias) pred, alias[] types ...)
 bool anyConvertsToInt(alias[] types ...)
 {
     // return anySatisfy!((alias t) => is(t : int), types);
+
     foreach(type;types)
     {
         if (is(type : int))
@@ -20,6 +21,21 @@ bool anyConvertsToInt(alias[] types ...)
         }
     }
     return false;
+
+/+
+    ulong idx = 0LU;
+    for (; idx < types.length; idx += 1)
+    {
+        alias type;
+        type = types[idx];
+        if (is(type))
+        {
+            return true;
+        }
+    }
+
+    return false;
++/
 }
 
 pragma(msg, anyConvertsToInt!(S, S2));

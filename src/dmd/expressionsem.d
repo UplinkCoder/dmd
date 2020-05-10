@@ -3276,8 +3276,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         printf("[typeFunctionSemantic] fd.fbody: %s\n", fd.fbody.toChars());
         import dmd.dinterpret;
         auto fl = new FuncLiteralDeclaration(fd.loc, fd.endloc, fd.type, TOK.function_, null, fd.ident);
-        //fl.fbody = fd.fbody.syntaxCopy();
-                                                    fl.fbody = fd.fbody;
+        fl.type_function = 1;
+        fl.fbody = fd.fbody.syntaxCopy();
+        //fl.fbody = fd.fbody;
         tfscope = tfscope.startCTFE();
         tfscope.flags |= SCOPE.ctfe;
         auto call = new CallExp(loc, new FuncExp(loc, fl), wrapped_args);

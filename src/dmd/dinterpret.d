@@ -2207,7 +2207,8 @@ public:
             printf("%s DeclarationExp::interpret() %s\n", e.loc.toChars(), e.toChars());
         }
         Dsymbol s = e.declaration;
-        printf("s: %s\n", s.toChars());
+        import dmd.asttypename;
+        printf("s: %s (type: %s)\n", s.toChars(), astTypeName(s).ptr);
 
         if (VarDeclaration v = s.isVarDeclaration())
         {
@@ -2254,20 +2255,23 @@ public:
             }
             if (v.isStatic())
             {
-                printf("Got into static case");
+                printf("Got into static case\n");
                 // Just ignore static variables which aren't read or written yet
                 result = null;
                 return;
             }
             if (!(v.isDataseg() || v.storage_class & STC.manifest) || v.isCTFE())
             {
-                ctfeGlobals.stack.push(v);
+                printf("if `%s` is a type function we insert into scope\n", istate.fd.toChars());
                 // only type functions play with this scope ;)
                 if (istate.fd.type_function)
                 {
+                    printf("Inserting %s into the scope\n", v.toChars());
                     Scope* sc =ctfeGlobals.sc;
                     sc.insert(v);
                 }
+                ctfeGlobals.stack.push(v);
+
             }
             if (v._init)
             {
@@ -5842,21 +5846,24 @@ public:
         Type type;
         Dsymbol sym;
         auto oldGagged = global.startGagging();
-        printf("earg.astTypeName: %s\n", targ.astTypeName().ptr);
+        // printf("earg.astTypeName: %s\n", targ.astTypeName().ptr); // debugline
         resolve(targ, e.loc, ctfeGlobals.sc, &exp, &type, &sym);
-        printf("exp:%p, type:%p, sym:%p\n", exp,type,sym);
-        printf("exp:%s, type:%s, sym:%s\n", exp ? exp.toChars : null, type ? type.toChars() : null , sym ? sym.toChars() : null);
+        // printf("exp:%p, type:%p, sym:%p\n", exp,type,sym); // debugline
+        // printf("exp:%s, type:%s, sym:%s\n", exp ? exp.toChars : null, type ? type.toChars() : null , sym ? sym.toChars() : null); //debugline
 
         //assert(type, "type excpted in isExp");
         //printf("type: %s\n", type.toChars());
 
-        if (type && type.ty == Talias)
+        // when we get both a type and an exp. 
+        // and the type is alias and the exp is a type exp
+        // that means we came from a typeof expression
+        if (type && type.ty == Talias && exp && exp.op == TOK.type)
         {
-            printf("Onto the second round!\n");
             // in case of an alias we expect a type expression
             // which contains a typeof expression
             // which is what we have to interpret.
             // and then check if the result is a type.
+
             assert(exp && exp.op == TOK.type);
             TypeExp te = exp.isTypeExp();
             TypeTypeof typeoftype = te.type.isTypeTypeof();
@@ -5864,7 +5871,19 @@ public:
             auto typeofexp = interpretRegion(typeoftype.exp, istate);
             // printf("resulting exp: %s\n", typeofexp.toChars());
             type = typeofexp.type;
-
+        }
+        if (exp)
+        {
+            auto ve = exp.isVarExp();
+            if (ve)
+            {
+                auto vd = ve.var.isVarDeclaration();
+                assert(vd);
+                auto v = getValue(vd);
+                auto te = v.isTypeExp();
+                assert(te, v.toString() ~ " is not a type exp?");
+                type = te.type;
+            }
         }
         global.endGagging(oldGagged);
 

@@ -37,8 +37,25 @@ string fqn(alias t)
     while(good)
     {
         p = __traits(parent, p);
-//        result = p.stringof ~ "." ~ result;
         result = __traits(identifier, p) ~ "." ~ result;
+        good = is(typeof(__traits(parent, p)));
+
+    }
+
+    return cast(string) result;
+}
+
+
+string fqnStringof(alias t)
+{
+    string result = t.stringof;
+    alias p;
+    p = t;
+    bool good = is(typeof(__traits(parent, p)));
+    while(good)
+    {
+        p = __traits(parent, p);
+        result = p.stringof ~ "." ~ result;
         good = is(typeof(__traits(parent, p)));
 
     }
@@ -51,7 +68,8 @@ struct S
     struct X
     {
         int xx;        
-        static assert( fqn!xx == "module " ~ __MODULE__ ~ ".S.X.xx" );
+        static assert( fqn!xx == __MODULE__ ~ ".S.X.xx" );
+        static assert( fqnStringof!xx == "module " ~ __MODULE__ ~ ".S.X.xx" );
     }
 }
 
