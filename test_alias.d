@@ -1,4 +1,4 @@
-
+/+
 string F(alias y)
 {
     return y.stringof;
@@ -18,6 +18,16 @@ static assert(F!(uint) == "uint");
 //pragma(msg, SO!(ulong));
 
 
+alias[] typeMap(alias[] types, alias function(alias) mapFn)
+{
+    alias[] result;
+    foreach(i, t;types)
+    {
+        result[i] = mapFn(t);
+    }
+    return result;
+}
++/
 string fqn(alias t)
 {
     string result = t.stringof;
@@ -27,8 +37,8 @@ string fqn(alias t)
     while(good)
     {
         p = __traits(parent, p);
-        result = p.stringof ~ "." ~ result;
-//        result = __traits(identifier, parent) ~ "." ~ result;
+//        result = p.stringof ~ "." ~ result;
+        result = __traits(identifier, p) ~ "." ~ result;
         good = is(typeof(__traits(parent, p)));
 
     }

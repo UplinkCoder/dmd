@@ -308,7 +308,7 @@ class Lexer
         tokenFreelist = token;
     }
 
-    final TOK nextToken()
+    final TOK nextToken(int line = __LINE__)
     {
         prevloc = token.loc;
         if (token.next)
@@ -321,7 +321,7 @@ class Lexer
         {
             scan(&token);
         }
-        //printf(token.toChars());
+        // printf("Advanced to token: %s from %d\n", token.toChars(), line);
         return token.value;
     }
 

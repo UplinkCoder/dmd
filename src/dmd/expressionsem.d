@@ -76,7 +76,7 @@ import dmd.utf;
 import dmd.utils;
 import dmd.visitor;
 
-enum LOGSEMANTIC = false;
+enum LOGSEMANTIC = true;
 
 /********************************************************
  * Perform semantic analysis and CTFE on expressions to produce
@@ -333,6 +333,7 @@ Expression resolveOpDollar(Scope* sc, ArrayExp ae, IntervalExp ie, Expression* p
  */
 bool arrayExpressionSemantic(Expressions* exps, Scope* sc, bool preserveErrors = false)
 {
+    printf("[ArrayExpressionSemantic] exps:%s\n", exps.toChars());
     bool err = false;
     if (exps)
     {
@@ -1586,9 +1587,19 @@ private Expression rewriteOpAssign(BinExp exp)
  * Returns:
  *      true    a semantic error occurred
  */
-private bool preFunctionParameters(Scope* sc, Expressions* exps, const bool reportErrors = true)
+private bool preFunctionParameters(Scope* sc, Expressions* exps, const bool reportErrors = true, Expression callee = null)
 {
     bool err = false;
+    if (callee)
+    {
+        import dmd.asttypename;
+        printf("astTypeName:%s callee: %s\n", astTypeName(callee).ptr, callee.toChars());
+        if (auto fe = callee.isFuncExp())
+        {
+            printf("fobdy: %s\n", fe.fd.fbody.toChars());
+        }
+    }
+    printf("exps: %s\n", exps.toChars());
     if (exps)
     {
         expandTuples(exps);
@@ -1596,6 +1607,7 @@ private bool preFunctionParameters(Scope* sc, Expressions* exps, const bool repo
         for (size_t i = 0; i < exps.dim; i++)
         {
             Expression arg = (*exps)[i];
+
             arg = resolveProperties(sc, arg);
             if (arg.op == TOK.type)
             {
@@ -3222,8 +3234,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
     Expression typeFunctionSemantic(FuncDeclaration fd,  Objects* tiargs, Loc loc, Scope* sc)
     {
         assert(fd.type_function);
-
-        Types* type_args = new Types();
+        printf("[typefunctionsemantic] fd.type: %s\n", fd.type.toChars());
+                                                    auto pl = (cast(TypeFunction)fd.type).parameterList;
+                                                        printf("%d is 2?\n", pl.varargs);
+                                                    printf("%s\n", pl[0].type.toChars());
+                                                    
+    Types* type_args = new Types();
         Expressions* wrapped_args = new Expressions();
         type_args.setDim(tiargs.length);
         wrapped_args.setDim(tiargs.length);
@@ -3257,15 +3273,17 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 }
             }
         }
-        printf("fd.fbody: %s\n", fd.fbody.toChars());
+        printf("[typeFunctionSemantic] fd.fbody: %s\n", fd.fbody.toChars());
         import dmd.dinterpret;
         auto fl = new FuncLiteralDeclaration(fd.loc, fd.endloc, fd.type, TOK.function_, null, fd.ident);
-        fl.fbody = fd.fbody.syntaxCopy();
+        //fl.fbody = fd.fbody.syntaxCopy();
+                                                    fl.fbody = fd.fbody;
         tfscope = tfscope.startCTFE();
         tfscope.flags |= SCOPE.ctfe;
         auto call = new CallExp(loc, new FuncExp(loc, fl), wrapped_args);
-        
+                                                    printf("call before semantic: %s\n", call.toChars());
         call = cast(CallExp)call.expressionSemantic(tfscope);
+                                                    printf("call after semantic: %s\n", call.toChars());
         Scope* oldctfe_sc = ctfeGlobals.sc;
         ctfeGlobals.sc = sc;
         auto result = ctfeInterpret(call);
@@ -3307,12 +3325,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
                     bool hasAliasInDecl = false;
 
-                    if (tf.nextOf && tf.nextOf.ty == Talias)
+                    if (tf.nextOf && (tf.nextOf.ty == Talias || isAliasType(tf.nextOf)))
                         hasAliasInDecl = true;
 
                     if (!hasAliasInDecl) foreach(p;*tf.parameterList)
                     {
-                        if (p.type.ty == Talias)
+                        if (p.type.ty == Talias || isAliasType(p.type))
                         {
                             hasAliasInDecl = true;
                             break;
@@ -4282,11 +4300,16 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
         if (exp.e1.op == TOK.function_)
         {
-            if (arrayExpressionSemantic(exp.arguments, sc) || preFunctionParameters(sc, exp.arguments))
+            FuncExp fe = cast(FuncExp)exp.e1;
+            /+if (fe.fd.type_function)
+                // cannot process calls for type functions
+                result = exp;
+                return ;
+            +/
+            if (arrayExpressionSemantic(exp.arguments, sc) || preFunctionParameters(sc, exp.arguments, true, exp.e1))
                 return setError();
 
             // Run e1 semantic even if arguments have any errors
-            FuncExp fe = cast(FuncExp)exp.e1;
             exp.e1 = callExpSemantic(fe, sc, exp.arguments);
             if (exp.e1.op == TOK.error)
             {
@@ -4481,7 +4504,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             result = exp.e1;
             return;
         }
-        if (arrayExpressionSemantic(exp.arguments, sc) || preFunctionParameters(sc, exp.arguments))
+        if (arrayExpressionSemantic(exp.arguments, sc) || preFunctionParameters(sc, exp.arguments, true, exp.e1))
             return setError();
 
         // Check for call operator overload

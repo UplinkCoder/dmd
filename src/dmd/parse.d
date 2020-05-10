@@ -3577,12 +3577,12 @@ final class Parser(AST) : Lexer
         return t;
     }
 
-    private AST.Type parseBasicType(bool dontLookDotIdents = false)
+    private AST.Type parseBasicType(bool dontLookDotIdents = false, uint line = __LINE__)
     {
         AST.Type t;
         Loc loc;
         Identifier id;
-        //printf("parseBasicType()\n");
+        //printf("parseBasicType() from %d\n", line);
         switch (token.value)
         {
         case TOK.alias_ :
@@ -4358,7 +4358,7 @@ final class Parser(AST) : Lexer
         AST.Expression ealign;
         AST.Expressions* udas = null;
 
-        //printf("parseDeclarations() %s\n", token.toChars());
+        // printf("parseDeclarations() %s\n", token.toChars());
         if (!comment)
             comment = token.blockComment.ptr;
 
@@ -6748,16 +6748,16 @@ final class Parser(AST) : Lexer
         return parseAssignExp();
     }
 
-    private void check(Loc loc, TOK value)
+    private void check(Loc loc, TOK value, int line = __LINE__)
     {
         if (token.value != value)
             error(loc, "found `%s` when expecting `%s`", token.toChars(), Token.toChars(value));
-        nextToken();
+        nextToken(line);
     }
 
-    void check(TOK value)
+    void check(TOK value, int line = __LINE__)
     {
-        check(token.loc, value);
+        check(token.loc, value, line);
     }
 
     private void check(TOK value, const(char)* string)

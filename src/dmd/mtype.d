@@ -4584,7 +4584,7 @@ extern (C++) final class TypeFunction : TypeNext
     }
 
     // arguments get specially formatted
-    private const(char)* getParamError(Expression arg, Parameter par)
+    private const(char)* getParamError(Expression arg, Parameter par, int line = __LINE__)
     {
         if (global.gag && !global.params.showGaggedErrors)
             return null;
@@ -4596,9 +4596,9 @@ extern (C++) final class TypeFunction : TypeNext
         OutBuffer buf;
         // only mention rvalue if it's relevant
         const rv = !arg.isLvalue() && par.storageClass & (STC.ref_ | STC.out_);
-        buf.printf("cannot pass %sargument `%s` of type `%s` to parameter `%s`",
+        buf.printf("cannot pass %sargument `%s` of type `%s` to parameter `%s` (:%d)",
             rv ? "rvalue ".ptr : "".ptr, arg.toChars(), at,
-            parameterToChars(par, this, qual));
+            parameterToChars(par, this, qual), line);
         return buf.extractChars();
     }
 
@@ -4928,7 +4928,11 @@ extern (C++) final class TypeFunction : TypeNext
                                     }
                                 }
                                 else
+                                {
                                     m = arg.implicitConvTo(ta.next);
+                                    if (ta.next.ty == Talias)
+                                        m = MATCH.convert;
+                                }
 
                                 if (m == MATCH.nomatch)
                                 {

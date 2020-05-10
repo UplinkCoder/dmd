@@ -772,6 +772,15 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
             return dimError(1);
 
         auto o = (*e.args)[0];
+
+        auto t = getType(o);
+        if (t && t.ty == Talias)
+        {
+            // we don't do anything here
+            e.type = Type.tstring;
+            return e;
+        }
+
         Identifier id;
         if (auto po = isParameter(o))
         {

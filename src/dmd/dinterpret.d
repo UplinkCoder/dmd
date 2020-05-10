@@ -148,7 +148,7 @@ public Expression ctfeInterpretForPragmaMsg(Expression e)
     }
     return e;
 }
-
+enum TypeFunctionsEnabled = true;
 public extern (C++) Expression getValue(VarDeclaration vd)
 {
     return ctfeGlobals.stack.getValue(vd);
@@ -5758,21 +5758,53 @@ public:
 
     override void visit(TraitsExp e)
     {
+        if (!TypeFunctionsEnabled)
+            assert(0, "Without enabled type functions we should never get here.");
+
         import dmd.asttypename;
         import dmd.traits;
-        printf("TraitsExp: %s\n", e.toChars());
+        if (e.ident == Id.identifier)
+        {
+            assert(e.args.dim == 1);
+            auto o = (*e.args)[0];
+            assert(o.getType().ty == Talias);
+
+            Dsymbol av = getDsymbolWithoutExpCtx(o);
+            VarDeclaration avd = av.isVarDeclaration();
+            assert(avd, "Symbol " ~ av.toString ~ " is expected to be an alias variable, but does not seem to be a VarDeclaration");
+            auto v = getValue(avd);
+            printf("[identifierTrait] v = %s.astTypeName: %s\n", v.toChars, astTypeName(v).ptr); //debugline
+            Dsymbol s;
+            if (auto te = v.isTypeExp())
+            {
+                s = te.type.toDsymbol(null);
+                // we need to get the decl out of the type exp
+
+            }
+            else
+            {
+                s = getDsymbolWithoutExpCtx(v);
+            }
+            assert(s, "Could not get Symbol from: " ~ v.toString());
+            Identifier id = s.ident;
+            auto se = new StringExp(e.loc, id.toString());
+            se.type = Type.tstring;
+            //e.type = Type.tstring;
+            //result = interpretRegion(se, istate);
+            result = se;
+        }
         if (e.ident == Id.parent)
         {
             assert(e.args.dim == 1);
             auto o = (*e.args)[0];
             assert(o.getType().ty == Talias);
-            printf("o = %s.astTypeName: %s\n", o.toChars, astTypeName(o).ptr);
+            // printf("o = %s.astTypeName: %s\n", o.toChars, astTypeName(o).ptr); //debugline
             import dmd.templateparamsem;
             import dmd.dtemplate;
             auto s = getDsymbolWithoutExpCtx(o);
-            printf("s = %s.astTypeName: %s\n", s.toChars, astTypeName(s).ptr);
+            // printf("s = %s.astTypeName: %s\n", s.toChars, astTypeName(s).ptr); //debugline
             auto v = getValue(cast(VarDeclaration)s);
-            printf("v = %s.astTypeName: %s\n", v.toChars, astTypeName(v).ptr);
+            // printf("v = %s.astTypeName: %s\n", v.toChars, astTypeName(v).ptr); //debugline
             Dsymbol s2;
             if (auto te = v.isTypeExp())
             {
@@ -5785,7 +5817,7 @@ public:
                 s2 = getDsymbolWithoutExpCtx(v);
             }
             assert(s2, "Could not get Symbol from: " ~ v.toString());
-            printf("s2 = %s.astTypeName: %s\n", s2.toChars, astTypeName(s2).ptr);
+            // printf("s2 = %s.astTypeName: %s\n", s2.toChars, astTypeName(s2).ptr); //debugline
             auto p = s2.toParent();
             if (!p || p.isImport())
             {
@@ -5794,11 +5826,10 @@ public:
                 return;
             }
 
-            printf("p = %s.astTypeName: %s\n", p.toChars, astTypeName(p).ptr);
+            // printf("p = %s.astTypeName: %s\n", p.toChars, astTypeName(p).ptr); //debugline
             auto pv = symbolToExp(p, e.loc, ctfeGlobals.sc, false);
-            printf("pv = %s.astTypeName: %s\n", pv.toChars, astTypeName(pv).ptr);
+            // printf("pv = %s.astTypeName: %s\n", pv.toChars, astTypeName(pv).ptr); //debugline
             result = pv;
-        
         }
     }
 
@@ -6441,7 +6472,7 @@ public:
 
 Expression interpret(UnionExp* pue, Expression e, InterState* istate, CtfeGoal goal = ctfeNeedRvalue)
 {
-    if (e) printf("interpret: %s\n", e.toChars());
+    debug (LOG) {if (e) printf("interpret: %s\n", e.toChars());}
     if (!e)
         return null;
     scope Interpreter v = new Interpreter(pue, istate, goal);
