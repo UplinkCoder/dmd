@@ -3938,7 +3938,6 @@ extern (C++) final class DeclarationExp : Expression
 
     override Expression syntaxCopy()
     {
-        printf("declaration: %s ... declaration.serial: %d\n", declaration.toChars(), declaration.serial);
         return new DeclarationExp(loc, declaration.syntaxCopy(null));
     }
 

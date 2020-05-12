@@ -76,7 +76,7 @@ import dmd.utf;
 import dmd.utils;
 import dmd.visitor;
 
-enum LOGSEMANTIC = true;
+enum LOGSEMANTIC = false;
 
 /********************************************************
  * Perform semantic analysis and CTFE on expressions to produce
@@ -835,7 +835,8 @@ Lagain:
     Expression e;
 
     //printf("DsymbolExp:: %p '%s' is a symbol\n", this, toChars());
-    printf("s = '%s', s.kind = '%s'\n", s.toChars(), s.kind());
+    import dmd.asttypename;
+    printf("s = '%s', s.kind = '%s', s.asttypename = '%s'\n", s.toChars(), s.kind(), s.astTypeName().ptr);
     Dsymbol olds = s;
     Declaration d = s.isDeclaration();
     if (d && (d.storage_class & STC.templateparameter))
@@ -969,7 +970,6 @@ Lagain:
 
     if (Type t = s.getType())
     {
-        printf("THis here h Fire\n");
         return (new TypeExp(loc, t)).expressionSemantic(sc);
     }
 
@@ -5442,19 +5442,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         Type type;
         Expression exp;
         Dsymbol symv;
-        printf("e: %s .. e.targ=%s\n", e.toChars, e.targ.toChars());
-
-        resolve(e.targ, e.loc, sc, &exp, &type, &symv, false);
+        {
+            auto oldgagged = global.startGagging();
+            resolve(e.targ, e.loc, sc, &exp, &type, &symv, false);
+            global.endGagging(oldgagged);
+        }
         printf("type:%p exp:%p, symv:%p\n", type, exp, symv);
         if ((exp && exp.type.ty == Talias) || (type && type.ty == Talias))
         {
             //e.type = new TypeBasic(Talias);
-            printf("[IsExp] Don't touch the alias \n");
+            // printf("[IsExp] Don't touch the alias \n");
             e.type = Type.tbool;
             result = e;
             return ;
         }
-
+        
         {
             printf("IsExp::semantic(%s)\n", e.toChars());
         }
@@ -11655,7 +11657,7 @@ Expression semanticY(DotIdExp exp, Scope* sc, int flag)
 {
     //if (sc.flags & SCOPE.ctfe)
     //    return exp;
-    printf("DotIdExp::semanticY(this = %p, '%s')\n", exp, exp.toChars());
+    //printf("DotIdExp::semanticY(this = %p, '%s')\n", exp, exp.toChars());
 
     //{ static int z; fflush(stdout); if (++z == 10) *(char*)0=0; }
 
@@ -11699,8 +11701,6 @@ Expression semanticY(DotIdExp exp, Scope* sc, int flag)
         {
             exp.type = Type.talias.arrayOf;
         }
-        import dmd.asttypename;
-        printf("exp.e1.asttypename: %s\n", exp.e1.astTypeName().ptr);
         return exp;
     }
 
@@ -11905,7 +11905,8 @@ Expression semanticY(DotIdExp exp, Scope* sc, int flag)
             // BUG: handle other cases like in IdentifierExp::semantic()
             debug
             {
-                printf("s = '%s', kind = '%s'\n", s.toChars(), s.kind());
+                import dmd.asttypename;
+                printf("xxs = '%s', kind = '%s', typename='%s'\n", s.toChars(), s.kind(), s.astTypeName().ptr);
             }
             assert(0);
         }
