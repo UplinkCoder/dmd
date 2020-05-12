@@ -4784,6 +4784,12 @@ extern (C++) final class TypeFunction : TypeNext
                         else
                             m = arg.implicitConvTo(tprm);
                     }
+
+                    if (p.type && p.type.ty == Talias)
+                    {
+                        // TODO make sure that arg is a type!
+                        m = MATCH.convert;
+                    }
                     //printf("match %d\n", m);
                 }
 

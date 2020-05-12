@@ -2879,17 +2879,18 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, Expression* pe, Type* pt, Ds
             goto Lerr;
         }
         mt.exp = exp2;
-
-        if (exp2.type.ty == Talias)
+        if (exp2.type)
         {
-            printf("Triggering on %s", exp2.toChars());
-            // Talias come back as half resolved TypeTypeof
-            *pt = Type.talias;
-            *pe = new TypeExp(mt.loc, mt);
-            mt.inuse--;
-            return;
+            if (exp2.type.ty == Talias)
+            {
+                printf("Triggering on %s", exp2.toChars());
+                // Talias come back as half resolved TypeTypeof
+                *pt = Type.talias;
+                *pe = new TypeExp(mt.loc, mt);
+                mt.inuse--;
+                return;
+            }
         }
-
 
         if (mt.exp.op == TOK.type ||
             mt.exp.op == TOK.scope_)
@@ -3111,6 +3112,7 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, Expression* pe, Type* pt, Ds
  */
 Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, int flag)
 {
+    // printf("calling dotExp: (%s.%s)\n", e.toChars(), ident.toChars()); // debugline
     Expression visitType(Type mt)
     {
         VarDeclaration v = null;

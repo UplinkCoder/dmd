@@ -11692,6 +11692,10 @@ Expression semanticY(DotIdExp exp, Scope* sc, int flag)
         {
             exp.type = Type.tsize_t;
         }
+        else if (exp.ident == Id._tupleof)
+        {
+            exp.type = Type.talias.arrayOf;
+        }
         import dmd.asttypename;
         printf("exp.e1.asttypename: %s\n", exp.e1.astTypeName().ptr);
         return exp;

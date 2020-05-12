@@ -1591,7 +1591,8 @@ Expression ctfeCast(UnionExp* pue, const ref Loc loc, Type type, Type to, Expres
             return pue.exp();
         }
     }
-    printf("e.op: %s\n", Token.toChars(e.op));
+    //printf("e.op: %s\n", Token.toChars(e.op));
+    //printf("type: %p to: %p\n", type, to);
     // Allow TypeInfo type painting
 
 
@@ -1603,7 +1604,7 @@ Expression ctfeCast(UnionExp* pue, const ref Loc loc, Type type, Type to, Expres
         return paint();
 
     Expression r;
-    if (e.type.equals(type) && type.equals(to))
+    if ((type is to) || (e.type.equals(type) && type.equals(to)))
     {
         // necessary not to change e's address for pointer comparisons
         r = e;

@@ -2911,6 +2911,36 @@ public:
             result = e;
             return ;
         }
+        if (die.ident == Id._tupleof)
+        {
+            auto ve = die.e1.isVarExp();
+            assert(ve, die.e1.toString ~ " execpted to be an alias variable");
+            auto e1 = ctfeInterpret(ve);
+            if (TypeExp te = e1.isTypeExp())
+            {
+                // handle type.tupleof
+                Type t = te.type;
+                if (auto ts = t.isTypeStruct())
+                {
+                    auto exps = new Expressions();
+                    exps.setDim(ts.sym.fields.dim);
+                    foreach(i, f;ts.sym.fields)
+                    {
+                        Expression e = new VarExp(die.loc, f);
+                        (*exps)[i] = e;
+                    }
+
+                    result = new ArrayLiteralExp(die.loc, Type.talias, exps);
+                    result.type = Type.talias.arrayOf();
+                        //new TupleExp(die.loc, null, exps);
+                    return ;
+                }
+
+                //t.
+            }
+            import dmd.asttypename;
+            printf("e1.asttypename: %s\n", e1.astTypeName().ptr);
+        }
         die.error(".%s cannot be resolved on a type (yet ?)", die.ident.toChars());
         result = new ErrorExp();
 
@@ -3895,7 +3925,8 @@ public:
         }
 
         if (vd)
-            setValue(vd, oldval);
+            //setValue(vd, oldval);
+            setValueWithoutChecking(vd, oldval);
         else
             *payload = oldval;
 
