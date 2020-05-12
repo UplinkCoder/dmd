@@ -7726,14 +7726,17 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             result = e;
             return;
         }
-
+        if (e.e1.type.toBasetype().ty == Talias)
+        {
+            goto LskipResolve;
+        }
         if (Expression ex = unaSemantic(e, sc))
         {
             result = ex;
             return;
         }
         e.e1 = resolveProperties(sc, e.e1);
-
+    LskipResolve:
         e.type = Type.tsize_t;
         result = e;
     }

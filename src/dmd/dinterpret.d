@@ -227,7 +227,7 @@ alias ctfeNeedRvalue = CtfeGoal.ctfeNeedRvalue;
 alias ctfeNeedLvalue = CtfeGoal.ctfeNeedLvalue;
 alias ctfeNeedNothing = CtfeGoal.ctfeNeedNothing;
 
-debug = LOG;
+//debug = LOG;
 //debug = LOGASSIGN;
 //debug = LOGCOMPILE;
 //debug = SHOWPERFORMANCE;
