@@ -441,6 +441,10 @@ extern (C++) struct Target
 
         Type tn = tf.next.toBasetype();
         //printf("tn = %s\n", tn.toChars());
+        if (tn.ty == Talias)
+        {
+            return false;
+        }
         d_uns64 sz = tn.size();
         Type tns = tn;
 

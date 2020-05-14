@@ -2142,6 +2142,16 @@ public:
             printf("Visiting Type variable exp\n");
             auto type_val = getValue(e.var.isVarDeclaration());
             printf("type_val: %s ... typename: %s\n", type_val.toChars(), astTypeName(type_val).ptr);
+            if (auto te = type_val.isTypeExp())
+            {
+                // printf("it is a TypeExp and the astTypeName of type is: %s deco is: %s\n", astTypeName(te.type).ptr);
+                TypeStruct ts = (te.type.ty == Tstruct ? cast(TypeStruct)te.type : null);
+                if (ts && ts.sym && ts.sym.semanticRun < 2)
+                {
+                    import dmd.dsymbolsem;
+                    dsymbolSemantic(ts.sym, null);
+                }
+            }
             printf("Got: %p\n", type_val);
             //assert(type_val.isTypeExp());
             result = type_val;

@@ -5829,7 +5829,45 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
     }
 }
 
-void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions* fargs)
+FuncDeclaration isTFunction(TemplateInstance ti, Scope* sc)
+{
+    FuncDeclaration result = null;
+
+    Dsymbol scopesym;
+    Dsymbol s = sc.search(ti.loc, ti.name, &scopesym);
+    if (s)
+    {
+        if (auto fd = s.isFuncDeclaration())
+        {
+            auto tf = fd.type.toTypeFunction();
+            
+            bool hasAliasInDecl = false;
+            
+            if (tf.nextOf && (tf.nextOf.ty == Talias || isAliasType(tf.nextOf)))
+                hasAliasInDecl = true;
+            
+            if (!hasAliasInDecl) foreach(p;*tf.parameterList)
+            {
+                if (p.type.ty == Talias || isAliasType(p.type))
+                {
+                    hasAliasInDecl = true;
+                    break;
+                }
+            }
+            
+            if (hasAliasInDecl)
+            {
+                printf("%s is a typefunction\n", fd.toPrettyChars());
+                fd.type_function = 1;
+                result = fd;
+            }                  
+        }
+    }
+
+    return result;
+}
+
+void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions* fargs, int line = __LINE__, string file = __FILE__)
 {
     //printf("[%s] TemplateInstance.dsymbolSemantic('%s', this=%p, gag = %d, sc = %p)\n", tempinst.loc.toChars(), tempinst.toChars(), tempinst, global.gag, sc);
     version (none)
@@ -5897,6 +5935,17 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
     {
         printf("\tdo semantic\n");
     }
+
+    if (tempinst)
+    {
+        if (auto tf = isTFunction(tempinst, sc))
+        {
+            printf("We found us to be a type function called by %d:%s\n", line, file.ptr);
+            //tempinst.aliasdecl = typeFunctionSemantic(tempinst, tempinst.tiargs,
+            return ;
+        }
+    }
+
     /* Find template declaration first,
      * then run semantic on each argument (place results in tiargs[]),
      * last find most specialized template from overload list/set.
@@ -5915,6 +5964,7 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
         tempinst.errors = true;
         return;
     }
+
     TemplateDeclaration tempdecl = tempinst.tempdecl.isTemplateDeclaration();
     assert(tempdecl);
 

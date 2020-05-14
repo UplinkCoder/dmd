@@ -333,7 +333,7 @@ Expression resolveOpDollar(Scope* sc, ArrayExp ae, IntervalExp ie, Expression* p
  */
 bool arrayExpressionSemantic(Expressions* exps, Scope* sc, bool preserveErrors = false)
 {
-    printf("[ArrayExpressionSemantic] exps:%s\n", exps.toChars());
+    // printf("[ArrayExpressionSemantic] exps:%s\n", exps.toChars()); //debugline
     bool err = false;
     if (exps)
     {
@@ -1599,7 +1599,7 @@ private bool preFunctionParameters(Scope* sc, Expressions* exps, const bool repo
             printf("fobdy: %s\n", fe.fd.fbody.toChars());
         }
     }
-    printf("exps: %s\n", exps.toChars());
+    // if (exps) printf("exps: %s\n", exps.toChars()); //debugline
     if (exps)
     {
         expandTuples(exps);
@@ -3312,39 +3312,13 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         TemplateInstance ti = sds2.isTemplateInstance();
         FuncDeclaration typefunc;
 
+
+
         if (ti) 
-        // if (isTFunction(ti, sc))
+        //if (isTFunction(ti, sc))
         {
             printf("Checking for `%s` type function\n", ti.name.toChars());
-            Dsymbol scopesym;
-            Dsymbol s = sc.search(ti.loc, ti.name, &scopesym);
-            if (s)
-            {
-                if (auto fd = s.isFuncDeclaration())
-                {
-                    auto tf = fd.type.toTypeFunction();
-
-                    bool hasAliasInDecl = false;
-
-                    if (tf.nextOf && (tf.nextOf.ty == Talias || isAliasType(tf.nextOf)))
-                        hasAliasInDecl = true;
-
-                    if (!hasAliasInDecl) foreach(p;*tf.parameterList)
-                    {
-                        if (p.type.ty == Talias || isAliasType(p.type))
-                        {
-                            hasAliasInDecl = true;
-                            break;
-                        }
-                    }
-
-                    if (hasAliasInDecl)
-                    {
-                        printf("%s is a typefunction\n", fd.toPrettyChars());
-                        typefunc = fd;
-                    }                  
-                }
-            }
+            typefunc = isTFunction(ti, sc);
         }
         if (typefunc)
         {
