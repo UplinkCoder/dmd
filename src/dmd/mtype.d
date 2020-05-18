@@ -4840,7 +4840,16 @@ extern (C++) final class TypeFunction : TypeNext
                             }
                         }
                         else
-                            m = arg.implicitConvTo(tprm);
+                        {
+                            if (tprm.ty == Talias)
+                            {
+                                m = MATCH.convert;
+                            }
+                            else
+                            {
+                                m = arg.implicitConvTo(tprm);
+                            }
+                        }
                     }
                     //printf("match %d\n", m);
                 }
