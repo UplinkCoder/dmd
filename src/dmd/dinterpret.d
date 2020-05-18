@@ -2197,6 +2197,13 @@ public:
             return;
         }
         result = getVarExp(e.loc, istate, e.var, goal);
+
+        if (result.op == TOK.type)
+        {
+            // we leave TypeExp alone
+            return ;
+        }
+
         if (exceptionOrCant(result))
             return;
         if ((e.var.storage_class & (STC.ref_ | STC.out_)) == 0 && e.type.baseElemOf().ty != Tstruct)
@@ -2882,6 +2889,22 @@ public:
         }
         e.error("cannot interpret `%s` at compile time", e.toChars());
         result = CTFEExp.cantexp;
+    }
+
+    override void visit(DotIdExp die)
+    {
+        if (die.ident == Id.stringof)
+        {
+            auto e1 = interpretRegion(die.e1, istate);
+            result = new StringExp(die.loc, e1.toString());
+            result.type = Type.tstring;
+        }
+        else
+        {
+            die.error("identifier: %s could not be resolved for what is presumably a alias variable", die.ident.toChars());
+            result = new ErrorExp();
+            result.type = Type.terror;
+        }
     }
 
     override void visit(UnaExp e)
@@ -5735,6 +5758,14 @@ public:
         {
             result = CTFEExp.voidexp;
             return;
+        }
+
+        // casts to alias just pass trough to the exp
+        if (e.to.ty == Talias)
+        {
+            result = ctfeInterpret(e1);
+            //result.type = Type.talias;
+            return ;
         }
         if (e.to.ty == Tpointer && e1.op != TOK.null_)
         {
