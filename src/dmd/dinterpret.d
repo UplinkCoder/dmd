@@ -2893,6 +2893,11 @@ public:
 
     override void visit(DotIdExp die)
     {
+        debug (LOG)
+        {
+            printf("%s DotIdExp::interpret() %s\n", die.loc.toChars(), die.toChars());
+        }
+
         if (die.ident == Id.stringof)
         {
             auto e1 = interpretRegion(die.e1, istate);
