@@ -3605,7 +3605,8 @@ public:
                     if (newval.type.ty != Tarray)
                     {
                         newval = copyLiteral(newval).copy();
-                        newval.type = e.e2.type; // repaint type
+                        if (newval.op != TOK.type) // don't repaint type expressions that's kindof destrucive
+                            newval.type = e.e2.type; // repaint type
                     }
                     else
                     {
