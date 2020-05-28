@@ -2,6 +2,16 @@ import dmd.trace_file;
 import std.stdio;
 import std.file;
 
+bool ArgOneToN(uint arg, uint N)
+{
+    if (!arg || arg > N)
+    {
+        writeln("ArgumentError: RangeError: Expected Range [1, ", N, "] (inclusive)");
+        return false;
+    }
+    return true;
+}
+
 void main(string[] args)
 {
 
@@ -195,6 +205,7 @@ void main(string[] args)
 
         auto sorted_selfTimes = selfTime.sort!((a, b) => a[1] > b[1]).release;
         writeln("SelfTimes");
+        writeln("selftime, kind, symbol_id");
         foreach (st; sorted_selfTimes[0 .. (header.n_records > 2000 ? 2000 : header.n_records)])
         {
             const r = records[st[0]];
@@ -286,39 +297,40 @@ void main(string[] args)
     {
         import std.conv : to;
         uint sNumber = to!uint(args[3]);
-
-        writeln("{name: ", getSymbolName(fileBytes, sNumber), 
-            "\nlocation: " ~ getSymbolLocation(fileBytes, sNumber) ~ "}");
-
-    }
-    else if (mode == "Symbol")
-    {
-        import std.conv : to;
-        uint sNumber = to!uint(args[3]);
-
-        writeln("{name: ", getSymbolName(fileBytes, sNumber), 
-            "\nlocation: " ~ getSymbolLocation(fileBytes, sNumber) ~ "}");
+        if (sNumber.ArgOneToN(header.n_symbols))
+        {
+            writeln("{name: ", getSymbolName(fileBytes, sNumber), 
+                "\nlocation: " ~ getSymbolLocation(fileBytes, sNumber) ~ "}");
+        }
 
     }
     else if (mode == "Parent")
     {
         import std.conv : to;
         uint sNumber = to!uint(args[3]);
-
-        writeln("{parentId: ", parents[sNumber - 1], "}");
+        if (sNumber.ArgOneToN(header.n_records))
+        {
+            writeln("{parentId: ", parents[sNumber - 1], "}");
+        }
 
     }
     else if (mode == "Phase")
     {
         import std.conv : to;
         uint sNumber = to!uint(args[3]);
-        writeln("{phase: " ~ phases[sNumber - 1] ~ "}");
+        if (sNumber.ArgOneToN(header.n_phases))
+        {
+            writeln("{phase: " ~ phases[sNumber - 1] ~ "}");
+        }
     }
     else if (mode == "Kind")
     {
         import std.conv : to;
         uint sNumber = to!uint(args[3]);
-        writeln("{kind: " ~ kinds[sNumber - 1] ~ "}");
+        if (sNumber.ArgOneToN(header.n_kinds))
+        {
+            writeln("{kind: " ~ kinds[sNumber - 1] ~ "}");
+        }
     }
     else if (mode == "RandSample")
     {
