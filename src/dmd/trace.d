@@ -570,9 +570,11 @@ pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFi
 
         auto nameStringLength = (traceFileName !is null ? traceFileName.length : timeStringLength);
         auto nameStringPointer = (traceFileName !is null ? traceFileName.ptr : timeString);
+        enum split_file = false;
 
         static if (COMPRESSED_TRACE)
         {
+
             auto fileNameLength =
                 snprintf(&fileNameBuffer[0], fileNameBuffer.sizeof, "%.*s.trace".ptr, nameStringLength, nameStringPointer);
 
@@ -621,14 +623,21 @@ pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFi
             sw.reset();
             sw.start();
 
-            auto data = fileBuffer[0 .. bufferPos - fileBuffer];
-            auto errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
+            char[] data;
+            size_t errorcode_write;
+
+            if (split_file)
+            {
+                data = fileBuffer[0 .. bufferPos - fileBuffer];
+                errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
+            }
 
             sw.stop();
             import std.stdio : writeln; writeln("writing records to disk took: ", sw.peek());
 
             // ----------------------------------------------------------------------------
-
+            if (split_file)
+            {
             fileNameLength =
                 snprintf(&fileNameBuffer[0], fileNameBuffer.sizeof, "%.*s.symbol".ptr, nameStringLength, nameStringPointer);
 
@@ -649,10 +658,17 @@ pragma(inline, false) void writeTrace(Strings* arguments, const (char)[] traceFi
 
             // now attach the metadata
             symHeader.offset_symbol_info_descriptors = currentOffset32();
-            writeSymInfos(bufferPos, fileBuffer);
 
+            }
+            else
+            {
+                header.n_symbols = n_symInfos;
+                header.offset_symbol_info_descriptors = currentOffset32();
+            }
+            writeSymInfos(bufferPos, fileBuffer);
             data = fileBuffer[0 .. bufferPos - fileBuffer];
             errorcode_write = File.write(fileNameBuffer[0 .. fileNameLength], data);
+
         }
         else
         {
