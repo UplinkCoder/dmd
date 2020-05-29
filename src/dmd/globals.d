@@ -17,6 +17,8 @@ import dmd.root.filename;
 import dmd.root.outbuffer;
 import dmd.identifier;
 
+import dmd.dtemplate;
+
 template xversion(string s)
 {
     enum xversion = mixin(`{ version (` ~ s ~ `) return true; else return false; }`)();
@@ -327,6 +329,10 @@ extern (C++) struct Global
 
     Array!Identifier* versionids;    // command line versions and predefined versions
     Array!Identifier* debugids;      // command line debug versions and predefined versions
+
+    import dmd.root.aav;
+
+    AssocArray!(TemplateDeclaration, uint) all_instantiated_templates;
 
     enum recursionLimit = 500; // number of recursive template expansions before abort
 

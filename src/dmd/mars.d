@@ -686,6 +686,13 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         }
     }
 
+                            auto buf = OutBuffer();
+                            foreach(template_,count;global.all_instantiated_templates.asRange())
+                            {
+                                buf.printf("%d|%s\n", count, template_.toChars());
+                            }
+                            File.write("template.lst", buf[]);
+
     if (global.params.doCxxHdrGeneration)
         genCppHdrFiles(modules);
 

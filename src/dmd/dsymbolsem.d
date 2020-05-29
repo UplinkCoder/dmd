@@ -6386,6 +6386,11 @@ Laftersemantic:
         auto ti2 = TemplateInstanceBox(tempinst);
         tempdecl.instances[ti2] = tempinst;
     }
+    else
+    {
+        if (global.all_instantiated_templates.get)
+            (*global.all_instantiated_templates.getLvalue())++;
+    }
 
     static if (LOG)
     {
