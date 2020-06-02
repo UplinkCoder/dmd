@@ -123,6 +123,7 @@ private Expression checkAssignmentAsCondition(Expression e)
 // Performs semantic analysis in Statement AST nodes
 extern(C++) Statement statementSemantic(Statement s, Scope* sc)
 {
+    import dmd.trace; mixin(traceString("s"));
     scope v = new StatementSemanticVisitor(sc);
     s.accept(v);
     return v.result;
@@ -651,6 +652,8 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
      */
     MakeTupleForeachRet!isDecl makeTupleForeach(bool isStatic, bool isDecl)(ForeachStatement fs, TupleForeachArgs!(isStatic, isDecl) args)
     {
+        import dmd.trace; mixin(traceString("fs"));
+
         auto returnEarly()
         {
             static if (isDecl)
