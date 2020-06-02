@@ -41,7 +41,7 @@ public:
      * Params:
      *  dim = initial length of array
      */
-    this(size_t dim) pure nothrow
+    this(size_t dim)  nothrow
     {
         reserve(dim);
         this.length = dim;
@@ -49,7 +49,7 @@ public:
 
     @disable this(this);
 
-    ~this() pure nothrow
+    ~this()  nothrow
     {
         debug (stomp) memset(data.ptr, 0xFF, data.length);
         if (data.ptr != &smallarray[0])
@@ -114,14 +114,14 @@ public:
         return toString.ptr;
     }
 
-    ref Array push(T ptr) return pure nothrow
+    ref Array push(T ptr) return  nothrow
     {
         reserve(1);
         data[length++] = ptr;
         return this;
     }
 
-    extern (D) ref Array pushSlice(T[] a) return pure nothrow
+    extern (D) ref Array pushSlice(T[] a) return  nothrow
     {
         const oldLength = length;
         setDim(oldLength + a.length);
@@ -129,13 +129,13 @@ public:
         return this;
     }
 
-    ref Array append(typeof(this)* a) return pure nothrow
+    ref Array append(typeof(this)* a) return  nothrow
     {
         insert(length, a);
         return this;
     }
 
-    void reserve(size_t nentries) pure nothrow
+    void reserve(size_t nentries)  nothrow
     {
         //printf("Array::reserve: length = %d, data.length = %d, nentries = %d\n", (int)length, (int)data.length, (int)nentries);
         if (data.length - length < nentries)
@@ -203,7 +203,7 @@ public:
         debug (stomp) memset(data.ptr + length, 0xFF, T.sizeof);
     }
 
-    void insert(size_t index, typeof(this)* a) pure nothrow
+    void insert(size_t index, typeof(this)* a) nothrow
     {
         if (a)
         {
@@ -216,7 +216,7 @@ public:
         }
     }
 
-    void insert(size_t index, T ptr) pure nothrow
+    void insert(size_t index, T ptr)  nothrow
     {
         reserve(1);
         memmove(data.ptr + index + 1, data.ptr + index, (length - index) * T.sizeof);
@@ -224,7 +224,7 @@ public:
         length++;
     }
 
-    void setDim(size_t newdim) pure nothrow
+    void setDim(size_t newdim)  nothrow
     {
         if (length < newdim)
         {
@@ -256,7 +256,7 @@ public:
         return data.ptr;
     }
 
-    Array!T* copy() const pure nothrow
+    Array!T* copy() const nothrow
     {
         auto a = new Array!T();
         a.setDim(length);
@@ -264,7 +264,7 @@ public:
         return a;
     }
 
-    void shift(T ptr) pure nothrow
+    void shift(T ptr)  nothrow
     {
         reserve(1);
         memmove(data.ptr + 1, data.ptr, length * T.sizeof);
@@ -413,7 +413,7 @@ unittest
  * Returns:
  *  The given array exposed to a standard D array.
  */
-@property inout(T)[] peekSlice(T)(inout(Array!T)* array) pure nothrow @nogc
+@property inout(T)[] peekSlice(T)(inout(Array!T)* array)  nothrow @nogc
 {
     return array ? (*array)[] : null;
 }
@@ -426,7 +426,7 @@ unittest
  *  index = the index to split the array from.
  *  length = the number of elements to make room for starting at $(D index).
  */
-void split(T)(ref Array!T array, size_t index, size_t length) pure nothrow
+void split(T)(ref Array!T array, size_t index, size_t length)  nothrow
 {
     if (length > 0)
     {
@@ -472,7 +472,7 @@ unittest
  * Returns:
  *      reversed a[]
  */
-T[] reverse(T)(T[] a) pure nothrow @nogc @safe
+T[] reverse(T)(T[] a)  nothrow @nogc @safe
 {
     if (a.length > 1)
     {
