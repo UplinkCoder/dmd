@@ -3,7 +3,7 @@ module dmd.ctfe.bc;
 import dmd.ctfe.bc_common;
 import dmd.ctfe.bc_limits;
 import dmd.ctfe.bc_abi;
-
+debug = bc;
 import core.stdc.stdio;
 
 /**
@@ -686,7 +686,7 @@ pure:
     }
 
 
-    void outputBytes(string s)
+    void outputBytes(const (char)[] s)
     {
         outputBytes(cast(const ubyte[]) s);
     }
@@ -1268,7 +1268,7 @@ pure:
             break;
             default :
                 debug{assert(0, "me no have no cast for targetType " ~ enumToString(targetType));}
-            break;
+            //break;
         }
 
         return lhs;
