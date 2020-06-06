@@ -397,7 +397,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         import std.stdio;
         import std.algorithm;
 
-        bcv.vars.keys.each!(k => (cast(VarDeclaration) k).print);
+//        bcv.vars.keys.each!(k => (cast(VarDeclaration) k).print);
         bcv.vars.writeln;
 
         writeln("stackUsage = " ~ itos(cast(int)(bcv.sp - 4)) ~ " byte");
@@ -1383,6 +1383,7 @@ struct SharedCtfeState(BCGenT)
             {
                 debug (ctfe)
                     assert(0, "cannot get size for BCType." ~ enumToString(type.type));
+                else
                 return 0;
             }
 
@@ -1459,7 +1460,7 @@ Expression toExpression(const BCValue value, Type expressionType,
         {
             assert(0, "return value was not set");
         }
-
+        else
         return null;
     }
 
@@ -1524,9 +1525,10 @@ Expression toExpression(const BCValue value, Type expressionType,
         {
             assert(0, "Interpreter had to bail out");
         }
-        import std.stdio;
+        else
         static if (bailoutMessages)
         {
+            import std.stdio;
             writeln("We just bailed out of the interpreter ... this is bad, VERY VERY VERY bad");
             writeln("It means we have missed to fixup jumps or did not emit a return or something along those lines");
         }
@@ -1925,7 +1927,7 @@ Expression toExpression(const BCValue value, Type expressionType,
     default:
         {
             debug (ctfe)
-                assert(0, "Cannot convert to " ~ expressionType.toString!Type ~ " yet.");
+                assert(0, "Cannot convert to " ~ expressionType.toString() ~ " yet.");
         }
     }
     if (result)
@@ -2120,7 +2122,7 @@ extern (C++) final class BCTypeVisitor : Visitor
 
         debug (ctfe)
             assert(0, "NBT Type unsupported " ~ (cast(Type)(t)).toString);
-
+        else
         return BCType.init;
     }
 
@@ -2259,9 +2261,9 @@ struct BCScope
 // debug = abi;
 debug = nullPtrCheck;
 debug = nullAllocCheck;
-//debug = ctfe;
+debug = ctfe;
 //debug = MemCpyLocation;
-//debug = SetLocation;
+debug = SetLocation;
 //debug = LabelLocation;
 
 extern (C++) final class BCV(BCGenT) : Visitor
@@ -5562,6 +5564,7 @@ static if (is(BCGen))
 
             debug (ctfe)
             {
+                import std.stdio;
                 writeln("elExpr: ", elexpr.toString, " elem ", elem.toString);
             }
 
@@ -6334,8 +6337,7 @@ static if (is(BCGen))
             {
                 auto initExp = type.initializerExps[i];
                 auto initValue = initExp ? genExpr(type.initializerExps[i]) : BCValue.init;
-                import std.stdio : writeln;
-                writeln(initExp.toString());
+                if (initExp) { import std.stdio : writeln; writeln(initExp.toString()); } // DEBUGLINE
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
                 Store32(offset.u32, initValue);
