@@ -205,6 +205,8 @@ extern (C++) struct Param
     bool externStdUsage;    // print help on -extern-std switch
     bool logo;              // print compiler logo
 
+    bool newCTFE = true;           // try the newCTFE evaluator
+
     CPU cpu = CPU.baseline; // CPU instruction set to target
 
     CHECKENABLE useInvariants  = CHECKENABLE._default;  // generate class invariant checks
