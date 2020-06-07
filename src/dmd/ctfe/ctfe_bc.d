@@ -2165,7 +2165,6 @@ extern (C++) final class BCTypeVisitor : Visitor
         sharedCtfeState.endClass(&ct, died);
     }
 
-
     override void visit(StructDeclaration sd)
     {
         lastLoc = sd.loc;
@@ -2179,7 +2178,7 @@ extern (C++) final class BCTypeVisitor : Visitor
         const(char)[] reason;
 
 //        __gshared static bcv = new BCV!BCGenT; // TODO don't do this.
-
+        import dmd.asttypename;
         addFieldLoop : foreach (mi, sMember; sd.fields)
         {
             bool calledSemantic = false;
@@ -2215,7 +2214,8 @@ extern (C++) final class BCTypeVisitor : Visitor
                     st.addField(bcType, true, null);
                 else
                 {
-                    initExp = sMember._init.isExpInitializer() ? sMember._init.isExpInitializer().exp : null;
+                    import dmd.initsem;
+                    initExp = initializerToExpression(sMember._init);
                     if(initExp)
                     {
                         if(!initExp.type && !calledSemantic)
@@ -2236,7 +2236,7 @@ extern (C++) final class BCTypeVisitor : Visitor
                         }
                     }
                     else
-                        assert(0, "We cannot deal with this initalizer -- " ~ sMember._init.toString());
+                        assert(0, "We cannot deal with this initalizer -- " ~ sMember._init.toString() ~ " asttypename: " ~ sMember._init.astTypeName());
                         //FIXME change the above assert to something we can bail out on
 
                     st.addField(bcType, false, initExp);
@@ -2433,7 +2433,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         return 0;
     }
 
-    int getConstructor(CtorDeclaration cd, BCType type)
+    int lookupConstructor(CtorDeclaration cd, BCType type)
     {
         assert(type.type == BCTypeEnum.Class);
         foreach (ctor; uncompiledConstructors[0 .. uncompiledConstructorCount])
@@ -2445,6 +2445,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
         }
         return 0;
     }
+
     import dmd.globals : Loc;
     BCValue addErrorWithMessage(Loc loc, BCValue errorMessage)
     {
@@ -3489,6 +3490,19 @@ public:
                 }
                 Store32AtOffset(p1, imm32(bcClass.vtblPtr), ClassMetaData.VtblOffset);
                 Store32AtOffset(p1, imm32(uc.type.typeIndex), ClassMetaData.TypeIdIdxOffset);
+            foreach(f;cdtp.fields)
+            {
+                // go through the fields and if there is a value store it at the appropriate offset
+                if (f._init)
+                {
+                    const fInfo = getFieldInfo(uc.type, f);
+                    auto initExp = genExpr(f._init.isExpInitializer().exp);
+
+
+                }
+            }
+
+
                 Ret(p1);
             endFunction();
             bcClass.defaultCtorIdx = uc.fnIdx;
@@ -5141,7 +5155,7 @@ static if (is(BCGen))
                 int offset = fInfo.offset;
                 if (offset == -1)
                 {
-                    bailout("Could not get field-offset of" ~ vd.toString);
+                    bailout("Could not get field-offset of: " ~ vd.toString);
                     return ;
                 }
                 BCType varType = fInfo.type;
@@ -5176,23 +5190,7 @@ static if (is(BCGen))
                     return ;
                 }
 
-                auto ptr = genTemporary(varType);
-                Add3(ptr.i32, lhs.i32, imm32(offset));
-                //FIXME horrible hack to make slice members work
-                // Systematize somehow!
-
-                if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8]))
-                    Set(retval.i32, ptr);
-                else if (_sharedCtfeState.size(ptr.type) == 8)
-                    Load64(retval.i32, ptr);
-                else
-                    Load32(retval.i32, ptr);
-                if (!ptr)
-                {
-                    bailout("could not gen :" ~ dve.toString);
-                    return ;
-                }
-                retval.heapRef = BCHeapRef(ptr);
+                getField(lhs, fInfo, &retval);
 
                 debug (ctfe)
                 {
@@ -5233,23 +5231,8 @@ static if (is(BCGen))
                 return ;
             }
 
-            auto ptr = genTemporary(varType);
-            Add3(ptr.i32, lhs.i32, imm32(offset));
-            //FIXME horrible hack to make slice members work
-            // Systematize somehow!
+            getField(lhs, fInfo, &retval);
 
-            if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8]))
-                Set(retval.i32, ptr);
-            else if (_sharedCtfeState.size(ptr.type) == 8)
-                Load64(retval.i32, ptr);
-            else
-                Load32(retval.i32, ptr);
-            if (!ptr)
-            {
-                bailout("could not gen :" ~ dve.toString);
-                return ;
-            }
-            retval.heapRef = BCHeapRef(ptr);
             //bailout("Class.field still has to be implemented fi:" ~ itos(fieldIndex) ~ " lvl:" ~ itos(level));
         }
         else
@@ -5257,6 +5240,28 @@ static if (is(BCGen))
             bailout("Can only take members of a struct/class for now");
         }
 
+    }
+
+    void getField(BCValue lhs, FieldInfo fInfo, BCValue* retvalp)
+    {
+        auto ptr = genTemporary(fInfo.type);
+        Add3(ptr.i32, lhs.i32, imm32(fInfo.offset));
+        //FIXME horrible hack to make slice members work
+        // Systematize somehow!
+        auto rv = *retvalp;
+
+        if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8]))
+            Set(rv.i32, ptr);
+        else if (_sharedCtfeState.size(ptr.type) == 8)
+            Load64(rv.i32, ptr);
+        else
+            Load32(rv.i32, ptr);
+        if (!ptr)
+        {
+            bailout("could not access field: " ~ itos(fInfo.index));
+            return ;
+        }
+        (*retvalp).heapRef = BCHeapRef(ptr);
     }
 
     override void visit(ArrayLiteralExp ale)
@@ -5821,7 +5826,11 @@ static if (is(BCGen))
     override void visit(NewExp ne)
     {
         lastLoc = ne.loc;
-
+        debug (ctfe)
+        {
+            import std.stdio;
+            printf("NewExp: %s\n", ne.toChars());
+        }
         File(fromStringz(ne.loc.filename));
         Line(ne.loc.linnum);
         auto type = toBCType(ne.newtype);
@@ -5886,7 +5895,8 @@ static if (is(BCGen))
         {
             auto ctor = ne.member;
 
-            auto cIdx = getConstructor(ctor, type);
+            auto cIdx = lookupConstructor(ctor, type);
+            printf("Ctor: %s\n", ctor ? ctor.fbody.toChars() : "default constructor"); //debugline
             if (!cIdx)
             {
                 addUncompiledConstructor(ctor, type, &cIdx);
@@ -7724,6 +7734,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
             assignTo = lhs;
         }
+
         if (assignTo.heapRef != BCHeapRef.init)
             StoreToHeapRef(assignTo);
         retval = assignTo;
@@ -8987,7 +8998,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             writefln("WithStatement.exp %s", ws.exp.toString);
             writefln("astTypeName(WithStatement.exp) %s", ws.exp.astTypeName);
             writefln("WithStatement.exp.op %s", ws.exp.op);
-            writefln("WithStatement.wthis %s", ws.wthis.toString);
+            if (ws.wthis) writefln("WithStatement.wthis %s", ws.wthis.toString);
         }
         if (!ws.wthis && ws.exp.op == TOK.type)
         {
