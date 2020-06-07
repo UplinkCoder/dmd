@@ -3,7 +3,7 @@ module dmd.ctfe.bc;
 import dmd.ctfe.bc_common;
 import dmd.ctfe.bc_limits;
 import dmd.ctfe.bc_abi;
-debug = bc;
+
 import core.stdc.stdio;
 
 /**
