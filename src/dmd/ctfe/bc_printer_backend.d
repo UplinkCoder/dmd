@@ -1,6 +1,6 @@
-module ddmd.ctfe.bc_printer_backend;
+module dmd.ctfe.bc_printer_backend;
 //version = std_algo;
-import ddmd.ctfe.bc_common;
+import dmd.ctfe.bc_common;
 
 string fromStringz(const(char)* cstring)
 {
@@ -23,9 +23,9 @@ enum BCFunctionTypeEnum : byte
 enum withMemCpy = 1;
 enum withStrEq3 = 1;
 
-static if (is(typeof(() { import ddmd.declaration : FuncDeclaration; })))
+static if (is(typeof(() { import dmd.declaration : FuncDeclaration; })))
 {
-    import ddmd.declaration : FuncDeclaration;
+    import dmd.declaration : FuncDeclaration;
     alias FT = FuncDeclaration;
 }
 else
@@ -78,7 +78,7 @@ struct Print_BCGen
         indent = indent[0 .. $-4];
     }
 
-    @property FunctionState* currentFunctionState()
+    @property FunctionState* currentFunctionState() return
     {
         return &functionStates[currentFunctionStateNumber];
     }
@@ -92,11 +92,11 @@ struct Print_BCGen
 
     string result = "\n";
 
-    uint addErrorMessage(string msg)
+    uint addErrorMessage(const(char)[] msg)
     {
         if (errorInfoCount < errorInfos.length)
         {
-            errorInfos[errorInfoCount++].msg = msg;
+            errorInfos[errorInfoCount++].msg = cast(string)msg;
             return errorInfoCount;
         }
 
@@ -105,14 +105,17 @@ struct Print_BCGen
 
     uint addErrorValue(BCValue v)
     {
+        // FIXME HACK renable this!
+/+ 
         if (errorInfoCount < errorInfos.length)
         {
+            assert(errorInfoCount);
             auto eInfo = &errorInfos[errorInfoCount - 1];
 
             eInfo.values[eInfo.valueCount++] = v;
             return eInfo.valueCount;
         }
-
++/
         return 0;
     }
 
@@ -292,7 +295,7 @@ struct Print_BCGen
     void beginFunction(uint f = 0, void* fnDecl = null)
     {
         sameLabel = false;
-        import ddmd.declaration : FuncDeclaration;
+        import dmd.func : FuncDeclaration;
 //        assert(!insideFunction);
         insideFunction = true;
         auto fd = *(cast(FuncDeclaration*) &fnDecl);
@@ -550,7 +553,7 @@ struct Print_BCGen
         result ~= indent ~ "Byte3(" ~ print(_result) ~ ", " ~ print(word) ~ ", " ~ print(idx) ~ ");\n";
     }
 
-    import ddmd.globals : Loc;
+    import dmd.globals : Loc;
     void Call(BCValue _result, BCValue fn, BCValue[] args, Loc l = Loc.init)
     {
         version(std_algo)
@@ -643,7 +646,7 @@ struct Print_BCGen
         result ~= indent ~ "StrEq3(" ~ print(_result) ~ ", " ~ print(lhs) ~ ", " ~ print(rhs) ~ ");\n";
     }
 
-    void Comment(string comment)
+    void Comment(const(char)[] comment)
     {
         result ~= "\n" ~ indent ~ "Comment(\"" ~ comment ~ "\");\n";
     }
