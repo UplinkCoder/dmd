@@ -8602,9 +8602,24 @@ final class Parser(AST) : Lexer
             const loc = token.loc;
             switch (token.value)
             {
-                case TOK.dotDotDot : 
-                    e = new AST.DotDotDotExp(loc, e);
-                    break;
+            case TOK.dotDotDot: 
+                e = new AST.DotDotDotExp(loc, e);
+                break;
+
+            case TOK.andAnd:
+                if (peekNext() != TOK.dotDotDot)
+                    return e;
+                e = new AST.DotDotDotExp(loc, e, TOK.andAnd);
+                nextToken();
+                break;
+
+            case TOK.orOr:
+                if (peekNext() != TOK.dotDotDot)
+                    return e;
+                e = new AST.DotDotDotExp(loc, e, TOK.orOr);
+                nextToken();
+                break;
+
             case TOK.dot:
                 nextToken();
                 if (token.value == TOK.identifier)

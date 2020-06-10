@@ -2170,6 +2170,12 @@ public:
         // buf.writeByte('(');
         e.e1.accept(this);
         //buf.writeByte(')');
+        if (e.foldOp != TOK.reserved)
+        {
+            buf.writeByte(' ');
+            buf.writestring(Token.toChars(e.foldOp));
+            buf.writeByte(' ');
+        }
         buf.writestring(Token.toChars(e.op));
     }
 

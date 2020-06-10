@@ -10,6 +10,25 @@ static assert([ (Tup + Tup2 + Tup3)... ] == [ 0 + 4 + 7, 1 + 5 + 8, 2 + 6 + 9 ])
 static assert([ [ Tup, Tup2... ]... ] == [[ 0, 4, 5, 6], [1, 4, 5, 6], [2, 4, 5, 6 ]]);
 static assert([ Seq!(Tup, (Tup2...))... ] == [ 0, 4, 5, 6, 1, 4, 5, 6, 2, 4, 5, 6 ]);
 
+alias FoldTup1 = Seq!(0, 0, 0);
+alias FoldTup2 = Seq!(1, 0, 0);
+alias FoldTup3 = Seq!(1, 1, 0);
+alias FoldTup4 = Seq!(1, 1, 1);
+alias FoldTup5 = Seq!(0);
+alias FoldTup6 = Seq!(1);
+static assert(FoldTup1 || ... == false);
+static assert(FoldTup2 || ... == true);
+static assert(FoldTup3 || ... == true);
+static assert(FoldTup4 || ... == true);
+static assert(FoldTup5 || ... == false);
+static assert(FoldTup6 || ... == true);
+static assert(FoldTup1 && ... == false);
+static assert(FoldTup2 && ... == false);
+static assert(FoldTup3 && ... == false);
+static assert(FoldTup4 && ... == true);
+static assert(FoldTup5 && ... == false);
+static assert(FoldTup6 && ... == true);
+
 // TODO: the `...` grammar can't appear in a tempalte argument list...
 //static assert([ Seq!(Tup2...) ] == [ 4, 5, 6 ]);
 

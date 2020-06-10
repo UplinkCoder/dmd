@@ -5044,11 +5044,19 @@ extern (C++) final class AddrExp : UnaExp
 
 extern (C++) final class DotDotDotExp : UnaExp
 {
+    TOK foldOp;
+
     extern (D) this(const ref Loc loc, Expression e)
     {
         super(loc, TOK.dotDotDot, __traits(classInstanceSize, DotDotDotExp), e);
     }
-    
+
+    extern (D) this(const ref Loc loc, Expression e, TOK foldOp)
+    {
+        super(loc, TOK.dotDotDot, __traits(classInstanceSize, DotDotDotExp), e);
+        this.foldOp = foldOp;
+    }
+
     extern (D) this(const ref Loc loc, Expression e, Type t)
     {
         super(loc, TOK.dotDotDot, __traits(classInstanceSize, DotDotDotExp), e);

@@ -5623,7 +5623,30 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
     {
         ExpandResult res = duplicateTree(e.e1, sc);
         if (res.etup || res.ttup)
-            result = expressionSemantic(new TupleExp(e.loc, res.etup), sc);
+        {
+            if (e.foldOp != TOK.reserved)
+            {
+                if (res.etup.length >= 2)
+                {
+                    static Expression makeRecursiveBinOp(DotDotDotExp e, Expression[] tup)
+                    {
+                        return new LogicalExp(e.loc, e.foldOp, tup.length > 2 ? makeRecursiveBinOp(e, tup[0 .. $-1]) : tup[0], tup[$-1]);
+                    }
+                    result = expressionSemantic(makeRecursiveBinOp(e, (*res.etup)[]), sc);
+                }
+                else if (res.etup.length == 1)
+                {
+                    result = (*res.etup)[0];
+                }
+                else
+                {
+                    e.error("Tuple fold expression requires at least 2 elememnts", e.toChars());
+                    result = expressionSemantic(new ErrorExp(), sc);
+                }
+            }
+            else
+                result = expressionSemantic(new TupleExp(e.loc, res.etup), sc);
+        }
         else
         {
             e.error("No tuple was found beneath `...` expression %s", e.toChars());
