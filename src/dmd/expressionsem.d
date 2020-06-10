@@ -5129,78 +5129,6 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         Types* ttup;
     }
 
-    static ExpandResult duplicateTree(Type t, Scope* sc)
-    {
-        // needs to receive as argument!!
-        Loc locHack = Loc.initial;
-
-        Type src = t;
-
-        // it is possible that types are not actually types!
-        Expression expr;
-        Type actualType;
-        Dsymbol sym;
-        src.resolve(locHack, sc, &expr, &actualType, &sym);
-
-        if (sym)
-        {
-            if (TupleDeclaration tup = sym.isTupleDeclaration())
-            {
-//                dsymbolSemantic(tup, sc);
-//                assert(!tup.tupletype, "Should be impossible? `actualType` should be non-null instead.");
-
-                Expressions* eres;
-                Types* tres;
-                foreach(i, obj; *tup.objects)
-                {
-                    if (Expression ex = obj.isExpression())
-                    {
-                        if (!eres)
-                        {
-                            eres = new Expressions(tup.objects.length);
-                            (*eres)[][] = null;
-                        }
-                        (*eres)[i] = ex;
-                    }
-                    else if (Type ty = obj.isType())
-                    {
-                        if (!tres)
-                        {
-                            tres = new Types(tup.objects.length);
-                            (*tres)[][] = null;
-                        }
-                        (*tres)[i] = ty;
-                    }
-                    else
-                        assert(false, "what is?");
-                }
-                return ExpandResult(null, eres, null, tres);
-            }
-
-            // TODO: what to return? O_o
-            // we can return the original `src`, but I hope `resolve` didn't mess with it!
-            return ExpandResult(null, null, src, null);
-        }
-
-        // TODO: we need to find a test to exercise this path...
-        if (expr)
-            return duplicateTree(expr, sc);
-
-        src = typeSemantic(actualType, Loc.initial, sc);
-
-        if (TypeTuple tup = src.isTypeTuple())
-        {
-            Types* res = new Types(tup.arguments.length);
-            foreach(i, a; *tup.arguments)
-            {
-                assert(a.type);
-                (*res)[i] = a.type;
-            }
-            return ExpandResult(null, null, null, res);
-        }
-        return ExpandResult(null, null, src, null);
-    }
-
     static extern(D) ExpandResult expandExprNode(ListType)(scope Expression delegate(bool copy, Expression[] childNodes, ListType childNodeList) copyNode,
                                                  Scope* sc, Expression node, ListType childList, Expression[] childNodes ...)
     {
@@ -5617,6 +5545,78 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             default:
                 assert(false, "TODO: What node is this? Does it have children?" );
         }
+    }
+
+    static ExpandResult duplicateTree(Type t, Scope* sc)
+    {
+        // needs to receive as argument!!
+        Loc locHack = Loc.initial;
+
+        Type src = t;
+
+        // it is possible that types are not actually types!
+        Expression expr;
+        Type actualType;
+        Dsymbol sym;
+        src.resolve(locHack, sc, &expr, &actualType, &sym);
+
+        if (sym)
+        {
+            if (TupleDeclaration tup = sym.isTupleDeclaration())
+            {
+//                dsymbolSemantic(tup, sc);
+//                assert(!tup.tupletype, "Should be impossible? `actualType` should be non-null instead.");
+
+                Expressions* eres;
+                Types* tres;
+                foreach(i, obj; *tup.objects)
+                {
+                    if (Expression ex = obj.isExpression())
+                    {
+                        if (!eres)
+                        {
+                            eres = new Expressions(tup.objects.length);
+                            (*eres)[][] = null;
+                        }
+                        (*eres)[i] = ex;
+                    }
+                    else if (Type ty = obj.isType())
+                    {
+                        if (!tres)
+                        {
+                            tres = new Types(tup.objects.length);
+                            (*tres)[][] = null;
+                        }
+                        (*tres)[i] = ty;
+                    }
+                    else
+                        assert(false, "what is?");
+                }
+                return ExpandResult(null, eres, null, tres);
+            }
+
+            // TODO: what to return? O_o
+            // we can return the original `src`, but I hope `resolve` didn't mess with it!
+            return ExpandResult(null, null, src, null);
+        }
+
+        // TODO: we need to find a test to exercise this path...
+        if (expr)
+            return duplicateTree(expr, sc);
+
+        src = typeSemantic(actualType, Loc.initial, sc);
+
+        if (TypeTuple tup = src.isTypeTuple())
+        {
+            Types* res = new Types(tup.arguments.length);
+            foreach(i, a; *tup.arguments)
+            {
+                assert(a.type);
+                (*res)[i] = a.type;
+            }
+            return ExpandResult(null, null, null, res);
+        }
+        return ExpandResult(null, null, src, null);
     }
 
     override void visit(DotDotDotExp e)
