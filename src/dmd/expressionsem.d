@@ -11475,6 +11475,7 @@ Expression binSemanticProp(BinExp e, Scope* sc)
 // entrypoint for semantic ExpressionSemanticVisitor
 extern (C++) Expression expressionSemantic(Expression e, Scope* sc)
 {
+    import dmd.trace; mixin(traceString("e"));
     scope v = new ExpressionSemanticVisitor(sc);
     e.accept(v);
     return v.result;
