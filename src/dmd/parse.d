@@ -1970,7 +1970,15 @@ final class Parser(AST) : Lexer
         // Get TemplateArgumentList
         while (token.value != endtok)
         {
-            tiargs.push(parseTypeOrAssignExp());
+            RootObject arg = parseTypeOrAssignExp();
+            if (token.value == TOK.dotDotDot)
+            {
+                assert(arg.dyncast() == DYNCAST.type);
+                const loc = token.loc;
+                arg = new AST.DotDotDotExp(loc, new AST.TypeExp(loc, cast(AST.Type)arg));
+                nextToken();
+            }
+            tiargs.push(arg);
             if (token.value != TOK.comma)
                 break;
             nextToken();
