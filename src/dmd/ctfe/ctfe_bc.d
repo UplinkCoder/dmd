@@ -4767,7 +4767,9 @@ static if (is(BCGen))
             switchFixup = null;
         }
         result.begin = genLabel();
-        stmt.accept(this);
+        // it's unfortunate but we can be called with a null stmt :-/
+        if (stmt !is null)
+            stmt.accept(this);
         result.end = genLabel();
 
         // Now let's fixup thoose breaks and continues
@@ -5063,6 +5065,7 @@ static if (is(BCGen))
             if (!elemType.type)
             {
                 bailout("could not get elementType for: " ~ _sharedCtfeState.typeToString(origSlice.type) ~ " -- " ~ se.toString);
+                return ;
             }
             auto elemSize = _sharedCtfeState.size(elemType);
 
@@ -5895,11 +5898,18 @@ static if (is(BCGen))
         {
             auto ctor = ne.member;
 
+            if (!ctor)
+            {
+                bailout("default class initalizer not supported yet.");
+                return ;
+            }
+
             auto cIdx = lookupConstructor(ctor, type);
-            printf("Ctor: %s\n", ctor ? ctor.fbody.toChars() : "default constructor"); //debugline
+            // printf("Ctor: %s\n", ctor ? ctor.fbody.toChars() : "default class initializer"); //debugline
             if (!cIdx)
             {
                 addUncompiledConstructor(ctor, type, &cIdx);
+
             }
 
             BCValue[] cTorArgs;
@@ -5971,13 +5981,18 @@ static if (is(BCGen))
                     bailout("arrayIndex: " ~ itos(idx) ~ " is out of bounds");
                     return BCValue.init;
                 }
+                writeln("idx:", idx);
                 length = imm32(_sharedCtfeState.arrayTypes[idx - 1].length);
             }
             else
             {
                 if (insideArgumentProcessing)
                 {
-                    assert(arr.vType == BCValueType.Immediate);
+                    if (arr.vType != BCValueType.Immediate)
+                    {
+                        bailout("Inside argument processing we expect a Immediate value for slice length's");
+                        return BCValue.init;
+                    }
                     if (arr.imm32)
                         length = imm32(_sharedExecutionState.heap._heap[arr.imm32 + SliceDescriptor.LengthOffset]);
                     else
@@ -6301,6 +6316,7 @@ static if (is(BCGen))
         foreach(size_t i_, mt; type.memberTypes[0 .. memberCount])
         {
             uint i = cast(uint)i_;
+            printf("structInitForMember %.*s\n", cast(int)_sharedCtfeState.typeToString(mt).length, _sharedCtfeState.typeToString(mt).ptr);
             Comment("StructInitForMember: " ~ _sharedCtfeState.typeToString(mt));
             auto pointerToMemberType = _sharedCtfeState.pointerOf(mt);
             if (mt.type == BCTypeEnum.Array)
@@ -6347,7 +6363,11 @@ static if (is(BCGen))
             {
                 auto initExp = type.initializerExps[i];
                 auto initValue = initExp ? genExpr(type.initializerExps[i]) : BCValue.init;
-                if (initExp) { import std.stdio : writeln; writeln(initExp.toString()); } // DEBUGLINE
+                if (!initExp)
+                {
+                    bailout("Cannot initalize string without initExp");
+                    return ;
+                }
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
                 Store32(offset.u32, initValue);
@@ -6370,7 +6390,10 @@ static if (is(BCGen))
             else if (mt.type == BCTypeEnum.Struct)
             {
                 auto offset = genTemporary(pointerToMemberType);
+                writeln("structPtr: ", structPtr);
+                writeln("offset: ", offset);
                 Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
+                writeln("offset: ", offset);
                 initStruct(offset, &_sharedCtfeState.structTypes[mt.typeIndex - 1]);
             }
             else if (mt.type == BCTypeEnum.Class)
@@ -8097,6 +8120,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             bailout("We already enountered a LabelStatement with this identifier");
             return ;
         }
+
         auto block = genBlock(ls.statement);
 
         labeledBlocks[cast(void*) ls.ident] = block;

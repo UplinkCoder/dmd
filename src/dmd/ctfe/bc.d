@@ -1276,9 +1276,11 @@ pure:
 
     BCValue pushOntoStack(BCValue val)
     {
+        if (!__ctfe) debug { import std.stdio; writeln("pushOntoStack: ", val); }
         if (!isStackValueOrParameter(val))
         {
             auto stackref = BCValue(currSp(), val.type);
+            assert(isStackValueOrParameter(stackref));
             Set(stackref.u32, val);
 
             sp += align4(basicTypeSize(val.type.type));
