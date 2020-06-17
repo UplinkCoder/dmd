@@ -1322,7 +1322,7 @@ void dwarf_termfile()
     const(char)* last_filename = null;
     for (uint seg = 1; seg < SegData.length; seg++)
     {
-        for (uint i = 0; i < SegData[seg].SDlinnum_count; i++)
+        for (uint i = 0; i < SegData[seg].SDlinnum_data.length; i++)
         {
             linnum_data *ld = &SegData[seg].SDlinnum_data[i];
             const(char)* filename;
@@ -1361,7 +1361,7 @@ else
         uint addressmax = 0;
         uint linestart = ~0;
 
-        if (!sd.SDlinnum_count)
+        if (!sd.SDlinnum_data.length)
             continue;
 
 static if (ELFOBJ)
@@ -1369,7 +1369,7 @@ static if (ELFOBJ)
             continue;
 
         //printf("sd = %x, SDlinnum_count = %d\n", sd, sd.SDlinnum_count);
-        for (int i = 0; i < sd.SDlinnum_count; i++)
+        for (int i = 0; i < sd.SDlinnum_data.length; i++)
         {   linnum_data *ld = &sd.SDlinnum_data[i];
 
             // Set address to start of segment with DW_LNE_set_address
