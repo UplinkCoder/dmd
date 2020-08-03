@@ -203,6 +203,7 @@ extern (C++) struct Param
     bool markdown = true;   // enable Markdown replacements in Ddoc
     bool vmarkdown;         // list instances of Markdown replacements in Ddoc
 
+    bool tracy;             /// use tracy profiler.
     bool showGaggedErrors;  // print gagged errors anyway
     bool printErrorContext;  // print errors with the error context (the error line in the source file)
     bool manual;            // open browser on compiler manual

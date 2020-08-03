@@ -3934,7 +3934,6 @@ elem *toElem(Expression e, IRState *irs)
                         }
                     }
                 }
-
                 ec = toElem(ce.e1, irs);
             }
             else

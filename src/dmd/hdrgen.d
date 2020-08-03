@@ -1226,6 +1226,7 @@ public:
                 typeToBuffer(vd.type, vd.ident, buf, hgs);
             else
                 buf.writestring(vd.ident.toString());
+
             buf.writeByte('(');
             visitTemplateParameters(hgs.ddoc ? d.origParameters : d.parameters);
             buf.writeByte(')');

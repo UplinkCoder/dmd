@@ -733,6 +733,12 @@ public int runLINK()
         //argv.push("-ldruntime");
         argv.push("-lpthread");
         argv.push("-lm");
+
+        if (global.params.tracy)
+        {
+            argv.push("-lstdc++");
+            argv.push("src/dmd/TracyClientNoExit.o");
+        }
         version (linux)
         {
             // Changes in ld for Ubuntu 11.10 require this to appear after phobos2

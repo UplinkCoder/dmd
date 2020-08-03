@@ -961,6 +961,157 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
         sbody = CompoundStatement.create(Loc.initial, sp, stf);
     }
 
+    if (global.params.tracy && !fd.isNested() &&!fd.hasNestedFrameRefs())
+    {
+        // copied from profiling code above
+        StringExp funcname = StringExp.create(Loc.initial, s.Sident.ptr);
+        funcname.type = Type.tstring;
+        funcname.type = funcname.type.typeSemantic(Loc.initial, null);
+
+        StringExp filename = StringExp.create(Loc.initial, cast(char*)fd.loc.filename);
+        filename.type = Type.tstring;
+        filename.type = filename.type.typeSemantic(Loc.initial, null);
+
+        Type constcharptr = Type.tchar.pointerTo().constOf();
+        Identifier id_name = Identifier.idPool("name");
+        Identifier id_function = Identifier.idPool("function");
+        Identifier id_file = Identifier.idPool("file");
+        Identifier id_line = Identifier.idPool("line");
+        Identifier id_color = Identifier.idPool("color");
+        Identifier id_id = Identifier.idPool("id");
+        Identifier id_active = Identifier.idPool("active");
+        Identifier id_source = Identifier.idPool("source");
+        Identifier id_sourceSz = Identifier.idPool("sourceSz");
+        Identifier id_functionSz = Identifier.idPool("functionSz");
+        Identifier id_ctx = Identifier.idPool("ctx");
+
+        import dmd.dsymbolsem;
+
+
+        static Parameters* AllocParams;
+        static Parameters* BeginParams;
+        static Parameters* EndParams;
+
+        if (!AllocParams)
+        {
+            AllocParams = new Parameters(5); 
+            // int64_t __tracy_alloc_srcloc( uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz );
+            (*AllocParams)[0] = new Parameter(STC.undefined_, Type.tint32, id_line, null, null);
+            (*AllocParams)[1] = new Parameter(STC.undefined_, constcharptr, id_source, null, null);
+            (*AllocParams)[2] = new Parameter(STC.undefined_, Type.tsize_t, id_sourceSz, null, null);
+            (*AllocParams)[3] = new Parameter(STC.undefined_, constcharptr, id_function, null, null);
+            (*AllocParams)[4] = new Parameter(STC.undefined_, Type.tsize_t, id_functionSz, null, null);
+        }
+
+        if (!BeginParams)
+        {
+            // ___tracy_emit_zone_begin_alloc_callstack( uint64_t srcloc, uint32_t depth, uint32_t active) ;
+            BeginParams = new Parameters(3);
+            (*BeginParams)[0] = new Parameter(STC.const_, Type.tint64, Identifier.idPool("srcloc"), null, null);
+            (*BeginParams)[1] = new Parameter(STC.const_, Type.tint32, Identifier.idPool("depth"), null, null);
+            (*BeginParams)[2] = new Parameter(STC.const_, Type.tint32, Identifier.idPool("active"), null, null);
+        }
+        if (!EndParams)
+        {
+            EndParams = new Parameters(1);
+            (*EndParams)[0] = new Parameter(STC.undefined_, Type.tint64, id_ctx, null, null);
+        }
+
+        FuncDeclaration allocSrcLoc = FuncDeclaration.genCfunc(AllocParams, Type.tsize_t, "___tracy_alloc_srcloc");
+        (cast(TypeFunction)allocSrcLoc.type).purity = PURE.weak;
+        (cast(TypeFunction)allocSrcLoc.type).trust = TRUST.trusted;
+
+        FuncDeclaration emitZoneBegin = FuncDeclaration.genCfunc(BeginParams, Type.tint64, "___tracy_emit_zone_begin_alloc_callstack");
+        (cast(TypeFunction)emitZoneBegin.type).purity = PURE.weak;
+        (cast(TypeFunction)emitZoneBegin.type).trust = TRUST.trusted;
+
+        static FuncDeclaration emitZoneEnd;
+        if (!emitZoneEnd) {
+            emitZoneEnd = FuncDeclaration.genCfunc(EndParams, Type.tvoid, "___tracy_emit_zone_end");
+            (cast(TypeFunction)emitZoneEnd.type).purity = PURE.weak;
+            (cast(TypeFunction)emitZoneEnd.type).trust = TRUST.trusted;
+        }
+        import dmd.expressionsem;
+        import dmd.init;
+        VarDeclaration src_loc = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("loc", fd.loc), 
+            new ExpInitializer(Loc.initial, new IntegerExp(0)), STC.static_);
+
+        src_loc.storage_class |=  STC.static_ | STC.gshared;
+        src_loc.dsymbolSemantic(fd._scope);
+        fd._scope.insert(src_loc);
+        // src_loc.type = Type.tint64;
+        src_loc.linkage = LINK.d;
+
+
+        VarExp ve_loc = new VarExp(Loc.initial, src_loc, false);
+
+        VarDeclaration ctx = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("ctx", fd.loc), 
+            null);
+
+        dsymbolSemantic(ctx, fd._scope);
+        fd._scope.insert(ctx);
+        ctx.linkage = LINK.d;
+        ctx.storage_class |= STC.tls;
+      
+        Statements* declStatments = new Statements();
+        declStatments.push(new ExpStatement(Loc.initial, new DeclarationExp(Loc.initial, src_loc)));
+        declStatments.push(new ExpStatement(Loc.initial, new DeclarationExp(Loc.initial, ctx)));
+        auto vds = new CompoundStatement(Loc.initial, declStatments);
+        Expression alloc_ec = VarExp.create(Loc.initial, allocSrcLoc);
+
+        Expressions *alloc_args = new Expressions(5);
+        
+        (*alloc_args)[0] = IntegerExp.create(Loc.initial, fd.loc.linnum, Type.tint32);
+        (*alloc_args)[1] = filename;
+        (*alloc_args)[2] = IntegerExp.create(Loc.initial, filename.len, Type.tsize_t);
+        (*alloc_args)[3] = funcname;
+        (*alloc_args)[4] = IntegerExp.create(Loc.initial, funcname.len, Type.tsize_t);
+
+        Expression alloc_loc = new CallExp(Loc.initial, alloc_ec, alloc_args).expressionSemantic(fd._scope);
+        alloc_loc.type = Type.tint64;
+
+        Expressions *args = new Expressions(3);
+        
+        (*args)[0] = new VarExp(Loc.initial, src_loc, false);
+        (*args)[1] = IntegerExp.create(Loc.initial, 64, Type.tint32);
+        (*args)[2] = IntegerExp.create(Loc.initial, 1, Type.tint32);
+
+
+        CondExp ce = new CondExp(Loc.initial, ve_loc, ve_loc, alloc_loc);
+        Expression assign2 = new AssignExp(Loc.initial, ve_loc, ce);
+        assign2 = assign2.expressionSemantic(fd._scope);
+
+
+        Expression ec = VarExp.create(Loc.initial, emitZoneBegin);
+        Expression e = CallExp.create(Loc.initial, ec, args).expressionSemantic(fd._scope);
+        e.type = Type.tint64;
+        VarExp ve_ctx =  new VarExp(Loc.initial, ctx, false);
+        ve_ctx = cast(VarExp)expressionSemantic(ve_ctx, fd._scope);
+        Expression assign = new AssignExp(Loc.initial, ve_ctx, e);
+
+
+        assign = assign.expressionSemantic(fd._scope);
+
+        Expressions* eargs = new Expressions(1);
+        (*eargs)[0] = ve_ctx;
+
+        Expression eec = VarExp.create(Loc.initial, emitZoneEnd);
+        Expression ee = CallExp.create(Loc.initial, eec, eargs).expressionSemantic(fd._scope);
+
+        auto as = new ExpStatement(Loc.initial, assign2);
+        auto sp = ExpStatement.create(Loc.initial, assign);
+        auto cs = CompoundStatement.create(Loc.initial, CompoundStatement.create(Loc.initial, vds, as), sp);
+        auto sf = ExpStatement.create(Loc.initial, ee);
+
+        Statement stf;
+        if (sbody.blockExit(fd, false) == BE.fallthru)
+            stf = CompoundStatement.create(Loc.initial, sbody, sf);
+        else
+            stf = TryFinallyStatement.create(Loc.initial, sbody, sf);
+        sbody = CompoundStatement.create(Loc.initial, cs, stf);
+        printf("sbody: %s\n", sbody.toChars());
+    }
+
     if (fd.interfaceVirtual)
     {
         // Adjust the 'this' pointer instead of using a thunk
