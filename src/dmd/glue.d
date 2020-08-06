@@ -964,7 +964,7 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
     if (global.params.tracy && !fd.isNested() &&!fd.hasNestedFrameRefs())
     {
         // copied from profiling code above
-        StringExp funcname = StringExp.create(Loc.initial, s.Sident.ptr);
+        StringExp funcname = StringExp.create(Loc.initial, cast(char*)fd.toPrettyChars());
         funcname.type = Type.tstring;
         funcname.type = funcname.type.typeSemantic(Loc.initial, null);
 
@@ -1017,14 +1017,21 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
             (*EndParams)[0] = new Parameter(STC.undefined_, Type.tint64, id_ctx, null, null);
         }
 
-        FuncDeclaration allocSrcLoc = FuncDeclaration.genCfunc(AllocParams, Type.tsize_t, "___tracy_alloc_srcloc");
-        (cast(TypeFunction)allocSrcLoc.type).purity = PURE.weak;
-        (cast(TypeFunction)allocSrcLoc.type).trust = TRUST.trusted;
+        static FuncDeclaration allocSrcLoc;
+        if (!allocSrcLoc)
+        {
+            allocSrcLoc = FuncDeclaration.genCfunc(AllocParams, Type.tsize_t, "___tracy_alloc_srcloc");
+            (cast(TypeFunction)allocSrcLoc.type).purity = PURE.weak;
+            (cast(TypeFunction)allocSrcLoc.type).trust = TRUST.trusted;
+        }
 
-        FuncDeclaration emitZoneBegin = FuncDeclaration.genCfunc(BeginParams, Type.tint64, "___tracy_emit_zone_begin_alloc_callstack");
-        (cast(TypeFunction)emitZoneBegin.type).purity = PURE.weak;
-        (cast(TypeFunction)emitZoneBegin.type).trust = TRUST.trusted;
-
+        static FuncDeclaration emitZoneBegin;
+        if (!emitZoneBegin)
+        {
+            emitZoneBegin = FuncDeclaration.genCfunc(BeginParams, Type.tint64, "___tracy_emit_zone_begin_alloc_callstack");
+            (cast(TypeFunction)emitZoneBegin.type).purity = PURE.weak;
+            (cast(TypeFunction)emitZoneBegin.type).trust = TRUST.trusted;
+        }
         static FuncDeclaration emitZoneEnd;
         if (!emitZoneEnd) {
             emitZoneEnd = FuncDeclaration.genCfunc(EndParams, Type.tvoid, "___tracy_emit_zone_end");
@@ -1033,26 +1040,30 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
         }
         import dmd.expressionsem;
         import dmd.init;
+
+        VarDeclaration ctx = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("ctx", fd.loc), 
+            null);
+        ctx.parent = fd;
+        ctx.storage_class |= STC.shared_;
+        fd._scope.insert(ctx);
+        dsymbolSemantic(ctx, fd._scope);
+        ctx.parent = fd;
+        ctx.linkage = LINK.d;
+
         VarDeclaration src_loc = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("loc", fd.loc), 
             new ExpInitializer(Loc.initial, new IntegerExp(0)), STC.static_);
 
         src_loc.storage_class |=  STC.static_ | STC.gshared;
-        src_loc.dsymbolSemantic(fd._scope);
+        src_loc.type.addMod(MODFlags.shared_).addSTC(STC.gshared);
         fd._scope.insert(src_loc);
-        // src_loc.type = Type.tint64;
+        src_loc.dsymbolSemantic(fd._scope);
         src_loc.linkage = LINK.d;
 
 
         VarExp ve_loc = new VarExp(Loc.initial, src_loc, false);
 
-        VarDeclaration ctx = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("ctx", fd.loc), 
-            null);
 
-        dsymbolSemantic(ctx, fd._scope);
-        fd._scope.insert(ctx);
-        ctx.linkage = LINK.d;
-        ctx.storage_class |= STC.tls;
-      
+
         Statements* declStatments = new Statements();
         declStatments.push(new ExpStatement(Loc.initial, new DeclarationExp(Loc.initial, src_loc)));
         declStatments.push(new ExpStatement(Loc.initial, new DeclarationExp(Loc.initial, ctx)));
@@ -1110,6 +1121,11 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
             stf = TryFinallyStatement.create(Loc.initial, sbody, sf);
         sbody = CompoundStatement.create(Loc.initial, cs, stf);
         printf("sbody: %s\n", sbody.toChars());
+/+
+        fd.fbody = sbody;
+        fd.semanticRun = PASS.semantic;
+        fd.functionSemantic();
++/        
     }
 
     if (fd.interfaceVirtual)
