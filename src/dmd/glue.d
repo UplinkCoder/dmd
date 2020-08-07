@@ -1088,8 +1088,7 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
         (*args)[2] = IntegerExp.create(Loc.initial, 1, Type.tint32);
 
 
-        CondExp ce = new CondExp(Loc.initial, ve_loc, ve_loc, alloc_loc);
-        Expression assign2 = new AssignExp(Loc.initial, ve_loc, ce);
+        Expression assign2 = new AssignExp(Loc.initial, ve_loc, alloc_loc);
         assign2 = assign2.expressionSemantic(fd._scope);
 
 
