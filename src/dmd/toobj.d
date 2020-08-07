@@ -539,8 +539,8 @@ void toObjFile(Dsymbol ds, bool multiobj)
         override void visit(VarDeclaration vd)
         {
 
-            printf("VarDeclaration.toObjFile(%p '%s' type=%s) protection %d\n", vd, vd.toChars(), vd.type.toChars(), vd.protection);
-            printf("\talign = %d\n", vd.alignment);
+            //printf("VarDeclaration.toObjFile(%p '%s' type=%s) protection %d\n", vd, vd.toChars(), vd.type.toChars(), vd.protection);
+            //printf("\talign = %d\n", vd.alignment);
 
             if (vd.type.ty == Terror)
             {
@@ -557,10 +557,8 @@ void toObjFile(Dsymbol ds, bool multiobj)
             // Do not store variables we cannot take the address of
             if (!vd.canTakeAddressOf())
             {
-                printf("we couldn't take the addr of it\n");
                 return;
             }
-            printf("vd: isDataseg: %d ... isExtern: %d\n", vd.isDataseg, vd.storage_class & STC.extern_);
 
             if (!vd.isDataseg() || vd.storage_class & STC.extern_)
                 return;

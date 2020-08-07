@@ -962,7 +962,8 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
     }
 
     // can only work on free functions for now :-/
-    if (global.params.tracy && fd.toParent2().isModule())
+    auto mod = fd.toParent2().isModule();
+    if (global.params.tracy && mod && mod.isRoot())
     {
         // copied from profiling code above
         StringExp funcname = StringExp.create(Loc.initial, cast(char*)fd.toPrettyChars());
