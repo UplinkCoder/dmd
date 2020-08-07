@@ -961,7 +961,8 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
         sbody = CompoundStatement.create(Loc.initial, sp, stf);
     }
 
-    if (global.params.tracy && !fd.isNested() &&!fd.hasNestedFrameRefs())
+    // can only work on free functions for now :-/
+    if (global.params.tracy && fd.toParent2().isModule())
     {
         // copied from profiling code above
         StringExp funcname = StringExp.create(Loc.initial, cast(char*)fd.toPrettyChars());
