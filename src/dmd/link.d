@@ -737,7 +737,7 @@ public int runLINK()
         if (global.params.tracy)
         {
             argv.push("-lstdc++");
-            argv.push("src/dmd/TracyClientNoExit.o");
+            argv.push("/tmp/TracyClientNoExit.o");
         }
         version (linux)
         {
