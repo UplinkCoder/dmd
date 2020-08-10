@@ -1126,11 +1126,13 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             }
         }
 
-        if (dsym.storage_class & (STC.static_ | STC.extern_ | STC.manifest | STC.templateparameter | STC.tls | STC.gshared | STC.ctfe))
+        if (dsym.storage_class & (STC.static_ | STC.extern_ | STC.manifest | STC.templateparameter | STC.tls | STC.gshared | STC.ctfe | STC.temp))
         {
         }
         else
         {
+            printf("%s.storage_class: %x\n", dsym.toChars(), dsym.storage_class);
+            printf("%s.storage_class & STC.temp: %x\n", dsym.toChars(), dsym.storage_class & STC.temp);
             AggregateDeclaration aad = parent.isAggregateDeclaration();
             if (aad)
             {

@@ -554,6 +554,194 @@ private extern(C++) final class Semantic3Visitor : Visitor
                 sym.endlinnum = funcdecl.endloc.linnum;
                 sc2 = sc2.push(sym);
 
+                if ((global.params.tracy) && (!sc.tinst || !sc.tinst.isSpeculative()) && !(sc.flags & (SCOPE.ctfe | SCOPE.compile)))
+                {
+
+                    auto fd = funcdecl;
+                    Statement fbody = fd.fbody;
+                    // let's go inject tracy :)
+
+                    StringExp funcname = StringExp.create(Loc.initial, cast(char*)fd.toPrettyChars());
+                    funcname.type = Type.tstring;
+                    funcname.type = funcname.type.typeSemantic(Loc.initial, null);
+                    
+                    StringExp filename = StringExp.create(Loc.initial, cast(char*)fd.loc.filename);
+                    filename.type = Type.tstring;
+                    filename.type = filename.type.typeSemantic(Loc.initial, null);
+                    
+                    Type constcharptr = Type.tchar.pointerTo().constOf();
+                    Identifier id_name = Identifier.idPool("name");
+                    Identifier id_function = Identifier.idPool("function");
+                    Identifier id_file = Identifier.idPool("file");
+                    Identifier id_line = Identifier.idPool("line");
+                    Identifier id_color = Identifier.idPool("color");
+                    Identifier id_id = Identifier.idPool("id");
+                    Identifier id_active = Identifier.idPool("active");
+                    Identifier id_source = Identifier.idPool("source");
+                    Identifier id_sourceSz = Identifier.idPool("sourceSz");
+                    Identifier id_functionSz = Identifier.idPool("functionSz");
+                    Identifier id_ctx = Identifier.idPool("ctx");
+                    
+                    import dmd.dsymbolsem;
+                    
+                    
+                    static Parameters* AllocParams;
+                    static Parameters* BeginParams;
+                    static Parameters* EndParams;
+                    
+                    if (!AllocParams)
+                    {
+                        AllocParams = new Parameters(5); 
+                        // int64_t __tracy_alloc_srcloc( uint32_t line, const char* source, size_t sourceSz, const char* function, size_t functionSz );
+                        (*AllocParams)[0] = new Parameter(STC.undefined_, Type.tint32, id_line, null, null);
+                        (*AllocParams)[1] = new Parameter(STC.undefined_, constcharptr, id_source, null, null);
+                        (*AllocParams)[2] = new Parameter(STC.undefined_, Type.tsize_t, id_sourceSz, null, null);
+                        (*AllocParams)[3] = new Parameter(STC.undefined_, constcharptr, id_function, null, null);
+                        (*AllocParams)[4] = new Parameter(STC.undefined_, Type.tsize_t, id_functionSz, null, null);
+                    }
+                    
+                    if (!BeginParams)
+                    {
+                        // ___tracy_emit_zone_begin_alloc_callstack( uint64_t srcloc, uint32_t depth, uint32_t active) ;
+                        BeginParams = new Parameters(3);
+                        (*BeginParams)[0] = new Parameter(STC.const_, Type.tint64, Identifier.idPool("srcloc"), null, null);
+                        (*BeginParams)[1] = new Parameter(STC.const_, Type.tint32, Identifier.idPool("depth"), null, null);
+                        (*BeginParams)[2] = new Parameter(STC.const_, Type.tint32, Identifier.idPool("active"), null, null);
+                    }
+                    if (!EndParams)
+                    {
+                        EndParams = new Parameters(1);
+                        (*EndParams)[0] = new Parameter(STC.undefined_, Type.tint64, id_ctx, null, null);
+                    }
+                    
+                    static FuncDeclaration allocSrcLoc;
+                    if (!allocSrcLoc)
+                    {
+                        allocSrcLoc = FuncDeclaration.genCfunc(AllocParams, Type.tsize_t, "___tracy_alloc_srcloc");
+                        (cast(TypeFunction)allocSrcLoc.type).purity = PURE.weak;
+                        (cast(TypeFunction)allocSrcLoc.type).trust = TRUST.trusted;
+                        (cast(TypeFunction)allocSrcLoc.type).isnogc = true;
+                        (cast(TypeFunction)allocSrcLoc.type).isnothrow = true;
+                    }
+                    
+                    static FuncDeclaration emitZoneBegin;
+                    if (!emitZoneBegin)
+                    {
+                        emitZoneBegin = FuncDeclaration.genCfunc(BeginParams, Type.tint64, "___tracy_emit_zone_begin_alloc_callstack");
+                        (cast(TypeFunction)emitZoneBegin.type).purity = PURE.weak;
+                        (cast(TypeFunction)emitZoneBegin.type).trust = TRUST.trusted;
+                        (cast(TypeFunction)emitZoneBegin.type).isnogc = true;
+                        (cast(TypeFunction)emitZoneBegin.type).isnothrow = true;
+                    }
+                    static FuncDeclaration emitZoneEnd;
+                    if (!emitZoneEnd)
+                    {
+                        emitZoneEnd = FuncDeclaration.genCfunc(EndParams, Type.tvoid, "___tracy_emit_zone_end");
+                        (cast(TypeFunction)emitZoneEnd.type).purity = PURE.weak;
+                        (cast(TypeFunction)emitZoneEnd.type).trust = TRUST.trusted;
+                        (cast(TypeFunction)emitZoneEnd.type).isnogc = true;
+                        (cast(TypeFunction)emitZoneEnd.type).isnothrow = true;
+                    }
+                    import dmd.expressionsem;
+                    import dmd.init;
+                    
+                    VarDeclaration ctx = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("ctx", fd.loc), 
+                        null, STC.temp);
+                    ctx.parent = fd;
+                    ctx.storage_class |= STC.tls;
+                    fd._scope.insert(ctx);
+                    dsymbolSemantic(ctx, fd._scope);
+                    ctx.parent = fd;
+                    ctx.linkage = LINK.d;
+                    
+                    VarDeclaration src_loc = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("loc", fd.loc), 
+                        null, STC.temp);
+                    
+                    fd._scope.insert(src_loc);
+                    src_loc.dsymbolSemantic(fd._scope);
+                    src_loc.linkage = LINK.d;
+                    
+                    
+                    VarExp ve_loc = new VarExp(Loc.initial, src_loc, false);
+                    ve_loc = cast(VarExp)ve_loc.expressionSemantic(fd._scope);
+
+                    Statements* tracyStatments = new Statements();
+                    tracyStatments.push(new ExpStatement(Loc.initial, new DeclarationExp(Loc.initial, src_loc)));
+                    tracyStatments.push(new ExpStatement(Loc.initial, new DeclarationExp(Loc.initial, ctx)));
+                    Expression alloc_ec = VarExp.create(Loc.initial, allocSrcLoc);
+                    
+                    Expressions *alloc_args = new Expressions(5);
+                    
+                    (*alloc_args)[0] = IntegerExp.create(Loc.initial, fd.loc.linnum, Type.tint32);
+                    (*alloc_args)[1] = filename;
+                    (*alloc_args)[2] = IntegerExp.create(Loc.initial, filename.len, Type.tsize_t);
+                    (*alloc_args)[3] = funcname;
+                    (*alloc_args)[4] = IntegerExp.create(Loc.initial, funcname.len, Type.tsize_t);
+                    
+                    Expression alloc_loc_call = new CallExp(Loc.initial, alloc_ec, alloc_args);//.expressionSemantic(fd._scope);
+                    Expressions *args = new Expressions(3);
+                    
+                    (*args)[0] = new VarExp(Loc.initial, src_loc, false);
+                    (*args)[1] = IntegerExp.create(Loc.initial, 64, Type.tint32);
+                    (*args)[2] = IntegerExp.create(Loc.initial, 1, Type.tint32);
+                    Expression loc_assign = new AssignExp(Loc.initial, ve_loc, alloc_loc_call);
+                    // alloc tracy location done
+
+                    tracyStatments.push(new ExpStatement(Loc.initial, loc_assign));
+                    
+                    Expression ec = VarExp.create(Loc.initial, emitZoneBegin);
+                    Expression e = CallExp.create(Loc.initial, ec, args).expressionSemantic(fd._scope);
+
+                    VarExp ve_ctx =  new VarExp(Loc.initial, ctx, false);
+                    Expression ctx_assign = new AssignExp(Loc.initial, ve_ctx, e);
+
+
+                    tracyStatments.push(new ExpStatement(Loc.initial, ctx_assign));
+
+                    Expressions* eargs = new Expressions(1);
+                    (*eargs)[0] = ve_ctx;
+
+                    ctx.storage_class = STC.temp;
+                    src_loc.storage_class = STC.temp;
+
+                    Expression eec = VarExp.create(Loc.initial, emitZoneEnd);
+                    Expression ee = CallExp.create(Loc.initial, eec, eargs).expressionSemantic(fd._scope);
+
+                    auto not_ctfe = new NotExp(Loc.initial,
+                        new VarExp(Loc.initial,
+                            new VarDeclaration(Loc.initial, Type.tbool, Id.ctfe, null)
+                            )
+                        );
+
+
+                    ScopeGuardStatement sge = new ScopeGuardStatement(Loc.initial, TOK.onScopeExit, 
+                        new IfStatement(
+                            Loc.initial, null, not_ctfe,
+                            new ExpStatement(
+                                Loc.initial, ee
+                            ),
+                            null, Loc.initial
+                        ) 
+                     );
+
+
+                    Statements* stmts = new Statements();
+                    auto if_not_ctfe = new IfStatement(
+                        Loc.initial, null, not_ctfe, 
+                        new CompoundStatement(
+                            Loc.initial, tracyStatments
+                        ),
+                        null, Loc.initial
+                    ); 
+                    stmts.push(if_not_ctfe);
+                    stmts.push(sge);
+                    stmts.push(fbody);
+                    auto cs = new CompoundStatement(Loc.initial, stmts);
+                    printf("cs: %s\n", cs.toChars());
+                    funcdecl.fbody = cs;
+                    printf("fbody: %s\n", funcdecl.fbody.toChars());
+                }
+
                 auto ad2 = funcdecl.isMemberLocal();
 
                 /* If this is a class constructor
