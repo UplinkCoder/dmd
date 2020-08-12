@@ -3363,12 +3363,12 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
                     {
                         auto offset = *opRef;
                         auto length = heapPtr._heap[offset];
-                        auto string_start = &heapPtr._heap[offset + 1];
+                        auto string_start = cast(char*)&heapPtr._heap[offset + 1];
                         printf("Printing string: '%.*s'\n", length, string_start);
                     }
                     else
                     {
-                        printf("Addr: %u, Value %p\n", (opRef - stackP) * 4, *opRef);
+                        printf("Addr: %lu, Value %lx\n", (opRef - stackP) * 4, *opRef);
                     }
                 }
             }
