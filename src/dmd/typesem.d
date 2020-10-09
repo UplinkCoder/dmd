@@ -4463,7 +4463,7 @@ Expression defaultInit(Type mt, const ref Loc loc)
             return ErrorExp.get();
 
         case Ttype:
-            return new TypeExp(loc, Type.basic[Terror]);
+            return new TypeExp(loc, Type.basic[Tempty]);
 
         default:
             break;
