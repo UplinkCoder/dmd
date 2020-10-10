@@ -581,6 +581,7 @@ final class Parser(AST) : Lexer
             case TOK.complex64:
             case TOK.complex80:
             case TOK.void_:
+            case TOK.__type_:
             case TOK.alias_:
             case TOK.identifier:
             case TOK.super_:
@@ -3631,8 +3632,12 @@ final class Parser(AST) : Lexer
         //printf("parseBasicType()\n");
         switch (token.value)
         {
-        case TOK.alias_ :
+        case TOK.__type_ :
             t = AST.Type.ttype;
+            goto LabelX;
+
+        case TOK.empty_ :
+            t = AST.Type.tempty;
             goto LabelX;
 
         case TOK.void_:
@@ -4463,21 +4468,6 @@ final class Parser(AST) : Lexer
                     addComment(s, comment);
                     return a;
                 }
-            }
-
-            /* Look for:
-             * alias identifier;
-             */
-            if (token.value == TOK.identifier && peekNext() == TOK.semicolon)
-            {
-                auto ident = token.ident;
-                nextToken();
-                auto s = new AST.VarDeclaration(loc, AST.Type.ttype, ident, null);
-                addComment(s, comment);
-                auto a = new AST.Dsymbols();
-                a.push(s);
-                check(TOK.semicolon);
-                return a;
             }
 
             /* Look for:
@@ -5698,6 +5688,7 @@ final class Parser(AST) : Lexer
         case TOK.complex64:
         case TOK.complex80:
         case TOK.void_:
+        case TOK.__type_:
             // bug 7773: int.max is always a part of expression
             if (peekNext() == TOK.dot)
                 goto Lexp;
@@ -6973,6 +6964,7 @@ final class Parser(AST) : Lexer
         case TOK.complex64:
         case TOK.complex80:
         case TOK.void_:
+        case TOK.__type_:
             t = peek(t);
             break;
 
@@ -7038,6 +7030,7 @@ final class Parser(AST) : Lexer
                     case TOK.complex64:
                     case TOK.complex80:
                     case TOK.void_:
+                    case TOK.__type_:
                     case TOK.int32Literal:
                     case TOK.uns32Literal:
                     case TOK.int64Literal:
@@ -7984,6 +7977,10 @@ final class Parser(AST) : Lexer
             t = AST.Type.tvoid;
             goto LabelX;
 
+        case TOK.__type_:
+            t = AST.Type.ttype;
+            goto LabelX;
+
         case TOK.int8:
             t = AST.Type.tint8;
             goto LabelX;
@@ -8593,6 +8590,7 @@ final class Parser(AST) : Lexer
                         case TOK.complex64:
                         case TOK.complex80:
                         case TOK.void_:
+                        case TOK.__type_:
                             {
                                 // (type) una_exp
                                 nextToken();
