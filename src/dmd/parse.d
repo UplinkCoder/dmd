@@ -3636,7 +3636,7 @@ final class Parser(AST) : Lexer
             t = AST.Type.ttype;
             goto LabelX;
 
-        case TOK.empty_ :
+        case TOK.emptyType_ :
             t = AST.Type.tempty;
             goto LabelX;
 
