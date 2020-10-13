@@ -109,6 +109,7 @@ private immutable char[TMAX] mangleChar =
     Ttraits      : '@',
     Tmixin       : '@',
     Ttype        : '@',
+    Tempty       : '@',
     Texp         : '@',
 ];
 
