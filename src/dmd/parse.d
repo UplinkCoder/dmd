@@ -581,7 +581,7 @@ final class Parser(AST) : Lexer
             case TOK.complex64:
             case TOK.complex80:
             case TOK.void_:
-            case TOK.__type_:
+            case TOK.__type___:
             case TOK.alias_:
             case TOK.identifier:
             case TOK.super_:
@@ -3632,7 +3632,7 @@ final class Parser(AST) : Lexer
         //printf("parseBasicType()\n");
         switch (token.value)
         {
-        case TOK.__type_ :
+        case TOK.__type___ :
             t = AST.Type.ttype;
             goto LabelX;
 
@@ -5688,7 +5688,7 @@ final class Parser(AST) : Lexer
         case TOK.complex64:
         case TOK.complex80:
         case TOK.void_:
-        case TOK.__type_:
+        case TOK.__type___:
             // bug 7773: int.max is always a part of expression
             if (peekNext() == TOK.dot)
                 goto Lexp;
@@ -6964,7 +6964,7 @@ final class Parser(AST) : Lexer
         case TOK.complex64:
         case TOK.complex80:
         case TOK.void_:
-        case TOK.__type_:
+        case TOK.__type___:
             t = peek(t);
             break;
 
@@ -7030,7 +7030,7 @@ final class Parser(AST) : Lexer
                     case TOK.complex64:
                     case TOK.complex80:
                     case TOK.void_:
-                    case TOK.__type_:
+                    case TOK.__type___:
                     case TOK.int32Literal:
                     case TOK.uns32Literal:
                     case TOK.int64Literal:
@@ -7977,7 +7977,7 @@ final class Parser(AST) : Lexer
             t = AST.Type.tvoid;
             goto LabelX;
 
-        case TOK.__type_:
+        case TOK.__type___:
             t = AST.Type.ttype;
             goto LabelX;
 
@@ -8590,7 +8590,7 @@ final class Parser(AST) : Lexer
                         case TOK.complex64:
                         case TOK.complex80:
                         case TOK.void_:
-                        case TOK.__type_:
+                        case TOK.__type___:
                             {
                                 // (type) una_exp
                                 nextToken();
