@@ -251,6 +251,9 @@ extern (C++) struct Param
     const(char)* mixinFile;             // .mixin file output name
     int mixinLines;                     // Number of lines in writeMixins
 
+    OutBuffer* templateDepsOut;			// wirte template instance depdendencies for debugging
+    const(char)[] templateDepsFile;		// .dot file output name
+
     uint debuglevel;                    // debug level
     Array!(const(char)*)* debugids;     // debug identifiers
 

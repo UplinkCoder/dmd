@@ -422,6 +422,14 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         atexit(&flushMixins); // see comment for flushMixins
     }
     scope(exit) flushMixins();
+
+    if (params.templateDepsFile)
+    {
+        params.templateDepsOut = cast(OutBuffer*)Mem.check(calloc(1, OutBuffer.sizeof));
+        atexit(&flushTemplateDeps); // see comment for flushMixins
+    }
+    scope(exit) flushTemplateDeps();
+
     global.path = buildPath(params.imppath);
     global.filePath = buildPath(params.fileImppath);
 
@@ -1397,6 +1405,21 @@ extern(C) void flushMixins()
     global.params.mixinOut = null;
 }
 
+/**************************************
+ * we want to write the template deps also on error, but there
+ * are too many ways to terminate dmd (e.g. fatal() which calls exit(EXIT_FAILURE)),
+ * so we can't rely on scope(exit) ... in tryMain() actually being executed
+ * so we add atexit(&flushMixins); for those fatal exits (with the GC still valid)
+ */
+extern(C) void flushTemplateDeps()
+{
+    if (!global.params.templateDepsOut)
+        return;
+
+    assert(global.params.templateDepsFile);
+    File.write(global.params.templateDepsFile, (*global.params.templateDepsOut)[]);
+}
+
 /****************************************************
  * Parse command line arguments.
  *
@@ -1736,6 +1759,13 @@ bool parseCommandLine(const ref Strings arguments, const size_t argc, ref Param 
             if (!tmp[0])
                 goto Lnoarg;
             params.mixinFile = mem.xstrdup(tmp);
+        }
+        else if (startsWith(p + 1, "templatedeps="))
+        {
+            auto tmp = p + "templatedeps=".length + 1;
+            if (!tmp[0])
+                goto Lnoarg;
+            params.templateDepsFile = mem.xstrdup(tmp)[0 .. strlen(tmp)];
         }
         else if (arg == "-g") // https://dlang.org/dmd.html#switch-g
             params.symdebug = 1;
