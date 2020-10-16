@@ -6207,6 +6207,33 @@ extern (C++) class TemplateInstance : ScopeDsymbol
         return true;
     }
 
+    static writeDepLine(const char* dependent, const char* depender)
+    {
+        static typeof(global.params.templateDepsOut) depsOut =
+            cast(typeof(global.params.templateDepsOut)) uint.max;
+
+        if (depsOut is null)
+        {
+            return;
+        }
+        else if ((cast(size_t)depsOut) == uint.max)
+        {
+            depsOut = global.params.templateDepsOut;
+        }
+
+        if (depsOut)
+        {
+            depsOut.writestring("\"");
+            depsOut.writestring(dependent);
+            depsOut.writestring("\"");
+            depsOut.writestring(" -> ");
+            depsOut.writestring("\"");
+            depsOut.writestring(depender);
+            depsOut.writestring("\"");
+            depsOut.writenl();
+        }
+    }
+
 
     /***********************************************
      * Returns true if this is not instantiated in non-root module, and
@@ -6257,6 +6284,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
         if (isDiscardable())
         {
+            writeDepLine("Discard", this.toPrettyChars());
             return false;
         }
 
