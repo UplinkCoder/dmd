@@ -6244,6 +6244,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
      */
     final bool needsCodegen()
     {
+        writeDepLine("needsCodgen", this.toPrettyChars());
         // Now -allInst is just for the backward compatibility.
         if (global.params.allInst)
         {
