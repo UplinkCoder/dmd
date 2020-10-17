@@ -1416,6 +1416,11 @@ extern(C) void flushTemplateDeps()
     if (!global.params.templateDepsOut)
         return;
 
+    global.params.templateDepsOut.prependstring("digraph {");
+    global.params.templateDepsOut.writestring("}");
+    global.params.templateDepsOut.writenl();
+
+
     assert(global.params.templateDepsFile);
     File.write(global.params.templateDepsFile, (*global.params.templateDepsOut)[]);
 }

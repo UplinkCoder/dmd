@@ -6207,7 +6207,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
         return true;
     }
 
-    static writeDepLine(const char* dependent, const char* depender)
+    static writeDepLine(const char* dependant, const char* provider)
     {
         static typeof(global.params.templateDepsOut) depsOut =
             cast(typeof(global.params.templateDepsOut)) uint.max;
@@ -6221,14 +6221,31 @@ extern (C++) class TemplateInstance : ScopeDsymbol
             depsOut = global.params.templateDepsOut;
         }
 
+        char[4096] buffer = void; // technically local to the function below
+        const(char)* escapeString(const char* s)
+        {
+            size_t idx = 0;
+            const (char)* ptr = s;
+            for (char c = *ptr; c != '\0'; c = *++ptr)
+            {
+                if (c == '"')
+                {
+                    buffer[idx++] = '\\';
+                }
+                buffer[idx++] = c;
+            }
+            buffer[idx++] = '\0';
+            return &buffer[0];
+        }
+
         if (depsOut)
         {
             depsOut.writestring("\"");
-            depsOut.writestring(dependent);
+            depsOut.writestring(escapeString(dependant));
             depsOut.writestring("\"");
             depsOut.writestring(" -> ");
             depsOut.writestring("\"");
-            depsOut.writestring(depender);
+            depsOut.writestring(escapeString(provider));
             depsOut.writestring("\"");
             depsOut.writenl();
         }
@@ -6244,7 +6261,6 @@ extern (C++) class TemplateInstance : ScopeDsymbol
      */
     final bool needsCodegen()
     {
-        writeDepLine("needsCodgen", this.toPrettyChars());
         // Now -allInst is just for the backward compatibility.
         if (global.params.allInst)
         {
@@ -6285,7 +6301,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
         if (isDiscardable())
         {
-            writeDepLine("Discard", this.toPrettyChars());
+            writeDepLine(this.toPrettyChars(), "Discard");
             return false;
         }
 
@@ -6304,6 +6320,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
             // Determine necessity of tinst before tnext.
             if (tinst && tinst.needsCodegen())
             {
+                writeDepLine(this.toPrettyChars(), tinst.toPrettyChars());
                 minst = tinst.minst; // cache result
                 assert(minst);
                 assert(minst.isRoot() || minst.rootImports());
@@ -6313,9 +6330,14 @@ extern (C++) class TemplateInstance : ScopeDsymbol
             {
                 minst = tnext.minst; // cache result
                 assert(minst);
-                return minst.isRoot() || minst.rootImports();
+                bool keepIt = minst.isRoot() || minst.rootImports();
+                if (keepIt)
+                {
+                    writeDepLine(this.toPrettyChars(), minst.toPrettyChars());
+                }
+                return keepIt;
             }
-
+            writeDepLine("Speculative", this.toPrettyChars());
             // Elide codegen because this is really speculative.
             return false;
         }
@@ -6402,7 +6424,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
                 assert(!minst.isRoot());
                 return false;
             }
-
+            writeDepLine(minst.toChars(), this.toPrettyChars());
             // Do codegen because this is not included in non-root instances.
             return true;
         }
