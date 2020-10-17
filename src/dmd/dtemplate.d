@@ -6337,7 +6337,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
                 }
                 return keepIt;
             }
-            writeDepLine("Speculative", this.toPrettyChars());
+            writeDepLine(this.toPrettyChars(), "Speculative");
             // Elide codegen because this is really speculative.
             return false;
         }
