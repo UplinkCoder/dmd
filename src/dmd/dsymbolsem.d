@@ -1131,8 +1131,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         }
         else
         {
-            printf("%s.storage_class: %x\n", dsym.toChars(), dsym.storage_class);
-            printf("%s.storage_class & STC.temp: %x\n", dsym.toChars(), dsym.storage_class & STC.temp);
             AggregateDeclaration aad = parent.isAggregateDeclaration();
             if (aad)
             {

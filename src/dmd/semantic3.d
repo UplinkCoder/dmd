@@ -553,10 +553,19 @@ private extern(C++) final class Semantic3Visitor : Visitor
                 sym.parent = sc2.scopesym;
                 sym.endlinnum = funcdecl.endloc.linnum;
                 sc2 = sc2.push(sym);
-
-                if ((global.params.tracy) && (!sc.tinst || !sc.tinst.isSpeculative()) && !(sc.flags & (SCOPE.ctfe | SCOPE.compile)))
+                auto comps = funcdecl.fbody.isCompoundStatement();
+                if ((global.params.tracy) &&
+                    (!sc.tinst || !sc.tinst.isSpeculative()) &&
+                    !(sc.flags & (SCOPE.ctfe | SCOPE.compile)) &&
+                    !funcdecl.isNested() &&
+                    // comps && comps.statements && comps.statements.length > 1 &&
+                    !(cast(TypeFunction)funcdecl.type).isproperty &&
+                    !funcdecl.parent.isFuncDeclaration() &&
+                    !(funcdecl.isCtorDeclaration() || funcdecl.isSharedStaticCtorDeclaration) &&
+                    !(funcdecl.isDtorDeclaration() || funcdecl.isSharedStaticDtorDeclaration) &&
+                    !(funcdecl.isFuncLiteralDeclaration())
+                    )
                 {
-
                     auto fd = funcdecl;
                     Statement fbody = fd.fbody;
                     // let's go inject tracy :)
@@ -642,13 +651,10 @@ private extern(C++) final class Semantic3Visitor : Visitor
                         (cast(TypeFunction)emitZoneEnd.type).isnogc = true;
                         (cast(TypeFunction)emitZoneEnd.type).isnothrow = true;
                     }
-                    import dmd.expressionsem;
-                    import dmd.init;
-                    
+
                     VarDeclaration ctx = new VarDeclaration(Loc.initial, Type.tint64, Identifier.generateIdWithLoc("ctx", fd.loc), 
                         null, STC.temp);
                     ctx.parent = fd;
-                    ctx.storage_class |= STC.tls;
                     fd._scope.insert(ctx);
                     dsymbolSemantic(ctx, fd._scope);
                     ctx.parent = fd;
@@ -737,7 +743,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                     stmts.push(sge);
                     stmts.push(fbody);
                     auto cs = new CompoundStatement(Loc.initial, stmts);
-                    printf("cs: %s\n", cs.toChars());
+                    // printf("cs: %s\n", cs.toChars());
                     funcdecl.fbody = cs;
                     printf("fbody: %s\n", funcdecl.fbody.toChars());
                 }
