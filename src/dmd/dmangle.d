@@ -97,6 +97,7 @@ private immutable char[TMAX] mangleChar =
     //              X   // variadic T t...)
     //              Y   // variadic T t,...)
     //              Z   // not variadic, end of parameters
+    Tempty       : 'E', // doesn't matter has to be something
 
     // '@' shouldn't appear anywhere in the deco'd names
     Tident       : '@',
@@ -109,7 +110,6 @@ private immutable char[TMAX] mangleChar =
     Ttraits      : '@',
     Tmixin       : '@',
     Ttype        : '@',
-    Tempty       : '@',
     Texp         : '@',
 ];
 
