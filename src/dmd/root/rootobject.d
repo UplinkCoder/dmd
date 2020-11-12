@@ -43,7 +43,10 @@ extern (C++) class RootObject
 
     this() nothrow @nogc
     {
-        serial = running_serial++;
+        if (!__ctfe)
+        {
+            serial = running_serial++;
+        }
     }
 
     bool equals(const RootObject o) const

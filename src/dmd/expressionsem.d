@@ -5174,7 +5174,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         {
             exp[i] = duplicateTree(n, sc);
             if (!validateTuple(exp[i]))
-                return ExpandResult(new ErrorExp(), null);
+                return ExpandResult(ErrorExp.get(), null);
         }
         static if (HasList) if (childList)
         {
@@ -5191,13 +5191,13 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 {
                     listExp[i] = duplicateTree(cast(Expression)n, sc);
                     if (!validateTuple(listExp[i]))
-                        return ExpandResult(new ErrorExp(), null);
+                        return ExpandResult(ErrorExp.get(), null);
                 }
                 else if (IsTypeList || (!IsExprList && n.dyncast() == DYNCAST.type))
                 {
                     listExp[i] = duplicateTree(cast(Type)n, sc);
                     if (!validateTuple(listExp[i]))
-                        return ExpandResult(new ErrorExp(), null);
+                        return ExpandResult(ErrorExp.get(), null);
                 }
                 else
                     assert(false, "Unexpected node type during tuple expansion");
@@ -5422,7 +5422,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 if (e1.etup && to.ttup && e1.etup.length != to.ttup.length)
                 {
                     e.error("Tuples must have the same length for parallel expansion");
-                    return ExpandResult(new ErrorExp(), null);
+                    return ExpandResult(ErrorExp.get(), null);
                 }
 
                 Expressions* res = e1.etup ? e1.etup : new Expressions(to.ttup.length);
@@ -5452,7 +5452,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 if (targ.ttup && tspec.ttup && targ.ttup.length != tspec.ttup.length)
                 {
                     e.error("Tuples must have the same length for parallel expansion");
-                    return ExpandResult(new ErrorExp(), null);
+                    return ExpandResult(ErrorExp.get(), null);
                 }
 
                 Expressions* res = new Expressions(targ.ttup ? targ.ttup.length : tspec.ttup.length);
@@ -5539,7 +5539,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             {
                 import dmd.asttypename;
                 e.error("Tuple expansion not supported for this expression: %s", astTypeName(e).ptr);
-                return ExpandResult(new ErrorExp(), null);
+                return ExpandResult(ErrorExp.get(), null);
             }
 
             default:
@@ -5641,7 +5641,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 else
                 {
                     e.error("Tuple fold expression requires at least 2 elememnts", e.toChars());
-                    result = expressionSemantic(new ErrorExp(), sc);
+                    result = expressionSemantic(ErrorExp.get(), sc);
                 }
             }
             else
@@ -5650,7 +5650,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         else
         {
             e.error("No tuple was found beneath `...` expression %s", e.toChars());
-            result = expressionSemantic(new ErrorExp(), sc);
+            result = expressionSemantic(ErrorExp.get(), sc);
         }
     }
 
