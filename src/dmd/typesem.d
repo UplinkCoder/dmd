@@ -2943,6 +2943,8 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, out Expression pe, out Type 
 
 
         Type t = mt.exp.type;
+if (global.params.sk_typefunctions)
+{
         if (mt.exp.op == TOK.type)
         {
             auto te = mt.exp.isTypeExp();
@@ -2955,7 +2957,9 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, out Expression pe, out Type 
                 goto Lret;
             }
         }
-        if (mt.exp.op == TOK.scope_)
+}
+        if (mt.exp.op == TOK.scope_ ||
+            mt.exp.op == TOK.type)
         {
             if (mt.exp.checkType())
                 goto Lerr;
