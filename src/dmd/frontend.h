@@ -7874,6 +7874,8 @@ struct Array
     }
 };
 
+using real_t = longdouble;
+
 struct CTFloat
 {
     enum : bool { yl2x_supported = true };
