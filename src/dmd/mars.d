@@ -217,10 +217,10 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         string s;
         foreach (n; params)
         {
-            s ~= q{
-                if (params.}~n~q{Usage)
-                    return printHelpUsage(CLIUsage.}~n~q{Usage);
-            };
+            s ~= `
+                if (params.`~n~`Usage)
+                    return printHelpUsage(CLIUsage.`~n~`Usage);
+            `;
         }
         return s;
     }
@@ -372,14 +372,28 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         }
     }
 
+    import dmd.taskgroup;
+	
+    TaskGroup loader = TaskGroup("loader", modules.length);
+
     foreach (m; modules)
     {
-        m.read(Loc.initial);
+        loader.addTask((void* data)
+        {
+            auto m = cast(Module) data;
+            m.read(Loc.initial);
+            return null;
+        }, cast(void*)m);
     }
+
+    loader.awaitCompletionOfAllTasks();
 
     // Parse files
     bool anydocfiles = false;
     size_t filecount = modules.dim;
+
+    TaskGroup parser;
+    
     for (size_t filei = 0, modi = 0; filei < filecount; filei++, modi++)
     {
         Module m = modules[modi];
