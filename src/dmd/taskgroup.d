@@ -18,7 +18,7 @@ struct OriginInformation
 
 struct Task
 {
-    void* function (void*) fn;
+    void* delegate (void*) fn;
     void* taskData;
     Task*[] children;
     size_t n_children_completed;
@@ -26,10 +26,10 @@ struct Task
     TaskFiber currentFiber;
     bool hasCompleted;
 
-    debug (task)
-    {
+    //debug (task)
+    //{
         OriginInformation originInfo;
-    }
+    //}
 }
 
 class TaskFiber : Fiber
@@ -38,7 +38,8 @@ class TaskFiber : Fiber
 
     this(Task* currentTask)
     {
-        super(&doTask);
+        super(&doTask, ushort.max);
+        // use large stack of ushort.max
         this.currentTask = currentTask;
         currentTask.currentFiber = this;
     }
@@ -91,17 +92,16 @@ struct TaskGroup
         tasks = ptr[0 .. n];
     }
     
-    Task* addTask(void* function (void*) fn, void* taskData, Task* originator = getCurrentTask(), size_t line = __LINE__, string file = __FILE__)
+    Task* addTask(void* delegate (void*) fn, void* taskData, Task* originator = getCurrentTask(), size_t line = __LINE__, string file = __FILE__)
     {
         if (tasks.length <= n_used)
         {
             size_t n_tasks;
 
-            if (!tasks.length)
-                n_tasks = 1;
-            else
-                n_tasks = cast(size_t) (tasks.length * 1.2);
-            
+            n_tasks = tasks.length == 0 ?
+                1 :
+                cast(size_t) (tasks.length * 1.2);
+
             allocate_tasks(n_tasks);
         }
 
@@ -110,9 +110,9 @@ struct TaskGroup
         if (originator)
             originator.children ~= task;
 
-        debug (task)
+        //debug (task)
         {
-            *task.originInfo = OriginInformation(file, line, originator);
+            task.originInfo = OriginInformation(file, cast(int)line, originator);
         }
 
         debug (immedaiteTaskCompletion)
@@ -219,4 +219,28 @@ struct TaskGroup
         runTask();
         while(n_completed < n_used) { runTask(); }
     }
+}
+
+@("Test Originator")
+unittest
+{
+    bool task1_completed = 0;
+    bool task2_completed = 0;
+
+    size_t line = __LINE__;
+    TaskGroup tg = TaskGroup("tg1", 2);
+    tg.addTask((void* x) { // line + 2
+        auto task = tg.addTask((void* x) { // line + 3
+            task2_completed = true;
+            return null;
+        }, x);
+        assert(task.originInfo.line == line + 3);
+        assert(task.originInfo.originator.originInfo.line == line + 2);
+        task1_completed = true;
+        return x;
+    }, null);
+    tg.awaitCompletionOfAllTasks();
+
+    assert(task1_completed);
+    assert(task2_completed);
 }
