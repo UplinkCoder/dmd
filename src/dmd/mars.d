@@ -386,13 +386,19 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         }, cast(void*)m);
     }
 
+    // TODO in theory we don't have to await the completion of all tasks here.
+    // If we kept the load status of the module inside the module
+    // (and we do since the code was meant to load asyncronously).
+    // However for easier debugging and for keeping the codepath the same
+    // we don't do deferred loading yet.
+    // That said. We should do it in the future.
     loader.awaitCompletionOfAllTasks();
 
     // Parse files
     bool anydocfiles = false;
     size_t filecount = modules.dim;
 
-    TaskGroup parser;
+    TaskGroup parser = TaskGroup("parser", filecount);
     
     for (size_t filei = 0, modi = 0; filei < filecount; filei++, modi++)
     {
@@ -405,7 +411,12 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 //        if (!params.oneobj || modi == 0 || m.isDocFile)
 //            m.deleteObjFile();
 
-        m.parse();
+        parser.addTask((void* data) {
+                auto m = cast(Module) data;
+                m.parse();
+                return null;
+        }, cast(void*)m);
+
         if (m.isHdrFile)
         {
             // Remove m's object file from list of object files
@@ -440,6 +451,8 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
                 params.link = false;
         }
     }
+
+    parser.awaitCompletionOfAllTasks();
 
     if (anydocfiles && modules.dim && (params.oneobj || params.objname))
     {
