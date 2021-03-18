@@ -163,6 +163,37 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     Strings libmodules;
     global._init();
 
+    import dmd.taskgroup;
+    initBackgroundThreads();
+    // Check for malformed input
+    if (argc < 1 || !argv)
+    {
+    Largs:
+        error(Loc.initial, "missing or null command line arguments");
+        fatal();
+    }
+    // Convert argc/argv into arguments[] for easier handling
+    Strings arguments = Strings(argc);
+    for (size_t i = 0; i < argc; i++)
+    {
+        if (!argv[i])
+            goto Largs;
+        arguments[i] = argv[i];
+    }
+    if (!responseExpand(arguments)) // expand response files
+        error(Loc.initial, "can't open response file");
+    //for (size_t i = 0; i < arguments.dim; ++i) printf("arguments[%d] = '%s'\n", i, arguments[i]);
+    files.reserve(arguments.dim - 1);
+    // Set default values
+    params.argv0 = arguments[0].toDString;
+
+    // Temporary: Use 32 bits OMF as the default on Windows, for config parsing
+    static if (TARGET.Windows)
+    {
+        params.is64bit = false;
+        params.mscoff = false;
+    }
+
     if (parseCommandlineAndConfig(argc, argv, params, files))
         return EXIT_FAILURE;
 
@@ -382,8 +413,9 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         {
             auto m = cast(Module) data;
             m.read(Loc.initial);
+            m.step = Module.Step.Loaded;
             return null;
-        }, cast(void*)m);
+        }, cast(void*)m, false);
     }
 
     // TODO in theory we don't have to await the completion of all tasks here.
@@ -399,7 +431,22 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     size_t filecount = modules.dim;
 
     TaskGroup parser = TaskGroup("parser", filecount);
-    
+
+    foreach(m;modules)
+    {
+        parser.addTask((void* data) {
+                auto m = cast(Module) data;
+                assert(m.step == Module.Step.Loaded);
+                m.parse();
+                m.step = Module.Step.Parsed;
+                return null;
+            }, cast(void*)m, false);
+    }
+
+    parser.awaitCompletionOfAllTasks();
+
+    killBackgroundThreads();
+
     for (size_t filei = 0, modi = 0; filei < filecount; filei++, modi++)
     {
         Module m = modules[modi];
@@ -410,12 +457,6 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         m.importedFrom = m; // m.isRoot() == true
 //        if (!params.oneobj || modi == 0 || m.isDocFile)
 //            m.deleteObjFile();
-
-        parser.addTask((void* data) {
-                auto m = cast(Module) data;
-                m.parse();
-                return null;
-        }, cast(void*)m);
 
         if (m.isHdrFile)
         {
@@ -433,6 +474,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         }
         if (m.isDocFile)
         {
+            printf("is ddocfile returned true\n");
             anydocfiles = true;
             gendocfile(m);
             // Remove m from list of modules
@@ -451,8 +493,6 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
                 params.link = false;
         }
     }
-
-    parser.awaitCompletionOfAllTasks();
 
     if (anydocfiles && modules.dim && (params.oneobj || params.objname))
     {

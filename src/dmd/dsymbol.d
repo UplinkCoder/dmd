@@ -241,6 +241,20 @@ extern (C++) class Dsymbol : ASTNode
     // (only use this with ddoc)
     UnitTestDeclaration ddocUnittest;
 
+    import dmd.taskgroup : Task;
+
+    Task* loadTask;
+    Task* parseTask;
+    Step step;
+
+    enum Step
+    {
+        Unknown,
+
+        Loaded,
+        Parsed,
+    }
+
     final extern (D) this()
     {
         //printf("Dsymbol::Dsymbol(%p)\n", this);

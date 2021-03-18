@@ -7,70 +7,110 @@ import core.thread.threadbase;
 import core.thread.osthread;
 
 
-Thread[4] unorderedBackgroudThreads;
-TaskQueue[4] unorderedBackgroudQueue;
+enum n_threads = 1;
+
+Thread[n_threads] unorderedBackgroundThreads;
+shared TaskQueue[n_threads] unorderedBackgroundQueue;
+shared bool[n_threads] killThread;
 
 import core.sys.posix.pthread;
 
-align(16) struct TaskQueue
+import core.atomic;
+
+extern (C) struct TaskQueue
 {
-    shared align(16) uint queueLock;
-    shared align(16) uint currentTickit;
+    shared align(16) uint nextTicket;
+    shared align(16) uint currentlyServing;
 
     // these can only be touched when locked
-    __gshared Task*[64] tasks;
-    __gshared uint n_queue_full;
+    shared Task*[1] tasks;
+    shared uint insert_pos;
+    shared uint currently_executing;
 
-    void addTaskToQueue(Task* task, uint queueID)
+    void addTaskToQueue(Task* task, uint queueID) shared
     {
-        assert(task.queueID == 0, "trying task which is already in a queue");
-        assert(queueID != 0, "Queue 0 means unowned, therefore can't be used as valid QueueID");
-        import core.atomic /*: atomicFence, cas, atomicFetchAdd*/;
+        assert(queueID != 0, "A zero queueID is invalid (0 means unowned)");
+        const myTicket = atomicFetchAdd(nextTicket, 1);
+        
+        scope (exit)
+            atomicFetchAdd(currentlyServing, 1);
 
-        auto tickit = atomicFetchAdd(currentTickit, 1);
-        if (tickit == 0)
+        printf("currentlyServing: %d, nextTickit: %d\n", currentlyServing, nextTicket);
+
+        for (;;)
         {
-            tickit = 1;
-        }
-
-        // lock is presumably  unowned
-        static immutable string __mmPause = "asm nothrow pure { rep; nop; }";
-    Lspin:
-
-        while (queueLock != 0 || n_queue_full == tasks.length) { mixin(__mmPause); }  // spin
-        if (atomicLoad(queueLock) == 0)
-        {
-            // try aquiring it
-            if (cas(&queueLock, 0, tickit))
+            if (insert_pos == tasks.length || atomicLoad(currentlyServing) != myTicket)
+                continue;
+            printf(" got the lock \n");
+            /* do locked stuff here ... */
+            if (insert_pos < tasks.length)
             {
-                // we have the lock
-                if (n_queue_full < tasks.length)
-                {
-                    tasks[n_queue_full++] = task;
-                    task.queueID = queueID;
-                    atomicFence();
-                }
-                atomicStore(queueLock, 0); // unlock
+                task.queueID = queueID;
+                tasks[atomicFetchAdd(insert_pos, 1)] = cast(shared)task;
+                atomicFence();
+                break;
             }
-            else
-                goto Lspin;
         }
     }
 }
+
+extern (C) void breakpoint() {}
 
 void initBackgroundThreads()
 {
-    foreach(i, ref t; unorderedBackgroudThreads)
+    int i;
+    foreach(ref t; unorderedBackgroundThreads)
     {
         t = new Thread(() {
-                for(;;)
-                {
+                const uint thread_idx = cast(uint)i++;
+                printf("thread_proc start thread_id: %d\n", thread_idx + 1);
+                auto myQueue = &unorderedBackgroundQueue[thread_idx];
 
+                while(true && !killThread[thread_idx])
+                {
+                    import core.atomic;
+                    while(atomicLoad(myQueue.insert_pos) != 0)
+                    {
+                        const myTicket = atomicFetchAdd(myQueue.nextTicket, 1);
+                        
+                        scope (exit)
+                            atomicFetchAdd(myQueue.currentlyServing, 1);
+                        
+                        for (;;)
+                        {
+                            if (atomicLoad(myQueue.currentlyServing) != myTicket)
+                                continue;
+
+                            Task task = cast(Task) *myQueue.tasks[atomicFetchAdd(myQueue.currently_executing, 1) % myQueue.tasks.length];
+                            printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
+                            assert(task.queueID == thread_idx + 1);
+                            task.assignFiber();
+                            task.callFiber();
+                            if (task.hasCompleted())
+                            {
+                                atomicFetchSub(myQueue.insert_pos, 1);
+                            }
+                        }
+                    }
+                    if (i == 3) breakpoint();
+                    // sleep for a microsecond if empty
+                    {
+                        //import core.time;
+                        //Thread.sleep(dur!"usecs"(1));
+                    }
                 }
+
         });
+        t.start();
     }
+
 }
 
+void killBackgroundThreads()
+{
+    foreach(i; 0 .. unorderedBackgroundThreads.length)
+        killThread[i] = true;
+}
 
 size_t align16(const size_t n) pure
 {
@@ -85,12 +125,11 @@ struct OriginInformation
     Task* originator;
 }
 
-void dispatchToBackgroudThread(Task* task)
+void dispatchToBackgroundThread(Task* task)
 {
-    static shared size_t queueCounter = 0;
-    import core.atomic;
-    auto queueID = atomicFetchAdd(queueCounter, 1) % unorderedBackgroudQueue.length;
-    
+    static shared uint queueCounter = 0;
+    uint queueID = atomicFetchAdd(queueCounter, 1) % cast(uint)(unorderedBackgroundQueue.length);
+    unorderedBackgroundQueue[queueID].addTaskToQueue(task, queueID + 1);
 }
 
 struct Task
@@ -100,15 +139,34 @@ struct Task
     Task*[] children;
     size_t n_children_completed;
 
-    size_t queueID;
+    uint queueID;
+    bool isBackgroundTask;
 
     TaskFiber currentFiber;
-    bool hasCompleted;
+    bool hasCompleted_;
 
+
+    bool hasCompleted()
+    {
+        return (hasCompleted_ || (currentFiber && currentFiber.hasCompleted()));
+    }
     //debug (task)
     //{
         OriginInformation originInfo;
     //}
+
+    void assignFiber()
+    {        
+        //TODO instead of new'ing a TaskFiber use a pool of them.
+        if (!hasCompleted_ && !currentFiber)
+            currentFiber = new TaskFiber(&this);
+    }
+
+    void callFiber()
+    {
+        if (!hasCompleted_ && currentFiber && currentFiber.state() != currentFiber.State.EXEC)
+            currentFiber.call();
+    }
 }
 
 class TaskFiber : Fiber
@@ -134,7 +192,7 @@ class TaskFiber : Fiber
         if (state() == State.TERM)
         {
             currentTask.currentFiber = null;
-            currentTask.hasCompleted = true;
+            currentTask.hasCompleted_ = true;
             reset();
             return true;
         }
@@ -192,7 +250,8 @@ struct TaskGroup
 
         if (background_task)
         {
-            dispatchToBackgroudThread(task);
+            task.isBackgroundTask = true;
+            dispatchToBackgroundThread(task);
         }
 
         //debug (task)
@@ -217,7 +276,17 @@ struct TaskGroup
 
         return task;
     }
-    
+
+    Task* findTask(void *taskData)
+    {
+        foreach(ref task;tasks)
+        {
+            if (task.taskData == taskData)
+                return &task;
+        }
+        return null;
+    }
+
     this(string name, size_t n_allocated = 0)
     {
         this.name = name;
@@ -237,7 +306,7 @@ struct TaskGroup
 
         foreach(ref task; tasks)
         {
-            if (!task.hasCompleted)
+            if (!task.hasCompleted())
             {
                 currentTask = &task;
                 break;
@@ -259,7 +328,7 @@ struct TaskGroup
             parent = currentTask;
             foreach(ref task; currentTask.children)
             {
-                if (!task.hasCompleted)
+                if (!task.hasCompleted())
                 {
                     currentTask = task;
                     break;
@@ -276,15 +345,20 @@ struct TaskGroup
                 assert(currentTask, cast(string)assertMessageBuffer[0 .. messageLength]);
             }
         }
-        //import dmd.root.rootobject;
-        //printf("running for %s\n", (cast(RootObject)currentTask.taskData).toChars());
+        import dmd.root.rootobject;
+        if (auto ro = cast(RootObject) currentTask.taskData)
+        {
+            // printf("running for %s\n", ro.toChars());
+        }
 
-        //TODO instead of new'ing a TaskFiber use a pool of them.
-        if (!currentTask.currentFiber)
-            currentTask.currentFiber = new TaskFiber(currentTask);
+        if (!currentTask.isBackgroundTask)
+        {
+            currentTask.assignFiber();
+            currentTask.callFiber();
+        }
 
-        currentTask.currentFiber.call();
-        if (currentTask.hasCompleted || currentTask.currentFiber.hasCompleted)
+
+        if (currentTask.hasCompleted())
         {
             if (parent)
             {
@@ -372,6 +446,9 @@ unittest
     }, null);
 
     tg.awaitCompletionOfAllTasks();
+
+    import std.stdio;
+    writeln(taskGraph(&tg.tasks[0]));
 
     assert(task1_completed);
     assert(task2_completed);
