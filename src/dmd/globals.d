@@ -279,6 +279,26 @@ enum c_ext    = "c";        // for C source files
 /**
  * Collection of global compiler settings and global state used by the frontend
  */
+struct TaskContext
+{
+    uint errors;            /// number of errors reported so far
+    uint warnings;          /// number of warnings reported so far
+    uint gag;               /// !=0 means gag reporting of errors & warnings
+    uint gaggedErrors;      /// number of errors reported while gagged
+    uint gaggedWarnings;    /// number of warnings reported while gagged
+}
+
+void takeGlobalLock()
+{
+    //TODO implement
+}
+
+void releaseGlobalLock()
+{
+    //TODO implement
+}
+
+
 extern (C++) struct Global
 {
     const(char)[] inifilename; /// filename of configuration file as given by `-conf=`, or default value

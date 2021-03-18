@@ -782,7 +782,12 @@ extern (C++) final class Module : Package
 
         if (global.params.emitMakeDeps)
         {
-            global.params.makeDeps.push(srcfile.toChars());
+
+            takeGlobalLock();
+            {
+                global.params.makeDeps.push(srcfile.toChars());
+            }
+            releaseGlobalLock();
         }
 
         return loadSourceBuffer(loc, readResult);

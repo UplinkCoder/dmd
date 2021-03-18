@@ -418,32 +418,32 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         }, cast(void*)m, false);
     }
 
+    loader.awaitCompletionOfAllTasks();
     // TODO in theory we don't have to await the completion of all tasks here.
     // If we kept the load status of the module inside the module
     // (and we do since the code was meant to load asyncronously).
     // However for easier debugging and for keeping the codepath the same
     // we don't do deferred loading yet.
     // That said. We should do it in the future.
-    loader.awaitCompletionOfAllTasks();
 
     // Parse files
     bool anydocfiles = false;
     size_t filecount = modules.dim;
 
-    TaskGroup parser = TaskGroup("parser", filecount);
+    TaskGroup parserGroup = TaskGroup("parser", filecount);
 
     foreach(m;modules)
     {
-        parser.addTask((void* data) {
-                auto m = cast(Module) data;
-                assert(m.step == Module.Step.Loaded);
-                m.parse();
-                m.step = Module.Step.Parsed;
-                return null;
-            }, cast(void*)m, false);
+        parserGroup.addTask((void* data) {
+            auto m = cast(Module) data;
+            assert(m.step == Module.Step.Loaded);
+            m.parse();
+            m.step = Module.Step.Parsed;
+            return null;
+        }, cast(void*)m, false);
     }
 
-    parser.awaitCompletionOfAllTasks();
+    parserGroup.awaitCompletionOfAllTasks();
 
     killBackgroundThreads();
 
