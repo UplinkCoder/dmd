@@ -2,9 +2,8 @@ module dmd.taskgroup;
 
 import core.thread.fiber;
 import core.stdc.stdio;
-
-import core.thread.threadbase;
 import core.thread.osthread;
+import core.atomic;
 
 
 enum n_threads = 1;
@@ -15,7 +14,6 @@ shared bool[n_threads] killThread;
 
 import core.sys.posix.pthread;
 
-import core.atomic;
 
 extern (C) struct TaskQueue
 {
@@ -24,12 +22,17 @@ extern (C) struct TaskQueue
 
     // these can only be touched when locked
     shared Task*[1] tasks;
-    shared int insert_pos;
-    shared int exec_pos;
+    align(16) shared int insert_pos;
+    align(16) shared int exec_pos;
 
-    void addTaskToQueue(Task* task, uint queueID) shared
+    void addTaskToQueue(shared Task* task, uint queueID) shared
     {
         assert(queueID != 0, "A zero queueID is invalid (0 means unowned)");
+        // while we have no room to insert anything there's no point in drawing a ticket
+        while(atomicLoad(insert_pos) == tasks.length)
+	{
+          // possibly pause ?            
+	}
         auto myTicket = atomicFetchAdd(nextTicket, 1);
         scope (exit)
             atomicFetchAdd(currentlyServing, 1);
@@ -39,9 +42,24 @@ extern (C) struct TaskQueue
 
         for (;;)
         {
-            if (insert_pos == tasks.length || atomicLoad(currentlyServing) != myTicket)
+            if (atomicLoad(currentlyServing) != myTicket)
+            {
+                // printf("could not get lock for enqueue {insert_pos = %d, currentlyServing = %d, myTicket = %d}\n", insert_pos, currentlyServing, myTicket);
                 continue;
+            }
             printf(" got the lock for %d\n", myTicket);
+
+            if (atomicLoad(insert_pos)  == tasks.length)
+            {
+               printf("TaskQueue is full ... retrying\n");
+               // if the task queue is full we need to relinquish our ticket
+               atomicFetchAdd(currentlyServing, 1);
+               // and draw a new one
+               myTicket = atomicFetchAdd(nextTicket, 1);
+               continue;
+            }
+
+
             /* do locked stuff here ... */
             if (atomicLoad(insert_pos) < tasks.length)
             {
@@ -50,11 +68,8 @@ extern (C) struct TaskQueue
                 atomicFence();
                 break;
             }
-            else // if we couldn't insert the task we need to release our ticket and get a new one
-            {
-                atomicFetchAdd(currentlyServing, 1); // release the ticket
-                myTicket = atomicFetchAdd(nextTicket, 1); // get a new one
-            }
+            else
+                assert(0, "we should have made sure that the queue has room");
         }
     }
 }
@@ -85,14 +100,14 @@ void initBackgroundThreads()
                         {
                             if (atomicLoad(myQueue.currentlyServing) != myTicket)
                                 continue;
-
+                            printf("TaskProc aquired lock using ticket: %d\n", myTicket);
                             // now that we have aquired the lock we need to check if the task we wanted to do wasn't already done
-                            if (myQueue.insert_pos == 0)
+                            if (atomicLoad(myQueue.insert_pos) == 0)
                             {
                                 // the queue is empty and we need to relinquish the lock
                                 break;
                             }
-                            auto task = cast(Task*) myQueue.tasks[atomicFetchAdd(myQueue.exec_pos, 1) % myQueue.tasks.length];
+                            auto task = myQueue.tasks[atomicFetchAdd(myQueue.exec_pos, 1) % myQueue.tasks.length];
                             assert(task.queueID);
                             printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
                             assert(task.queueID == thread_idx + 1);
@@ -136,10 +151,10 @@ struct OriginInformation
 {
     string filename;
     uint line;
-    Task* originator;
+    shared Task* originator;
 }
 
-void dispatchToBackgroundThread(Task* task)
+void dispatchToBackgroundThread(shared Task* task)
 {
     static shared uint queueCounter = 0;
     uint queueID = atomicFetchAdd(queueCounter, 1) % cast(uint)(unorderedBackgroundQueue.length);
@@ -150,37 +165,52 @@ struct Task
 {
     void* delegate (void*) fn;
     void* taskData;
-    Task*[] children;
-    size_t n_children_completed;
+    shared Task*[] children;
+    shared size_t n_children_completed;
 
     uint queueID;
     bool isBackgroundTask;
 
-    TaskFiber currentFiber;
-    bool hasCompleted_;
+    shared TaskFiber currentFiber;
+    align(16) shared bool hasCompleted_;
+    align(16) shared bool hasFiber;
+    align(16) shared bool fiberIsExecuting;
+    align(16) shared uint originatorAppendLock;
 
 
-    bool hasCompleted()
+    bool hasCompleted() shared
     {
-        return (hasCompleted_ || (currentFiber && currentFiber.hasCompleted()));
+        return (atomicLoad(hasCompleted_) || (currentFiber && currentFiber.hasCompleted()));
     }
     //debug (task)
     //{
         OriginInformation originInfo;
     //}
 
-    void assignFiber()
+    void assignFiber() shared
     {
         assert(fn !is null);
         //TODO instead of new'ing a TaskFiber use a pool of them.
-        if (!hasCompleted_ && !currentFiber)
-            currentFiber = new TaskFiber(&this);
+        if (!atomicLoad(hasCompleted_) && !hasFiber)
+        {
+            if (cas(&hasFiber, false, true))
+            {
+                currentFiber = cast(shared)new TaskFiber(cast(Task*)&this);
+            }
+        }
     }
 
-    void callFiber()
+    void callFiber() shared
     {
-        if (!hasCompleted_ && currentFiber && currentFiber.state() != currentFiber.State.EXEC)
-            currentFiber.call();
+        if (!atomicLoad(hasCompleted_) && hasFiber)
+	{
+            auto unshared_fiber = cast()currentFiber;
+            if (unshared_fiber.state() != unshared_fiber.State.EXEC &&
+                cas(cast()&fiberIsExecuting, false, true))
+            {
+                (cast()currentFiber).call();                
+            }
+	}
     }
 }
 
@@ -190,10 +220,11 @@ class TaskFiber : Fiber
 
     this(Task* currentTask)
     {
+        assert(currentTask.hasFiber && currentTask.currentFiber is null);
         super(&doTask, ushort.max);
         // use large stack of ushort.max
         this.currentTask = currentTask;
-        currentTask.currentFiber = this;
+        currentTask.currentFiber = cast(shared)this;
     }
 
     void doTask()
@@ -202,13 +233,18 @@ class TaskFiber : Fiber
         currentTask.fn(currentTask.taskData);
     }
 
-    bool hasCompleted()
+    bool hasCompleted() shared
     {
-        if (state() == State.TERM)
+        assert(!atomicLoad(currentTask.hasCompleted_));
+        auto state = (cast()this).state();
+        if (state == State.TERM)
         {
-            currentTask.currentFiber = null;
-            currentTask.hasCompleted_ = true;
-            reset();
+            if (cas(&currentTask.hasCompleted_, false, true))
+            {
+                currentTask.currentFiber = null;
+                currentTask = null;
+                (cast()this).reset();
+            }
             return true;
         }
         else
@@ -219,37 +255,37 @@ class TaskFiber : Fiber
 struct TaskGroup
 {
     string name;
-    size_t n_used;
-    size_t n_completed;
+    shared size_t n_used;
+    shared size_t n_completed;
 
-    Task[] tasks;
+    shared Task[] tasks;
  
-    static Task* getCurrentTask()
+    static shared(Task)* getCurrentTask()
     {
         TaskFiber fiber = cast(TaskFiber) Fiber.getThis();
         if (!fiber)
             return null;
         else
-            return fiber.currentTask;
+            return cast(shared)fiber.currentTask;
     }
 
-    private void allocate_tasks(size_t n)
+    private void allocate_tasks(size_t n) shared
     {
         import dmd.root.rmem;
 
         assert(tasks.length < n);
         n = align16(n);
         const n_bytes = n * Task.sizeof;
-        auto ptr = cast(Task*)(tasks.ptr ? Mem.xrealloc_noscan(tasks.ptr, n_bytes) : Mem.xmalloc_noscan(n_bytes));
+        auto ptr = cast(shared Task*)(tasks.ptr ? Mem.xrealloc_noscan(cast(void*)tasks.ptr, n_bytes) : Mem.xmalloc_noscan(n_bytes));
         tasks = ptr[0 .. n];
     }
     
-    Task* addTask(void* delegate (void*) fn, void* taskData, bool background_task = false,
-        Task* originator = getCurrentTask(), size_t line = __LINE__, string file = __FILE__)
+    shared(Task)* addTask(void* delegate (void*) fn, void* taskData, bool background_task = false,
+        shared Task* originator = getCurrentTask(), size_t line = __LINE__, string file = __FILE__) shared
     {
         if (tasks.length <= n_used)
         {
-            size_t n_tasks;
+            shared size_t n_tasks;
 
             n_tasks = tasks.length == 0 ?
                 1 :
@@ -258,9 +294,9 @@ struct TaskGroup
             allocate_tasks(n_tasks);
         }
 
-        auto task = &tasks[n_used++]; 
-        *task = Task(fn, taskData);
-        if (originator)
+        shared task = &tasks[atomicFetchAdd(n_used, 1)]; 
+        *task = cast(shared) Task(fn, taskData);
+        if (originator) // technically we need to take a lock here!
             originator.children ~= task;
 
         if (background_task)
@@ -292,7 +328,7 @@ struct TaskGroup
         return task;
     }
 
-    Task* findTask(void *taskData)
+    shared(Task)* findTask(void *taskData)
     {
         foreach(ref task;tasks)
         {
@@ -307,17 +343,17 @@ struct TaskGroup
         this.name = name;
         
         if (n_allocated)
-            allocate_tasks(n_allocated);
+            (cast(shared)(this)).allocate_tasks(n_allocated);
     }
     
-    void runTask ()
+    void runTask () shared
     {
         if (n_completed == n_used)
             return ;
         // if task group is done, don't try to run anything.
 
-        Task* parent;
-        Task* currentTask;
+        shared Task* parent;
+        shared Task* currentTask;
 
         foreach(ref task; tasks)
         {
@@ -360,12 +396,13 @@ struct TaskGroup
                 assert(currentTask, cast(string)assertMessageBuffer[0 .. messageLength]);
             }
         }
-        assert(currentTask.fn);
         import dmd.root.rootobject;
         if (auto ro = cast(RootObject) currentTask.taskData)
         {
-            // printf("running for %s\n", ro.toChars());
+            printf("running for %s\n", ro.toChars());
         }
+        assert(currentTask.fn);
+        import dmd.root.rootobject;
 
         if (!currentTask.isBackgroundTask)
         {
@@ -377,18 +414,20 @@ struct TaskGroup
         {
             if (parent)
             {
-                parent.n_children_completed++;
+                atomicFetchAdd(parent.n_children_completed, 1);
+                // we need to get a lock for modifiung parent.children!
+                // TODO FIXME LOCKING
                 parent.children = parent.children[1 .. $];
+                // TODO FIXME LOCKING
             }
             else
             {
-                n_completed++;
+                atomicFetchAdd(n_completed, 1);
             }
         }
-        //TODO have this actually use fibers!
     }
     
-    void awaitCompletionOfAllTasks()
+    void awaitCompletionOfAllTasks() shared
     {
         runTask();
         while(n_completed < n_used) { runTask(); }
@@ -423,7 +462,7 @@ string taskGraph(Task* task, Task* parent = null, int indent = 0)
 
     foreach(ref c;task.children)
     {
-        result ~= taskGraph(c, task, indent);
+        result ~= taskGraph(cast(Task*)c, task, indent);
         //result ~= formatPtr(task) ~ " > " ~ formatPtr(c);
     }
 

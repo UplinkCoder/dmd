@@ -405,7 +405,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     import dmd.taskgroup;
 	
-    TaskGroup loader = TaskGroup("loader", modules.length);
+    shared TaskGroup loader = cast(shared)TaskGroup("loader", modules.length);
 
     foreach (m; modules)
     {
@@ -430,7 +430,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     bool anydocfiles = false;
     size_t filecount = modules.dim;
 
-    TaskGroup parserGroup = TaskGroup("parser", filecount);
+    shared TaskGroup parserGroup = TaskGroup("parser", filecount);
 
     foreach(m;modules)
     {
