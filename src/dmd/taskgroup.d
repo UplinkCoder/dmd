@@ -24,16 +24,16 @@ extern (C) struct TaskQueue
 
     // these can only be touched when locked
     shared Task*[1] tasks;
-    shared uint insert_pos;
-    shared uint currently_executing;
+    shared int insert_pos;
+    shared int exec_pos;
 
     void addTaskToQueue(Task* task, uint queueID) shared
     {
         assert(queueID != 0, "A zero queueID is invalid (0 means unowned)");
-        const myTicket = atomicFetchAdd(nextTicket, 1);
-        
+        auto myTicket = atomicFetchAdd(nextTicket, 1);
         scope (exit)
             atomicFetchAdd(currentlyServing, 1);
+        
 
         printf("currentlyServing: %d, nextTickit: %d\n", currentlyServing, nextTicket);
 
@@ -41,14 +41,19 @@ extern (C) struct TaskQueue
         {
             if (insert_pos == tasks.length || atomicLoad(currentlyServing) != myTicket)
                 continue;
-            printf(" got the lock \n");
+            printf(" got the lock for %d\n", myTicket);
             /* do locked stuff here ... */
-            if (insert_pos < tasks.length)
+            if (atomicLoad(insert_pos) < tasks.length)
             {
                 task.queueID = queueID;
                 tasks[atomicFetchAdd(insert_pos, 1)] = cast(shared)task;
                 atomicFence();
                 break;
+            }
+            else // if we couldn't insert the task we need to release our ticket and get a new one
+            {
+                atomicFetchAdd(currentlyServing, 1); // release the ticket
+                myTicket = atomicFetchAdd(nextTicket, 1); // get a new one
             }
         }
     }
@@ -69,7 +74,7 @@ void initBackgroundThreads()
                 while(true && !killThread[thread_idx])
                 {
                     import core.atomic;
-                    while(atomicLoad(myQueue.insert_pos) != 0)
+                    while(atomicLoad(myQueue.insert_pos) > 0)
                     {
                         const myTicket = atomicFetchAdd(myQueue.nextTicket, 1);
                         
@@ -81,18 +86,27 @@ void initBackgroundThreads()
                             if (atomicLoad(myQueue.currentlyServing) != myTicket)
                                 continue;
 
-                            Task task = cast(Task) *myQueue.tasks[atomicFetchAdd(myQueue.currently_executing, 1) % myQueue.tasks.length];
+                            // now that we have aquired the lock we need to check if the task we wanted to do wasn't already done
+                            if (myQueue.insert_pos == 0)
+                            {
+                                // the queue is empty and we need to relinquish the lock
+                                break;
+                            }
+                            auto task = cast(Task*) myQueue.tasks[atomicFetchAdd(myQueue.exec_pos, 1) % myQueue.tasks.length];
+                            assert(task.queueID);
                             printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
                             assert(task.queueID == thread_idx + 1);
                             task.assignFiber();
                             task.callFiber();
                             if (task.hasCompleted())
                             {
+                                printf("task %p has completed myQueue.insert_pos: %d\n", task, myQueue.insert_pos);
                                 atomicFetchSub(myQueue.insert_pos, 1);
+                                printf("myQueue.insert_pos: %d\n", myQueue.insert_pos);
                             }
+                            break;
                         }
                     }
-                    if (i == 3) breakpoint();
                     // sleep for a microsecond if empty
                     {
                         //import core.time;
@@ -156,7 +170,8 @@ struct Task
     //}
 
     void assignFiber()
-    {        
+    {
+        assert(fn !is null);
         //TODO instead of new'ing a TaskFiber use a pool of them.
         if (!hasCompleted_ && !currentFiber)
             currentFiber = new TaskFiber(&this);
@@ -345,6 +360,7 @@ struct TaskGroup
                 assert(currentTask, cast(string)assertMessageBuffer[0 .. messageLength]);
             }
         }
+        assert(currentTask.fn);
         import dmd.root.rootobject;
         if (auto ro = cast(RootObject) currentTask.taskData)
         {
@@ -356,7 +372,6 @@ struct TaskGroup
             currentTask.assignFiber();
             currentTask.callFiber();
         }
-
 
         if (currentTask.hasCompleted())
         {

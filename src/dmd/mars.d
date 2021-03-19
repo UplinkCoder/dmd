@@ -415,7 +415,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             m.read(Loc.initial);
             m.step = Module.Step.Loaded;
             return null;
-        }, cast(void*)m, false);
+        }, cast(void*)m, true);
     }
 
     loader.awaitCompletionOfAllTasks();
@@ -440,7 +440,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             m.parse();
             m.step = Module.Step.Parsed;
             return null;
-        }, cast(void*)m, false);
+        }, cast(void*)m, true);
     }
 
     parserGroup.awaitCompletionOfAllTasks();
