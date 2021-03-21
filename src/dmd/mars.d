@@ -165,6 +165,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     import dmd.taskgroup;
     initBackgroundThreads();
+
     // Check for malformed input
     if (argc < 1 || !argv)
     {
@@ -405,17 +406,19 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     import dmd.taskgroup;
 	
+    initBackgroundThreads();
+
     shared TaskGroup loader = cast(shared)TaskGroup("loader", modules.length);
 
     foreach (m; modules)
     {
-        loader.addTask((void* data)
+        loader.addTask((shared void* data)
         {
             auto m = cast(Module) data;
             m.read(Loc.initial);
             m.step = Module.Step.Loaded;
             return null;
-        }, cast(void*)m, true);
+        }, cast(shared void*)m, true);
     }
 
     loader.awaitCompletionOfAllTasks();
@@ -434,13 +437,13 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     foreach(m;modules)
     {
-        parserGroup.addTask((void* data) {
+        parserGroup.addTask((shared void* data) {
             auto m = cast(Module) data;
             assert(m.step == Module.Step.Loaded);
             m.parse();
             m.step = Module.Step.Parsed;
             return null;
-        }, cast(void*)m, true);
+        }, cast(shared void*)m, true);
     }
 
     parserGroup.awaitCompletionOfAllTasks();
