@@ -7,7 +7,7 @@ import core.thread.osthread;
 import core.atomic;
 
 
-enum n_threads = 1;
+enum n_threads = 4;
 
 Thread[n_threads] unorderedBackgroundThreads;
 shared TaskQueue[n_threads] unorderedBackgroundQueue;
@@ -77,13 +77,13 @@ extern (C) struct TaskQueue
 
 extern (C) void breakpoint() {}
 
+shared uint thread_counter;
 void initBackgroundThreads()
 {
-    int i;
     foreach(ref t; unorderedBackgroundThreads)
     {
         t = new Thread(() {
-                const uint thread_idx = cast(uint)i++;
+                const uint thread_idx = atomicFetchAdd(thread_counter, 1);
                 printf("thread_proc start thread_id: %d\n", thread_idx + 1);
                 auto myQueue = &unorderedBackgroundQueue[thread_idx];
 

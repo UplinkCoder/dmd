@@ -960,6 +960,7 @@ extern (C++) final class Module : Package
         //printf("Module::parse(srcname = '%s')\n", srcname);
         isPackageFile = (strcmp(srcfile.name(), package_d) == 0 ||
                          strcmp(srcfile.name(), package_di) == 0);
+        assert(srcBuffer);
         const(char)[] buf = cast(const(char)[]) srcBuffer.data;
 
         bool needsReencoding = true;

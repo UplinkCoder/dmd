@@ -405,8 +405,14 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     }
 
     import dmd.taskgroup;
-	
-    initBackgroundThreads();
+
+    version(MULTITHREAD)
+        enum MULTITHREAD = true;
+    else
+        enum MULTITHREAD = false
+
+    static if (MULTITHREAD)
+        initBackgroundThreads();
 
     shared TaskGroup loader = cast(shared)TaskGroup("loader", modules.length);
 
@@ -418,7 +424,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             m.read(Loc.initial);
             m.step = Module.Step.Loaded;
             return null;
-        }, cast(shared void*)m, true);
+        }, cast(shared void*)m, MULTITHREAD);
     }
 
     loader.awaitCompletionOfAllTasks();
@@ -443,12 +449,13 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             m.parse();
             m.step = Module.Step.Parsed;
             return null;
-        }, cast(shared void*)m, true);
+        }, cast(shared void*)m, MULTITHREAD);
     }
 
     parserGroup.awaitCompletionOfAllTasks();
 
-    killBackgroundThreads();
+    static if (MULTITHREAD)
+        killBackgroundThreads();
 
     for (size_t filei = 0, modi = 0; filei < filecount; filei++, modi++)
     {

@@ -30,6 +30,8 @@ import dmd.semantic3;
 import dmd.tokens;
 import dmd.statement;
 
+import core.sync.mutex;
+
 version (DMDLIB)
 {
     version = CallbackAPI;
@@ -42,7 +44,6 @@ extern (C++) __gshared
     Array!(const(char)*) includeModulePatterns;
     Modules compiledImports;
 }
-
 
 /**
  * A data structure that describes a back-end compiler and implements
