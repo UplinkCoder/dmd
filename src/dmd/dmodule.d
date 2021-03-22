@@ -298,7 +298,10 @@ extern (C++) class Package : ScopeDsymbol
      */
     extern (D) static DsymbolTable resolve(Identifier[] packages, Dsymbol* pparent, Package* ppkg)
     {
-        DsymbolTable dst = Module.modules;
+        Module.module_globals.takeLock();
+        scope(exit)
+            Module.module_globals.releaseLock();
+        DsymbolTable dst = Module.module_globals.modules;
         Dsymbol parent = null;
         //printf("Package::resolve()\n");
         if (ppkg)
@@ -428,17 +431,37 @@ extern (C++) class Package : ScopeDsymbol
  */
 extern (C++) final class Module : Package
 {
-    extern (C++) __gshared Module rootModule;
-    extern (C++) __gshared DsymbolTable modules; // symbol table of all modules
-    extern (C++) __gshared Modules amodules;     // array of all modules
-    extern (C++) __gshared Dsymbols deferred;    // deferred Dsymbol's needing semantic() run on them
-    extern (C++) __gshared Dsymbols deferred2;   // deferred Dsymbol's needing semantic2() run on them
-    extern (C++) __gshared Dsymbols deferred3;   // deferred Dsymbol's needing semantic3() run on them
-    extern (C++) __gshared uint dprogress;       // progress resolving the deferred list
+    import core.sync.mutex;
+    extern (C++) __gshared Module_Globals module_globals;
+
+    struct Module_Globals
+    {
+
+        Mutex takeMe;
+
+        void takeLock()
+        {
+            takeMe.lock();
+        }
+
+        void releaseLock()
+        {
+            takeMe.unlock();
+        }
+
+        extern (C++) __gshared Module rootModule;
+        extern (C++) __gshared DsymbolTable modules; // symbol table of all modules
+        extern (C++) __gshared Modules amodules;     // array of all modules
+        extern (C++) __gshared Dsymbols deferred;    // deferred Dsymbol's needing semantic() run on them
+        extern (C++) __gshared Dsymbols deferred2;   // deferred Dsymbol's needing semantic2() run on them
+        extern (C++) __gshared Dsymbols deferred3;   // deferred Dsymbol's needing semantic3() run on them
+        extern (C++) __gshared uint dprogress;       // progress resolving the deferred list
+    }
 
     static void _init()
     {
-        modules = new DsymbolTable();
+        module_globals.modules = new DsymbolTable();
+        module_globals.takeMe = new Mutex();
     }
 
     /**
@@ -449,7 +472,8 @@ extern (C++) final class Module : Package
      */
     static void deinitialize()
     {
-        modules = modules.init;
+        module_globals.modules = module_globals.modules.init;
+        module_globals.takeMe = null;
     }
 
     extern (C++) __gshared AggregateDeclaration moduleinfo;
@@ -481,11 +505,15 @@ extern (C++) final class Module : Package
         //printf("Module::selfImports() %s\n", toChars());
         if (selfimports == 0)
         {
-            for (size_t i = 0; i < amodules.dim; i++)
-                amodules[i].insearch = 0;
-            selfimports = imports(this) + 1;
-            for (size_t i = 0; i < amodules.dim; i++)
-                amodules[i].insearch = 0;
+            module_globals.takeLock();
+            {
+                for (size_t i = 0; i < module_globals.amodules.dim; i++)
+                    module_globals.amodules[i].insearch = 0;
+                selfimports = imports(this) + 1;
+                for (size_t i = 0; i < module_globals.amodules.dim; i++)
+                    module_globals.amodules[i].insearch = 0;
+            }
+            module_globals.releaseLock();
         }
         return selfimports == 2;
     }
@@ -500,20 +528,24 @@ extern (C++) final class Module : Package
         //printf("Module::rootImports() %s\n", toChars());
         if (rootimports == 0)
         {
-            for (size_t i = 0; i < amodules.dim; i++)
-                amodules[i].insearch = 0;
-            rootimports = 1;
-            for (size_t i = 0; i < amodules.dim; ++i)
+            module_globals.takeLock();
             {
-                Module m = amodules[i];
-                if (m.isRoot() && imports(m))
+                for (size_t i = 0; i < module_globals.amodules.dim; i++)
+                    module_globals.amodules[i].insearch = 0;
+                rootimports = 1;
+                for (size_t i = 0; i < module_globals.amodules.dim; ++i)
                 {
-                    rootimports = 2;
-                    break;
+                    Module m = module_globals.amodules[i];
+                    if (m.isRoot() && imports(m))
+                    {
+                        rootimports = 2;
+                        break;
+                    }
                 }
+                for (size_t i = 0; i < module_globals.amodules.dim; i++)
+                    module_globals.amodules[i].insearch = 0;
             }
-            for (size_t i = 0; i < amodules.dim; i++)
-                amodules[i].insearch = 0;
+            module_globals.releaseLock();
         }
         return rootimports == 2;
     }
@@ -755,7 +787,11 @@ extern (C++) final class Module : Package
                 fprintf(stderr, "Specify path to file '%s' with -I switch\n", srcfile.toChars());
             }
 
-            removeHdrFilesAndFail(global.params, Module.amodules);
+            module_globals.takeLock();
+            {
+                removeHdrFilesAndFail(global.params, Module.module_globals.amodules);
+            }
+            module_globals.releaseLock();
         }
         return false;
     }
@@ -1121,7 +1157,7 @@ extern (C++) final class Module : Package
             /* The name of the module is set to the source file name.
              * There are no packages.
              */
-            dst = modules; // and so this module goes into global module symbol table
+            dst = module_globals.modules; // and so this module goes into global module symbol table
             /* Check to see if module name is a valid identifier
              */
             if (!Identifier.isValidIdentifier(this.ident.toChars()))
@@ -1191,7 +1227,13 @@ extern (C++) final class Module : Package
             {
                 // 'package.d' loaded after a previous 'Package' insertion
                 if (isPackageFile)
-                    amodules.push(this); // Add to global array of all modules
+                {
+                    module_globals.takeLock();
+                    {
+                        module_globals.amodules.push(this); // Add to global array of all modules
+                    }
+                    module_globals.releaseLock();
+                }
                 else
                     error(md ? md.loc : loc, "from file %s conflicts with package name %s", srcname, pkg.toChars());
             }
@@ -1201,7 +1243,11 @@ extern (C++) final class Module : Package
         else
         {
             // Add to global array of all modules
-            amodules.push(this);
+            module_globals.takeLock();
+            {
+                module_globals.amodules.push(this);
+            }
+            module_globals.releaseLock();
         }
         Compiler.onParseModule(this);
         return this;
@@ -1375,19 +1421,31 @@ extern (C++) final class Module : Package
     extern (D) static void addDeferredSemantic(Dsymbol s)
     {
         //printf("Module::addDeferredSemantic('%s')\n", s.toChars());
-        deferred.push(s);
+        module_globals.takeLock();
+        {
+            module_globals.deferred.push(s);
+        }
     }
 
     extern (D) static void addDeferredSemantic2(Dsymbol s)
     {
         //printf("Module::addDeferredSemantic2('%s')\n", s.toChars());
-        deferred2.push(s);
+        module_globals.takeLock();
+        {
+            module_globals.deferred2.push(s);
+        }
+        module_globals.releaseLock();
     }
 
     extern (D) static void addDeferredSemantic3(Dsymbol s)
     {
         //printf("Module::addDeferredSemantic3('%s')\n", s.toChars());
-        deferred3.push(s);
+        module_globals.takeLock();
+        {
+            module_globals.deferred3.push(s);
+        }
+        module_globals.releaseLock();
+
     }
 
     /******************************************
@@ -1395,7 +1453,10 @@ extern (C++) final class Module : Package
      */
     static void runDeferredSemantic()
     {
-        if (dprogress == 0)
+        module_globals.takeLock();
+        scope (exit) module_globals.releaseLock();
+
+        if (module_globals.dprogress == 0)
             return;
 
         __gshared int nested;
@@ -1407,8 +1468,8 @@ extern (C++) final class Module : Package
         size_t len;
         do
         {
-            dprogress = 0;
-            len = deferred.dim;
+            module_globals.dprogress = 0;
+            len = module_globals.deferred.dim;
             if (!len)
                 break;
 
@@ -1424,8 +1485,8 @@ extern (C++) final class Module : Package
                 todo = cast(Dsymbol*)Mem.check(malloc(len * Dsymbol.sizeof));
                 todoalloc = todo;
             }
-            memcpy(todo, deferred.tdata(), len * Dsymbol.sizeof);
-            deferred.setDim(0);
+            memcpy(todo, module_globals.deferred.tdata(), len * Dsymbol.sizeof);
+            module_globals.deferred.setDim(0);
 
             for (size_t i = 0; i < len; i++)
             {
@@ -1437,7 +1498,7 @@ extern (C++) final class Module : Package
             if (todoalloc)
                 free(todoalloc);
         }
-        while (deferred.dim < len || dprogress); // while making progress
+        while (module_globals.deferred.dim < len || module_globals.dprogress); // while making progress
         nested--;
         //printf("-Module::runDeferredSemantic(), len = %d\n", deferred.dim);
     }
@@ -1446,7 +1507,10 @@ extern (C++) final class Module : Package
     {
         Module.runDeferredSemantic();
 
-        Dsymbols* a = &Module.deferred2;
+        module_globals.takeLock();
+        scope (exit) module_globals.releaseLock();
+
+        Dsymbols* a = &Module.module_globals.deferred2;
         for (size_t i = 0; i < a.dim; i++)
         {
             Dsymbol s = (*a)[i];
@@ -1463,7 +1527,10 @@ extern (C++) final class Module : Package
     {
         Module.runDeferredSemantic2();
 
-        Dsymbols* a = &Module.deferred3;
+        module_globals.takeLock();
+        scope (exit) module_globals.releaseLock();
+
+        Dsymbols* a = &Module.module_globals.deferred3;
         for (size_t i = 0; i < a.dim; i++)
         {
             Dsymbol s = (*a)[i];
@@ -1478,11 +1545,16 @@ extern (C++) final class Module : Package
 
     extern (D) static void clearCache()
     {
-        for (size_t i = 0; i < amodules.dim; i++)
+        // TODO maybe just take read lock?
+        module_globals.takeLock();
         {
-            Module m = amodules[i];
-            m.searchCacheIdent = null;
+            for (size_t i = 0; i < module_globals.amodules.dim; i++)
+            {
+                Module m = module_globals.amodules[i];
+                m.searchCacheIdent = null;
+            }
         }
+        module_globals.releaseLock();
     }
 
     /************************************
@@ -1501,6 +1573,9 @@ extern (C++) final class Module : Package
                 printf("\t[%d] %s\n", i, mi.toChars());
             }
         }
+        Module.module_globals.takeLock();
+        scope(exit)
+            Module.module_globals.releaseLock();
         for (size_t i = 0; i < aimports.dim; i++)
         {
             Module mi = aimports[i];

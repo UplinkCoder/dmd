@@ -203,7 +203,7 @@ extern (C++) final class Import : Dsymbol
             }
         }
         if (mod && !mod.importedFrom)
-            mod.importedFrom = sc ? sc._module.importedFrom : Module.rootModule;
+            mod.importedFrom = sc ? sc._module.importedFrom : Module.module_globals.rootModule;
         if (!pkg)
         {
             if (mod && mod.isPackageFile)

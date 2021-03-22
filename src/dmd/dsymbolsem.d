@@ -1898,7 +1898,12 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             ed.semanticRun = PASS.semanticdone;
             return;
         }
-        uint dprogress_save = Module.dprogress;
+        Module.module_globals.takeLock();
+        scope(exit)
+            Module.module_globals.releaseLock();
+
+
+        uint dprogress_save = Module.module_globals.dprogress;
 
         Scope* scx = null;
         if (ed._scope)
@@ -1956,7 +1961,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                 {
                     // memtype is forward referenced, so try again later
                     deferDsymbolSemantic(ed, scx);
-                    Module.dprogress = dprogress_save;
+                    Module.module_globals.dprogress = dprogress_save;
                     //printf("\tdeferring %s\n", toChars());
                     ed.semanticRun = PASS.init;
                     return;
@@ -1992,7 +1997,11 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             return;
         }
 
-        Module.dprogress++;
+        Module.module_globals.takeLock(); 
+        {
+            Module.module_globals.dprogress++;
+        }
+        Module.module_globals.releaseLock();
 
         Scope* sce;
         if (ed.isAnonymous())
@@ -3688,7 +3697,12 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         if (funcdecl.canInferAttributes(sc))
             funcdecl.initInferAttributes();
 
-        Module.dprogress++;
+        Module.module_globals.takeLock();
+        {
+            Module.module_globals.dprogress++;
+        }
+        Module.module_globals.releaseLock();
+
         funcdecl.semanticRun = PASS.semanticdone;
 
         /* Save scope for possible later use (if we need the
@@ -4428,7 +4442,12 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         if (sd.inv)
             reinforceInvariant(sd, sc2);
 
-        Module.dprogress++;
+        Module.module_globals.takeLock();
+        {
+            Module.module_globals.dprogress++;
+        }
+        Module.module_globals.releaseLock();
+
         sd.semanticRun = PASS.semanticdone;
         //printf("-StructDeclaration::semantic(this=%p, '%s')\n", sd, sd.toChars());
 
@@ -5078,7 +5097,12 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         if (cldec.inv)
             reinforceInvariant(cldec, sc2);
 
-        Module.dprogress++;
+        Module.module_globals.takeLock(); 
+        {
+            Module.module_globals.dprogress++;
+        }
+        Module.module_globals.releaseLock();
+
         cldec.semanticRun = PASS.semanticdone;
         //printf("-ClassDeclaration.dsymbolSemantic(%s), type = %p\n", toChars(), type);
 
@@ -5425,7 +5449,12 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
         idec.members.foreachDsymbol( s => s.dsymbolSemantic(sc2) );
 
-        Module.dprogress++;
+        Module.module_globals.takeLock(); 
+        {
+            Module.module_globals.dprogress++;
+        }
+        Module.module_globals.releaseLock();
+
         idec.semanticRun = PASS.semanticdone;
         //printf("-InterfaceDeclaration.dsymbolSemantic(%s), type = %p\n", toChars(), type);
 
@@ -5882,9 +5911,11 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
      */
     {
         bool found_deferred_ad = false;
-        for (size_t i = 0; i < Module.deferred.dim; i++)
+
+        Module.module_globals.takeLock();
+        for (size_t i = 0; i < Module.module_globals.deferred.dim; i++)
         {
-            Dsymbol sd = Module.deferred[i];
+            Dsymbol sd = Module.module_globals.deferred[i];
             AggregateDeclaration ad = sd.isAggregateDeclaration();
             if (ad && ad.parent && ad.parent.isTemplateInstance())
             {
@@ -5898,7 +5929,9 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
                 }
             }
         }
-        if (found_deferred_ad || Module.deferred.dim)
+        Module.module_globals.releaseLock();
+
+        if (found_deferred_ad || Module.module_globals.deferred.dim)
             goto Laftersemantic;
     }
 

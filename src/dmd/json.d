@@ -960,24 +960,28 @@ public:
         objectStart();
         propertyStart("modules");
         arrayStart();
-        foreach (m; Module.amodules)
+        Module.module_globals.takeLock();
         {
-            objectStart();
-            requiredProperty("name", m.md ? m.md.toString() : null);
-            requiredProperty("file", m.srcfile.toString());
-            propertyBool("isRoot", m.isRoot());
-            if(m.contentImportedFiles.dim > 0)
+            foreach (m; Module.module_globals.amodules)
             {
-                propertyStart("contentImports");
-                arrayStart();
-                foreach (file; m.contentImportedFiles)
+                objectStart();
+                requiredProperty("name", m.md ? m.md.toString() : null);
+                requiredProperty("file", m.srcfile.toString());
+                propertyBool("isRoot", m.isRoot());
+                if(m.contentImportedFiles.dim > 0)
                 {
-                    item(file.toDString);
+                    propertyStart("contentImports");
+                    arrayStart();
+                    foreach (file; m.contentImportedFiles)
+                    {
+                        item(file.toDString);
+                    }
+                    arrayEnd();
                 }
-                arrayEnd();
+                objectEnd();
             }
-            objectEnd();
         }
+        Module.module_globals.releaseLock();
         arrayEnd();
         objectEnd();
     }

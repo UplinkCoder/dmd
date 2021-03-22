@@ -455,8 +455,8 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         Module m = modules[modi];
         if (params.verbose)
             message("parse     %s", m.toChars());
-        if (!Module.rootModule)
-            Module.rootModule = m;
+        if (Module.module_globals.rootModule)
+            Module.module_globals.rootModule = m;
         m.importedFrom = m; // m.isRoot() == true
 //        if (!params.oneobj || modi == 0 || m.isDocFile)
 //            m.deleteObjFile();
@@ -545,17 +545,21 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     }
     //if (global.errors)
     //    fatal();
-    Module.dprogress = 1;
-    Module.runDeferredSemantic();
-    if (Module.deferred.dim)
+    Module.module_globals.takeLock();
     {
-        for (size_t i = 0; i < Module.deferred.dim; i++)
+        Module.module_globals.dprogress = 1;
+        Module.runDeferredSemantic();
+        if (Module.module_globals.deferred.dim)
         {
-            Dsymbol sd = Module.deferred[i];
-            sd.error("unable to resolve forward reference in definition");
+            for (size_t i = 0; i < Module.module_globals.deferred.dim; i++)
+            {
+                Dsymbol sd = Module.module_globals.deferred[i];
+                sd.error("unable to resolve forward reference in definition");
+            }
+            //fatal();
         }
-        //fatal();
     }
+    Module.module_globals.releaseLock();
 
     // Do pass 2 semantic analysis
     foreach (m; modules)
@@ -564,10 +568,15 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             message("semantic2 %s", m.toChars());
         m.semantic2(null);
     }
-    Module.runDeferredSemantic2();
+    Module.module_globals.takeLock();
+    {
+        Module.runDeferredSemantic2();
+    }
+    Module.module_globals.releaseLock();
+
     if (global.errors)
         removeHdrFilesAndFail(params, modules);
-
+    
     // Do pass 3 semantic analysis
     foreach (m; modules)
     {
@@ -586,10 +595,16 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             if (params.verbose)
                 message("semantic3 %s", m.toChars());
             m.semantic3(null);
+            //TODO do we have to lock modules?
             modules.push(m);
         }
     }
-    Module.runDeferredSemantic3();
+    Module.module_globals.takeLock();
+    {
+        Module.runDeferredSemantic3();
+    }
+    Module.module_globals.releaseLock();
+
     if (global.errors)
         removeHdrFilesAndFail(params, modules);
 
