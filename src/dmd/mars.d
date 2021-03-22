@@ -409,7 +409,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     version(MULTITHREAD)
         enum MULTITHREAD = true;
     else
-        enum MULTITHREAD = false
+        enum MULTITHREAD = false;
 
     static if (MULTITHREAD)
         initBackgroundThreads();
