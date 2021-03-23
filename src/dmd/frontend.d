@@ -427,7 +427,7 @@ void fullSemantic(Module m)
     m.importAll(null);
 
     m.dsymbolSemantic(null);
-    Module.dprogress = 1;
+    Module.module_globals.dprogress = 1;
     Module.runDeferredSemantic();
 
     m.semantic2(null);

@@ -76,12 +76,12 @@ unittest
 {
     import dmd.dmodule : Module;
 
-    assert(Module.modules is Module.modules.init);
+    assert(Module.module_globals.modules is Module.module_globals.modules.init);
 
     Module._init();
     Module.deinitialize();
 
-    assert(Module.modules is Module.modules.init);
+    assert(Module.module_globals.modules is Module.module_globals.modules.init);
 }
 
 @("Target.deinitialize")

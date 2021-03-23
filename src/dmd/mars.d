@@ -462,7 +462,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         Module m = modules[modi];
         if (params.verbose)
             message("parse     %s", m.toChars());
-        if (Module.module_globals.rootModule)
+        if (!Module.module_globals.rootModule)
             Module.module_globals.rootModule = m;
         m.importedFrom = m; // m.isRoot() == true
 //        if (!params.oneobj || modi == 0 || m.isDocFile)

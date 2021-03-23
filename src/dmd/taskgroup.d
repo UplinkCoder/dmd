@@ -492,7 +492,9 @@ string taskGraph(Task* task, Task* parent = null, int indent = 0)
         if (!t)
             return cast(char[])"\"null, (TheRoot)\"";
 
-        auto len = sprintf(formatBuffer.ptr, "\"%p (%s)\"", t, (cast(RootObject)t.taskData).toChars());
+        auto ro = cast(RootObject)t.taskData;
+
+        auto len = sprintf(formatBuffer.ptr, "\"%p (%s)\"", t, (ro ? ro.toChars() : ""));
         return formatBuffer[0 .. len].dup;
     }
 
