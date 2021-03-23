@@ -531,13 +531,25 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     if (global.errors)
         removeHdrFilesAndFail(params, modules);
 
+    shared TaskGroup importAllGroup = TaskGroup("importAll", modules.length);
+
     // load all unconditional imports for better symbol resolving
     foreach (m; modules)
     {
         if (params.verbose)
             message("importall %s", m.toChars());
-        m.importAll(null);
+
+        importAllGroup.addTask((shared void* ro)
+        {
+           auto m = cast(Module) ro;
+           assert(m.step == Module.Step.Parsed);
+           m.importAll(null);
+           return null;
+        }, cast(shared void*)m, false);
     }
+
+    importAllGroup.awaitCompletionOfAllTasks();
+
     if (global.errors)
         removeHdrFilesAndFail(params, modules);
 

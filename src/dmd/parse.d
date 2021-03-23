@@ -3469,7 +3469,7 @@ class Parser(AST) : Lexer
         //printf("Parser::parseImport()\n");
         do
         {
-        L1:
+        LparseImportBegin:
             nextToken();
             if (token.value != TOK.identifier)
             {
@@ -3484,7 +3484,7 @@ class Parser(AST) : Lexer
             if (!aliasid && token.value == TOK.assign)
             {
                 aliasid = id;
-                goto L1;
+                goto LparseImportBegin;
             }
             while (token.value == TOK.dot)
             {

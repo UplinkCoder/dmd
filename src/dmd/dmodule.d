@@ -1307,11 +1307,23 @@ extern (C++) final class Module : Package
             Dsymbol s = (*members)[i];
             s.setScope(sc);
         }
+
+        import dmd.taskgroup;
+        shared TaskGroup importAllNestedGroup = TaskGroup("importAll Nested", members.dim);
+
         for (size_t i = 0; i < members.dim; i++)
         {
             Dsymbol s = (*members)[i];
-            s.importAll(sc);
+            importAllNestedGroup.addTask((shared void* arg)
+            {
+                auto s = cast (Dsymbol) arg;
+                s.importAll(sc);
+                return null;
+            }, cast(shared void*)s, false);
         }
+
+        importAllNestedGroup.awaitCompletionOfAllTasks();
+
         sc = sc.pop();
         sc.pop(); // 2 pops because Scope.createGlobal() created 2
     }

@@ -16,6 +16,8 @@ shared bool[n_threads] killThread;
 import core.sys.posix.pthread;
 
 
+// debug = ImmediateTaskCompletion;
+
 extern (C) struct TaskQueue
 {
     shared align(16) uint nextTicket;
@@ -39,7 +41,7 @@ extern (C) struct TaskQueue
             atomicFetchAdd(currentlyServing, 1);
         
 
-        printf("currentlyServing: %d, nextTickit: %d\n", currentlyServing, nextTicket);
+        // printf("currentlyServing: %d, nextTickit: %d\n", currentlyServing, nextTicket);
 
         for (;;)
         {
@@ -48,11 +50,11 @@ extern (C) struct TaskQueue
                 // printf("could not get lock for enqueue {insert_pos = %d, currentlyServing = %d, myTicket = %d}\n", insert_pos, currentlyServing, myTicket);
                 continue;
             }
-            printf(" got the lock for %d\n", myTicket);
+            // printf(" got the lock for %d\n", myTicket);
 
             if (atomicLoad(insert_pos)  == tasks.length)
             {
-               printf("TaskQueue is full ... retrying\n");
+               // printf("TaskQueue is full ... retrying\n");
                // if the task queue is full we need to relinquish our ticket
                atomicFetchAdd(currentlyServing, 1);
                // and draw a new one
@@ -84,7 +86,7 @@ void initBackgroundThreads()
     {
         t = new Thread(() {
                 const uint thread_idx = atomicFetchAdd(thread_counter, 1);
-                printf("thread_proc start thread_id: %d\n", thread_idx + 1);
+                // printf("thread_proc start thread_id: %d\n", thread_idx + 1);
                 auto myQueue = &unorderedBackgroundQueue[thread_idx];
 
                 while(true && !killThread[thread_idx])
@@ -101,7 +103,7 @@ void initBackgroundThreads()
                         {
                             if (atomicLoad(myQueue.currentlyServing) != myTicket)
                                 continue;
-                            printf("TaskProc aquired lock using ticket: %d\n", myTicket);
+                            // printf("TaskProc aquired lock using ticket: %d\n", myTicket);
                             // now that we have aquired the lock we need to check if the task we wanted to do wasn't already done
                             if (atomicLoad(myQueue.insert_pos) == 0)
                             {
@@ -110,22 +112,22 @@ void initBackgroundThreads()
                             }
                             auto task = myQueue.tasks[atomicFetchAdd(myQueue.exec_pos, 1) % myQueue.tasks.length];
                             assert(task.queueID);
-                            printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
+                            // printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
                             assert(task.queueID == thread_idx + 1);
                             import dmd.root.rootobject;
 
                             if (auto ro = cast(RootObject) task.taskData)
                             {
-                                printf("[BackgroundThread] running for %s\n", ro.toChars());
+                                // printf("[BackgroundThread] running for %s\n", ro.toChars());
                             }
 
                             task.assignFiber();
                             task.callFiber();
                             if (task.hasCompleted())
                             {
-                                printf("task %p has completed myQueue.insert_pos: %d\n", task, myQueue.insert_pos);
+                                // printf("task %p has completed myQueue.insert_pos: %d\n", task, myQueue.insert_pos);
                                 atomicFetchSub(myQueue.insert_pos, 1);
-                                printf("myQueue.insert_pos: %d\n", myQueue.insert_pos);
+                                // printf("myQueue.insert_pos: %d\n", myQueue.insert_pos);
                             }
                             break;
                         }
@@ -350,10 +352,10 @@ struct TaskGroup
             task.originInfo = OriginInformation(file, cast(int)line, originator);
         }
 
-        debug (immedaiteTaskCompletion)
+        // debug (ImmedaiteTaskCompletion)
         {
-            task.currentFiber = new TaskFiber(task);
-            task.currentFiber.call();
+            task.assignFiber();
+            task.callFiber();
             if(!(task.hasCompleted || task.currentFiber.hasCompleted))
             {
                 import dmd.root.rootobject;
@@ -361,7 +363,7 @@ struct TaskGroup
             }
             else
             {
-                n_completed++;
+                atomicFetchAdd(n_completed, 1);
             }
         }
 
@@ -403,7 +405,7 @@ struct TaskGroup
                 break;
             }
         }
-/+
+
         if (currentTask is null)
         {
             char[255] assertMessageBuffer = '0';
@@ -413,7 +415,7 @@ struct TaskGroup
             );
             assert(currentTask, cast(string)assertMessageBuffer[0 .. messageLength]);
         }
-+/
+
         if (currentTask !is null)
         {
             while (currentTask.children.length)
@@ -445,7 +447,7 @@ struct TaskGroup
                 import dmd.root.rootobject;
                 if (auto ro = cast(RootObject) currentTask.taskData)
                 {
-                    printf("running for %s\n", ro.toChars());
+                    // printf("running for %s\n", ro.toChars());
                 }
 
                 currentTask.assignFiber();
@@ -470,26 +472,34 @@ struct TaskGroup
     void awaitCompletionOfAllTasks() shared
     {
         while(n_completed < n_used) { runTask(); }
+        foreach(ref task;tasks[0 .. n_used])
+        {
+            import std.stdio;
+            // writeln(taskGraph(&task));
+        }
     }
 }
 
 string taskGraph(Task* task, Task* parent = null, int indent = 0)
 {
-
-    static char[] formatPtr(Task* t)
+    import dmd.root.rootobject;
+    static char[] formatTask(Task* t)
     {
-        char[32] formatBuffer; // only used for toHex conversion of ptr
+        char[4096] formatBuffer; // only used for toHex conversion of ptr
 
         string result;
 
-        auto len = sprintf(formatBuffer.ptr, "\"%p\"", t);
+        if (!t)
+            return cast(char[])"\"null, (TheRoot)\"";
+
+        auto len = sprintf(formatBuffer.ptr, "\"%p (%s)\"", t, (cast(RootObject)t.taskData).toChars());
         return formatBuffer[0 .. len].dup;
     }
 
     string result;
     if (parent is null)
     {
-        result ~= "digraph Tasks {\n";
+        result ~= "digraph \"" ~ task.taskGroup.name ~ "\" {\n";
     }
 
     foreach(_; 0 .. indent++)
@@ -497,7 +507,7 @@ string taskGraph(Task* task, Task* parent = null, int indent = 0)
         result ~= "\t";
     }
 
-    result ~= formatPtr(parent) ~ " -> " ~ formatPtr(task) ~ "\n";
+    result ~= formatTask(parent) ~ " -> " ~ formatTask(task) ~ "\n";
 
     foreach(ref c;task.children)
     {
