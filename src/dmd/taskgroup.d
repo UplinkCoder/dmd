@@ -294,9 +294,19 @@ class TaskFiber : Fiber
     }
 }
 
+enum TaskGroupFlags
+{
+   None = 0,
+   ImmediateTaskCompletion = 1 >> 0,
+}
+
+enum DefaultTaskGroupFlags = TaskGroupFlags.None | TaskGroupFlags.ImmediateTaskCompletion;
+
 struct TaskGroup
 {
     string name;
+    TaskGroupFlags flags;
+
     shared size_t n_used;
     shared size_t n_completed;
 
@@ -352,11 +362,11 @@ struct TaskGroup
             task.originInfo = OriginInformation(file, cast(int)line, originator);
         }
 
-        // debug (ImmedaiteTaskCompletion)
+        if (flags & TaskGroupFlags.ImmediateTaskCompletion)
         {
             task.assignFiber();
             task.callFiber();
-            if(!(task.hasCompleted || task.currentFiber.hasCompleted))
+            if(!(task.hasCompleted || task.currentFiber.hasCompleted()))
             {
                 import dmd.root.rootobject;
                 fprintf(stderr, "[TaskGroup: %s] No immediate task completion possible for '%s'\n", this.name.ptr, (cast(RootObject)task.taskData).toChars());
@@ -380,10 +390,19 @@ struct TaskGroup
         return null;
     }
 
-    this(string name, size_t n_allocated = 0)
+    this(string name, size_t n_allocated = 0, TaskGroupFlags flags = DefaultTaskGroupFlags)
     {
         this.name = name;
-        
+        this.flags = flags;
+        if (n_allocated)
+            (cast(shared)(this)).allocate_tasks(n_allocated);
+    }
+
+    this(string name, TaskGroupFlags flags = DefaultTaskGroupFlags, size_t n_allocated = 0)
+    {
+        this.name = name;
+        this.flags = flags;
+
         if (n_allocated)
             (cast(shared)(this)).allocate_tasks(n_allocated);
     }
