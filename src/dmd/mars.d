@@ -414,7 +414,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     static if (MULTITHREAD)
         initBackgroundThreads();
 
-    shared TaskGroup loader = cast(shared)TaskGroup("loader", modules.length);
+    shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length);
 
     foreach (m; modules)
     {
@@ -439,7 +439,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     bool anydocfiles = false;
     size_t filecount = modules.dim;
 
-    shared TaskGroup parserGroup = TaskGroup("parser", filecount);
+    shared TaskGroup* parserGroup = cast(shared) new TaskGroup("parser", filecount);
 
     foreach(m;modules)
     {

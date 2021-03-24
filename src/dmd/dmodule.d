@@ -1309,7 +1309,7 @@ extern (C++) final class Module : Package
         }
 
         import dmd.taskgroup;
-        shared TaskGroup importAllNestedGroup = TaskGroup("importAll Nested", members.dim);
+        shared TaskGroup* importAllNestedGroup = cast(shared)new TaskGroup("Module.importAll", members.dim);
 
         for (size_t i = 0; i < members.dim; i++)
         {

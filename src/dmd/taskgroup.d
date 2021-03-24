@@ -472,11 +472,13 @@ struct TaskGroup
     void awaitCompletionOfAllTasks() shared
     {
         while(n_completed < n_used) { runTask(); }
+/+
         foreach(ref task;tasks[0 .. n_used])
         {
             import std.stdio;
-            // writeln(taskGraph(&task));
+            writeln(taskGraph(&task));
         }
++/
     }
 }
 
@@ -485,7 +487,9 @@ string taskGraph(Task* task, Task* parent = null, int indent = 0)
     import dmd.root.rootobject;
     static char[] formatTask(Task* t)
     {
-        char[4096] formatBuffer; // only used for toHex conversion of ptr
+        import core.stdc.stdlib;
+        char[] formatBuffer = cast(char[])malloc(4096 * 32)[0  .. 2096 * 32];
+        scope(exit) free(formatBuffer.ptr);
 
         string result;
 
@@ -493,8 +497,8 @@ string taskGraph(Task* task, Task* parent = null, int indent = 0)
             return cast(char[])"\"null, (TheRoot)\"";
 
         auto ro = cast(RootObject)t.taskData;
-
-        auto len = sprintf(formatBuffer.ptr, "\"%p (%s)\"", t, (ro ? ro.toChars() : ""));
+        auto tg = t.taskGroup;
+        auto len = sprintf(formatBuffer.ptr, "\"%p {%s} (%s)\"", t, (tg && tg.name ? tg.name.ptr : null), (ro ? ro.toChars() : ""));
         return formatBuffer[0 .. len].dup;
     }
 
