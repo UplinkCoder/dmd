@@ -221,22 +221,61 @@ extern (C++) final class Import : Dsymbol
 
     override void importAll(Scope* sc)
     {
-        if (mod) return; // Already done
-        load(sc);
-        if (!mod) return; // Failed
+        import dmd.taskgroup;
+        import dmd.root.rootobject;
+        shared tg = cast(shared)new TaskGroup("Import.importAll", 1);
 
-        if (sc.stc & STC.static_)
-            isstatic = true;
-        mod.importAll(null);
-        mod.checkImportDeprecation(loc, sc);
-        if (sc.explicitVisibility)
-            visibility = sc.visibility;
-        if (!isstatic && !aliasId && !names.dim)
-            sc.scopesym.importScope(mod, visibility);
-        // Enable access to pkgs/mod as soon as posible, because compiler
-        // can traverse them before the import gets semantic (Issue: 21501)
-        if (!aliasId && !names.dim)
-            addPackageAccess(sc.scopesym);
+        class ImportWithScope : RootObject
+        {
+            Scope* sc;
+            Import imp;
+            this(Import imp, Scope* sc)
+            {
+                this.imp = imp;
+                this.sc = sc;
+            }
+
+            override const (char)[] toString() const
+            {
+                return imp.toString();
+            }
+
+            override extern (C++) const (char)* toChars() const
+            {
+                return imp.toChars();
+            }
+        }
+
+        static shared(void*) importAllTask(shared void* arg)
+        {
+            auto taskClosure = cast(ImportWithScope)arg;
+            auto sc = taskClosure.sc;
+            with (taskClosure.imp)
+            {
+                if (mod) return null; // Already done
+                load(sc);
+                if (!mod) return null; // Failed
+
+                if (sc.stc & STC.static_)
+                    isstatic = true;
+                mod.importAll(null);
+                mod.checkImportDeprecation(loc, sc);
+                if (sc.explicitVisibility)
+                    visibility = sc.visibility;
+                if (!isstatic && !aliasId && !names.dim)
+                    sc.scopesym.importScope(mod, visibility);
+                // Enable access to pkgs/mod as soon as posible, because compiler
+                // can traverse them before the import gets semantic (Issue: 21501)
+                if (!aliasId && !names.dim)
+                    addPackageAccess(sc.scopesym);
+
+                return null;
+            }
+        }
+
+        tg.addTask((shared void* arg) { return importAllTask(arg); }, cast(shared void*) new ImportWithScope(this, sc));
+        tg.awaitCompletionOfAllTasks();
+
     }
 
     /*******************************
