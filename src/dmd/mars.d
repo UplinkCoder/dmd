@@ -414,7 +414,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     static if (MULTITHREAD)
         initBackgroundThreads();
 
-    shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length);
+    shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length, TaskGroupFlags.ImmediateTaskCompletion);
 
     foreach (m; modules)
     {

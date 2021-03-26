@@ -18,56 +18,77 @@ import core.sys.posix.pthread;
 
 // debug = ImmediateTaskCompletion;
 
-extern (C) struct TaskQueue
+struct TicketCounter
 {
     shared align(16) uint nextTicket;
     shared align(16) uint currentlyServing;
 
+    uint drawTicket() shared
+    {
+        return atomicFetchAdd(nextTicket, 1);
+    }
+
+    void releaseTicket(uint ticket) shared
+    {
+        assert(ticket == currentlyServing);
+        atomicFetchAdd(currentlyServing, 1);
+    }
+
+    bool servingMe(uint ticket) shared
+    {
+        return atomicLoad(currentlyServing) == ticket;
+    }
+}
+
+extern (C) struct TaskQueue
+{
+    TicketCounter counter;
+
     // these can only be touched when locked
     shared Task*[1] tasks;
-    align(16) shared int insert_pos;
-    align(16) shared int exec_pos;
+    align(16) shared int next_entry_to_write;
+    align(16) shared int next_entry_to_read;
 
     void addTaskToQueue(shared Task* task, uint queueID) shared
     {
         assert(queueID != 0, "A zero queueID is invalid (0 means unowned)");
         // while we have no room to insert anything there's no point in drawing a ticket
-        while(atomicLoad(insert_pos) == tasks.length)
+        while(atomicLoad(next_entry_to_write) == tasks.length)
 	{
           // possibly pause ?            
 	}
-        auto myTicket = atomicFetchAdd(nextTicket, 1);
+        auto myTicket = counter.drawTicket();
         scope (exit)
-            atomicFetchAdd(currentlyServing, 1);
+            counter.releaseTicket(myTicket);
         
 
         // printf("currentlyServing: %d, nextTickit: %d\n", currentlyServing, nextTicket);
 
         for (;;)
         {
-            if (atomicLoad(currentlyServing) != myTicket)
+            if (!counter.servingMe(myTicket))
             {
-                // printf("could not get lock for enqueue {insert_pos = %d, currentlyServing = %d, myTicket = %d}\n", insert_pos, currentlyServing, myTicket);
+                // printf("could not get lock for enqueue {next_entry_to_write = %d, currentlyServing = %d, myTicket = %d}\n", next_entry_to_write, currentlyServing, myTicket);
                 continue;
             }
             // printf(" got the lock for %d\n", myTicket);
 
-            if (atomicLoad(insert_pos)  == tasks.length)
+            if (atomicLoad(next_entry_to_write)  == tasks.length)
             {
-               // printf("TaskQueue is full ... retrying\n");
-               // if the task queue is full we need to relinquish our ticket
-               atomicFetchAdd(currentlyServing, 1);
-               // and draw a new one
-               myTicket = atomicFetchAdd(nextTicket, 1);
-               continue;
+                // printf("TaskQueue is full ... retrying\n");
+                // if the task queue is full we need to relinquish our ticket
+                counter.releaseTicket(myTicket);
+                // and draw a new one
+                myTicket = counter.drawTicket();
+                continue;
             }
 
 
             /* do locked stuff here ... */
-            if (atomicLoad(insert_pos) < tasks.length)
+            if (atomicLoad(next_entry_to_write) < tasks.length)
             {
                 task.queueID = queueID;
-                tasks[atomicFetchAdd(insert_pos, 1)] = cast(shared)task;
+                tasks[atomicFetchAdd(next_entry_to_write, 1)] = cast(shared)task;
                 atomicFence();
                 break;
             }
@@ -75,6 +96,11 @@ extern (C) struct TaskQueue
                 assert(0, "we should have made sure that the queue has room");
         }
     }
+    /+
+    Task* getTaskFromQueue() shared
+    {
+        if (head == tail) return 
+    }+/
 }
 
 extern (C) void breakpoint() {}
@@ -92,25 +118,25 @@ void initBackgroundThreads()
                 while(true && !killThread[thread_idx])
                 {
                     import core.atomic;
-                    while(atomicLoad(myQueue.insert_pos) > 0)
+                    while(atomicLoad(myQueue.next_entry_to_write) > 0)
                     {
-                        const myTicket = atomicFetchAdd(myQueue.nextTicket, 1);
+                        const myTicket = myQueue.counter.drawTicket();
                         
                         scope (exit)
-                            atomicFetchAdd(myQueue.currentlyServing, 1);
+                            myQueue.counter.releaseTicket(myTicket);
                         
                         for (;;)
                         {
-                            if (atomicLoad(myQueue.currentlyServing) != myTicket)
+                            if (!myQueue.counter.servingMe(myTicket))
                                 continue;
                             // printf("TaskProc aquired lock using ticket: %d\n", myTicket);
                             // now that we have aquired the lock we need to check if the task we wanted to do wasn't already done
-                            if (atomicLoad(myQueue.insert_pos) == 0)
+                            if (atomicLoad(myQueue.next_entry_to_write) == 0)
                             {
                                 // the queue is empty and we need to relinquish the lock
                                 break;
                             }
-                            auto task = myQueue.tasks[atomicFetchAdd(myQueue.exec_pos, 1) % myQueue.tasks.length];
+                            auto task = myQueue.tasks[atomicFetchAdd(myQueue.next_entry_to_read, 1) % myQueue.tasks.length];
                             assert(task.queueID);
                             // printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
                             assert(task.queueID == thread_idx + 1);
@@ -125,9 +151,9 @@ void initBackgroundThreads()
                             task.callFiber();
                             if (task.hasCompleted())
                             {
-                                // printf("task %p has completed myQueue.insert_pos: %d\n", task, myQueue.insert_pos);
-                                atomicFetchSub(myQueue.insert_pos, 1);
-                                // printf("myQueue.insert_pos: %d\n", myQueue.insert_pos);
+                                // printf("task %p has completed myQueue.next_entry_to_write: %d\n", task, myQueue.next_entry_to_write);
+                                atomicFetchSub(myQueue.next_entry_to_write, 1);
+                                // printf("myQueue.next_entry_to_write: %d\n", myQueue.next_entry_to_write);
                             }
                             break;
                         }
@@ -323,6 +349,7 @@ struct TaskGroup
 
     private void allocate_tasks(size_t n) shared
     {
+
         import dmd.root.rmem;
 
         assert(tasks.length < n);
@@ -490,7 +517,11 @@ struct TaskGroup
     
     void awaitCompletionOfAllTasks() shared
     {
-        while(n_completed < n_used) { runTask(); }
+        while(n_completed < n_used)
+        {
+            runTask();
+            assert(n_used >= n_completed);
+        }
 /+
         foreach(ref task;tasks[0 .. n_used])
         {
