@@ -1,4 +1,3 @@
-
 module dmd.taskgroup;
 
 import core.thread.fiber;
@@ -13,11 +12,8 @@ Thread[n_threads] unorderedBackgroundThreads;
 shared TaskQueue[n_threads] unorderedBackgroundQueue;
 shared bool[n_threads] killThread;
 
-import core.sys.posix.pthread;
-
-
 // debug = ImmediateTaskCompletion;
-
+/// Ticket Lock ordered syncronisation mechanism
 struct TicketCounter
 {
     shared align(16) uint nextTicket;
@@ -38,6 +34,12 @@ struct TicketCounter
     {
         return atomicLoad(currentlyServing) == ticket;
     }
+
+    void redrawTicket(ref uint ticket) shared
+    {
+        releaseTicket(ticket);
+        ticket = drawTicket();
+    }
 }
 
 extern (C) struct TaskQueue
@@ -45,22 +47,25 @@ extern (C) struct TaskQueue
     TicketCounter counter;
 
     // these can only be touched when locked
-    shared Task*[1] tasks;
-    align(16) shared int next_entry_to_write;
-    align(16) shared int next_entry_to_read;
+    shared Task*[2] tasks;
+    align(16) shared int next_entry_to_write = 0;
+    align(16) shared int next_entry_to_read = -1;
 
     void addTaskToQueue(shared Task* task, uint queueID) shared
     {
+        printf("trying to enqueue a task\n");
         assert(queueID != 0, "A zero queueID is invalid (0 means unowned)");
         // while we have no room to insert anything there's no point in drawing a ticket
-        while(atomicLoad(next_entry_to_write) == tasks.length)
-	{
-          // possibly pause ?            
-	}
+        while(next_entry_to_write >= tasks.length)
+        {
+            assert(next_entry_to_write == tasks.length, 
+                "next entry to write should not be greater than tasks.length this indicates a logic error.");
+              // possibly pause ?            
+        }
         auto myTicket = counter.drawTicket();
         scope (exit)
             counter.releaseTicket(myTicket);
-        
+            
 
         // printf("currentlyServing: %d, nextTickit: %d\n", currentlyServing, nextTicket);
 
@@ -68,26 +73,27 @@ extern (C) struct TaskQueue
         {
             if (!counter.servingMe(myTicket))
             {
-                // printf("could not get lock for enqueue {next_entry_to_write = %d, currentlyServing = %d, myTicket = %d}\n", next_entry_to_write, currentlyServing, myTicket);
                 continue;
             }
             // printf(" got the lock for %d\n", myTicket);
 
-            if (atomicLoad(next_entry_to_write)  == tasks.length)
+            if (next_entry_to_write >= tasks.length)
             {
-                // printf("TaskQueue is full ... retrying\n");
-                // if the task queue is full we need to relinquish our ticket
-                counter.releaseTicket(myTicket);
-                // and draw a new one
-                myTicket = counter.drawTicket();
+                // TODO we could also grow the queue here, since it's under our lock
+
+                assert(next_entry_to_write == tasks.length, 
+                    "next entry to write should not be greater than tasks.length this indicates a logic error.");
+
+                // if the task queue is full we need to redraw a ticket
+                counter.redrawTicket(myTicket);
                 continue;
             }
 
-
             /* do locked stuff here ... */
-            if (atomicLoad(next_entry_to_write) < tasks.length)
+            if (next_entry_to_write < tasks.length)
             {
                 task.queueID = queueID;
+                cas(&next_entry_to_read, -1, 0); 
                 tasks[atomicFetchAdd(next_entry_to_write, 1)] = cast(shared)task;
                 atomicFence();
                 break;
@@ -96,14 +102,61 @@ extern (C) struct TaskQueue
                 assert(0, "we should have made sure that the queue has room");
         }
     }
-    /+
-    Task* getTaskFromQueue() shared
-    {
-        if (head == tail) return 
-    }+/
-}
 
-extern (C) void breakpoint() {}
+    shared(Task)* getTaskFromQueue() shared
+    {
+        //TODO FIXME THIS IS BROKEN
+        printf("Trying to dequeue a task\n");
+
+        // if the next entry to read is -1 we are empty
+        if (next_entry_to_read == -1) return null;
+
+        auto myTicket = counter.drawTicket();
+        scope (exit)
+            counter.releaseTicket(myTicket);
+
+        for (;;)
+        {
+            if (!counter.servingMe(myTicket))
+            {
+                // perhaps mmPause ?
+                continue;
+            }
+            // we have the lock now
+
+            // we may have to wait again
+            if (next_entry_to_read == -1 && next_entry_to_write) return null;
+            else
+            {
+                auto task = tasks[next_entry_to_read];
+                if (!task || task.hasCompleted_) return null;
+
+                auto q = this;
+                assert(task);
+                printf("Got a task\n");
+                if (next_entry_to_write > atomicFetchAdd(next_entry_to_read, 1))
+                {
+                    if (next_entry_to_read == tasks.length)
+                    {
+                        printf("We have gone through the whole list\n");
+                        // we have gone through the whole list
+                        assert(cas(&next_entry_to_read, cast(int)tasks.length, -1));
+                        assert(cas(&next_entry_to_write, cast(int)tasks.length, 0));
+                    }
+                }
+                else
+                {
+                    import std.algorithm : min;
+                    if (!next_entry_to_write)
+                        next_entry_to_read = -1;
+                    else
+                        next_entry_to_read = min(next_entry_to_read, (next_entry_to_write - 1));
+                }
+                return task;
+            }
+        }
+    }
+}
 
 shared uint thread_counter;
 void initBackgroundThreads()
@@ -111,60 +164,43 @@ void initBackgroundThreads()
     foreach(ref t; unorderedBackgroundThreads)
     {
         t = new Thread(() {
-                const uint thread_idx = atomicFetchAdd(thread_counter, 1);
-                // printf("thread_proc start thread_id: %d\n", thread_idx + 1);
-                auto myQueue = &unorderedBackgroundQueue[thread_idx];
+            const uint thread_idx = atomicFetchAdd(thread_counter, 1);
+            // printf("thread_proc start thread_id: %d\n", thread_idx + 1);
+            auto myQueue = &unorderedBackgroundQueue[thread_idx];
 
-                while(true && !killThread[thread_idx])
+            while(true && !killThread[thread_idx])
+            {
+                auto task = myQueue.getTaskFromQueue();
+                if (!task)
                 {
-                    import core.atomic;
-                    while(atomicLoad(myQueue.next_entry_to_write) > 0)
-                    {
-                        const myTicket = myQueue.counter.drawTicket();
-                        
-                        scope (exit)
-                            myQueue.counter.releaseTicket(myTicket);
-                        
-                        for (;;)
-                        {
-                            if (!myQueue.counter.servingMe(myTicket))
-                                continue;
-                            // printf("TaskProc aquired lock using ticket: %d\n", myTicket);
-                            // now that we have aquired the lock we need to check if the task we wanted to do wasn't already done
-                            if (atomicLoad(myQueue.next_entry_to_write) == 0)
-                            {
-                                // the queue is empty and we need to relinquish the lock
-                                break;
-                            }
-                            auto task = myQueue.tasks[atomicFetchAdd(myQueue.next_entry_to_read, 1) % myQueue.tasks.length];
-                            assert(task.queueID);
-                            // printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
-                            assert(task.queueID == thread_idx + 1);
-                            import dmd.root.rootobject;
-
-                            if (auto ro = cast(RootObject) task.taskData)
-                            {
-                                // printf("[BackgroundThread] running for %s\n", ro.toChars());
-                            }
-
-                            task.assignFiber();
-                            task.callFiber();
-                            if (task.hasCompleted())
-                            {
-                                // printf("task %p has completed myQueue.next_entry_to_write: %d\n", task, myQueue.next_entry_to_write);
-                                atomicFetchSub(myQueue.next_entry_to_write, 1);
-                                // printf("myQueue.next_entry_to_write: %d\n", myQueue.next_entry_to_write);
-                            }
-                            break;
-                        }
-                    }
-                    // sleep for a microsecond if empty
-                    {
-                        //import core.time;
-                        //Thread.sleep(dur!"usecs"(1));
-                    }
+                        //printf("got no work \n");
+                    continue;
                 }
+                // printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
+                assert(task.queueID == thread_idx + 1);
+                if (task.hasCompleted_)
+                    continue;
 
+                import dmd.root.rootobject;
+
+                if (auto ro = cast(RootObject) task.taskData)
+                {
+                    printf("[BackgroundThread] running for %s\n", ro.toChars());
+                }
+                    if (task.hasCompleted_) assert(0);
+
+                task.assignFiber();
+                task.callFiber();
+                if (task.hasCompleted())
+                {
+                    printf("task %p has completed myQueue.next_entry_to_write: %d\n", task, myQueue.next_entry_to_write);
+                    // printf("myQueue.next_entry_to_write: %d\n", myQueue.next_entry_to_write);
+                }
+                else
+                {
+                    myQueue.addTaskToQueue(cast(shared)task, thread_idx + 1);
+                }
+            }
         });
         t.start();
     }
@@ -214,16 +250,11 @@ shared struct Task
     align(16) shared bool hasFiber;
     align(16) shared bool fiberIsExecuting;
     align(16) shared uint originatorAppendLock;
-    align(16) shared uint readers;
 
 
     bool hasCompleted(string file = __FILE__, int line = __LINE__) shared
     {
         // printf("[%s:+%d]asking has Completed \n", file.ptr, line);
-        atomicFetchAdd(readers, 1);
-        scope (exit)
-            atomicFetchSub(readers, 1);
-
         return (atomicLoad(hasCompleted_) || (atomicLoad(hasFiber) && !fiberIsExecuting && currentFiber.hasCompleted()));
     }
     //debug (task)
@@ -300,15 +331,11 @@ class TaskFiber : Fiber
                 if (cas(&currentTask.hasCompleted_, false, true))
                 {
                     atomicFetchAdd(currentTask.taskGroup.n_completed, 1);
-                Lloop:
-                    while(currentTask.readers > 1) {}
-                    if (!cas(&currentTask.readers, 1, 1))
-                        goto Lloop;
 
                     assert(currentTask.hasFiber);
                     atomicStore(currentTask.hasFiber, false);
                     currentTask.currentFiber = null;
-                    //currentTask = null;
+                    currentTask = null;
                     atomicStore(hasTask, false);
                     (cast()this).reset();
                 }
@@ -397,10 +424,6 @@ struct TaskGroup
             {
                 import dmd.root.rootobject;
                 fprintf(stderr, "[TaskGroup: %s] No immediate task completion possible for '%s'\n", this.name.ptr, (cast(RootObject)task.taskData).toChars());
-            }
-            else
-            {
-                atomicFetchAdd(n_completed, 1);
             }
         }
 
@@ -506,10 +529,6 @@ struct TaskGroup
                     // TODO FIXME LOCKING
                     parent.children = parent.children[1 .. $];
                     // TODO FIXME LOCKING
-                }
-                else
-                {
-                    atomicFetchAdd(n_completed, 1);
                 }
             }
         }
