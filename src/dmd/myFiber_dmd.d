@@ -9,23 +9,14 @@
  * Source:    $(DRUNTIMESRC core/thread/fiber.d)
  */
 
-module core.thread.fiber;
+module dmd.myFiber_dmd;
+enum module_string = q{
 
-enum realfile = __FILE__;
+#line 16 "src/dmd/myFiber_dmd.d"
 import core.thread.osthread;
 import core.thread.threadgroup;
 import core.thread.types;
 import core.thread.context;
-
-pragma(msg, "outer: ", typeof(PAGESIZE));
-
-import core.thread.osthread;
-import core.thread.threadgroup;
-import core.thread.types;
-import core.thread.context;
-
-pragma(msg, "inner: ", typeof(PAGESIZE));
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // Fiber Platform Detection
@@ -901,6 +892,10 @@ private:
     final void allocStack( size_t sz, size_t guardPageSize ) nothrow
     in
     {
+            import core.stdc.stdio;
+            if (m_pmem || m_ctxt)
+                printf("m_pmem: %lld, m_ctxt: %p\n", cast(long)m_pmem, m_ctxt);
+
         assert( !m_pmem && !m_ctxt );
     }
     do
@@ -968,7 +963,6 @@ private:
         else
         {
             version (Posix) import core.sys.posix.sys.mman; // mmap, MAP_ANON
-
             static if ( __traits( compiles, mmap ) )
             {
                 // Allocate more for the memory guard
@@ -1012,14 +1006,20 @@ private:
                 void* guard = m_pmem + sz - guardPageSize;
             }
             m_size = sz;
-
+/+
             static if ( __traits( compiles, mmap ) )
             {
                 if (guardPageSize)
                 {
                     // protect end of stack
                     if ( mprotect(guard, guardPageSize, PROT_NONE) == -1 )
+                    {
+                        import core.stdc.stdio;
+                        import core.stdc.string;
+                        import core.stdc.errno;
+                        printf("mprotect failed: %s\n", strerror(errno()));
                         abort();
+                    }
                 }
             }
             else
@@ -1027,6 +1027,7 @@ private:
                 // Supported only for mmap allocated memory - results are
                 // undefined if applied to memory not obtained by mmap
             }
+            +/
         }
 
         Thread.add( m_ctxt );
@@ -1569,421 +1570,4 @@ unittest {
     assert( derived.state == Fiber.State.TERM );
     assert( composed.state == Fiber.State.TERM );
 }
-
-version (CoreUnittest)
-{
-    class TestFiber : Fiber
-    {
-        this()
-        {
-            super(&run);
-        }
-
-        void run()
-        {
-            foreach (i; 0 .. 1000)
-            {
-                sum += i;
-                Fiber.yield();
-            }
-        }
-
-        enum expSum = 1000 * 999 / 2;
-        size_t sum;
-    }
-
-    void runTen()
-    {
-        TestFiber[10] fibs;
-        foreach (ref fib; fibs)
-            fib = new TestFiber();
-
-        bool cont;
-        do {
-            cont = false;
-            foreach (fib; fibs) {
-                if (fib.state == Fiber.State.HOLD)
-                {
-                    fib.call();
-                    cont |= fib.state != Fiber.State.TERM;
-                }
-            }
-        } while (cont);
-
-        foreach (fib; fibs)
-        {
-            assert(fib.sum == TestFiber.expSum);
-        }
-    }
-}
-
-
-// Single thread running separate fibers
-unittest
-{
-    runTen();
-}
-
-
-// Multiple threads running separate fibers
-unittest
-{
-    auto group = new ThreadGroup();
-    foreach (_; 0 .. 4)
-    {
-        group.create(&runTen);
-    }
-    group.joinAll();
-}
-
-
-// Multiple threads running shared fibers
-unittest
-{
-    shared bool[10] locks;
-    TestFiber[10] fibs;
-
-    void runShared()
-    {
-        bool cont;
-        do {
-            cont = false;
-            foreach (idx; 0 .. 10)
-            {
-                if (cas(&locks[idx], false, true))
-                {
-                    if (fibs[idx].state == Fiber.State.HOLD)
-                    {
-                        fibs[idx].call();
-                        cont |= fibs[idx].state != Fiber.State.TERM;
-                    }
-                    locks[idx] = false;
-                }
-                else
-                {
-                    cont = true;
-                }
-            }
-        } while (cont);
-    }
-
-    foreach (ref fib; fibs)
-    {
-        fib = new TestFiber();
-    }
-
-    auto group = new ThreadGroup();
-    foreach (_; 0 .. 4)
-    {
-        group.create(&runShared);
-    }
-    group.joinAll();
-
-    foreach (fib; fibs)
-    {
-        assert(fib.sum == TestFiber.expSum);
-    }
-}
-
-
-// Test exception handling inside fibers.
-unittest
-{
-    enum MSG = "Test message.";
-    string caughtMsg;
-    (new Fiber({
-        try
-        {
-            throw new Exception(MSG);
-        }
-        catch (Exception e)
-        {
-            caughtMsg = e.msg;
-        }
-    })).call();
-    assert(caughtMsg == MSG);
-}
-
-
-unittest
-{
-    int x = 0;
-
-    (new Fiber({
-        x++;
-    })).call();
-    assert( x == 1 );
-}
-
-nothrow unittest
-{
-    new Fiber({}).call!(Fiber.Rethrow.no)();
-}
-
-unittest
-{
-    new Fiber({}).call(Fiber.Rethrow.yes);
-    new Fiber({}).call(Fiber.Rethrow.no);
-}
-
-unittest
-{
-    enum MSG = "Test message.";
-
-    try
-    {
-        (new Fiber({
-            throw new Exception( MSG );
-        })).call();
-        assert( false, "Expected rethrown exception." );
-    }
-    catch ( Throwable t )
-    {
-        assert( t.msg == MSG );
-    }
-}
-
-// Test exception chaining when switching contexts in finally blocks.
-unittest
-{
-    static void throwAndYield(string msg) {
-      try {
-        throw new Exception(msg);
-      } finally {
-        Fiber.yield();
-      }
-    }
-
-    static void fiber(string name) {
-      try {
-        try {
-          throwAndYield(name ~ ".1");
-        } finally {
-          throwAndYield(name ~ ".2");
-        }
-      } catch (Exception e) {
-        assert(e.msg == name ~ ".1");
-        assert(e.next);
-        assert(e.next.msg == name ~ ".2");
-        assert(!e.next.next);
-      }
-    }
-
-    auto first = new Fiber(() => fiber("first"));
-    auto second = new Fiber(() => fiber("second"));
-    first.call();
-    second.call();
-    first.call();
-    second.call();
-    first.call();
-    second.call();
-    assert(first.state == Fiber.State.TERM);
-    assert(second.state == Fiber.State.TERM);
-}
-
-// Test Fiber resetting
-unittest
-{
-    static string method;
-
-    static void foo()
-    {
-        method = "foo";
-    }
-
-    void bar()
-    {
-        method = "bar";
-    }
-
-    static void expect(Fiber fib, string s)
-    {
-        assert(fib.state == Fiber.State.HOLD);
-        fib.call();
-        assert(fib.state == Fiber.State.TERM);
-        assert(method == s); method = null;
-    }
-    auto fib = new Fiber(&foo);
-    expect(fib, "foo");
-
-    fib.reset();
-    expect(fib, "foo");
-
-    fib.reset(&foo);
-    expect(fib, "foo");
-
-    fib.reset(&bar);
-    expect(fib, "bar");
-
-    fib.reset(function void(){method = "function";});
-    expect(fib, "function");
-
-    fib.reset(delegate void(){method = "delegate";});
-    expect(fib, "delegate");
-}
-
-// Test unsafe reset in hold state
-unittest
-{
-    auto fib = new Fiber(function {ubyte[2048] buf = void; Fiber.yield();}, 4096);
-    foreach (_; 0 .. 10)
-    {
-        fib.call();
-        assert(fib.state == Fiber.State.HOLD);
-        fib.reset();
-    }
-}
-
-// stress testing GC stack scanning
-unittest
-{
-    import core.memory;
-    import core.time : dur;
-
-    static void unreferencedThreadObject()
-    {
-        static void sleep() { Thread.sleep(dur!"msecs"(100)); }
-        auto thread = new Thread(&sleep).start();
-    }
-    unreferencedThreadObject();
-    GC.collect();
-
-    static class Foo
-    {
-        this(int value)
-        {
-            _value = value;
-        }
-
-        int bar()
-        {
-            return _value;
-        }
-
-        int _value;
-    }
-
-    static void collect()
-    {
-        auto foo = new Foo(2);
-        assert(foo.bar() == 2);
-        GC.collect();
-        Fiber.yield();
-        GC.collect();
-        assert(foo.bar() == 2);
-    }
-
-    auto fiber = new Fiber(&collect);
-
-    fiber.call();
-    GC.collect();
-    fiber.call();
-
-    // thread reference
-    auto foo = new Foo(2);
-
-    void collect2()
-    {
-        assert(foo.bar() == 2);
-        GC.collect();
-        Fiber.yield();
-        GC.collect();
-        assert(foo.bar() == 2);
-    }
-
-    fiber = new Fiber(&collect2);
-
-    fiber.call();
-    GC.collect();
-    fiber.call();
-
-    static void recurse(size_t cnt)
-    {
-        --cnt;
-        Fiber.yield();
-        if (cnt)
-        {
-            auto fib = new Fiber(() { recurse(cnt); });
-            fib.call();
-            GC.collect();
-            fib.call();
-        }
-    }
-    fiber = new Fiber(() { recurse(20); });
-    fiber.call();
-}
-
-
-version (AsmX86_64_Windows)
-{
-    // Test Windows x64 calling convention
-    unittest
-    {
-        void testNonvolatileRegister(alias REG)()
-        {
-            auto zeroRegister = new Fiber(() {
-                mixin("asm pure nothrow @nogc { naked; xor "~REG~", "~REG~"; ret; }");
-            });
-            long after;
-
-            mixin("asm pure nothrow @nogc { mov "~REG~", 0xFFFFFFFFFFFFFFFF; }");
-            zeroRegister.call();
-            mixin("asm pure nothrow @nogc { mov after, "~REG~"; }");
-
-            assert(after == -1);
-        }
-
-        void testNonvolatileRegisterSSE(alias REG)()
-        {
-            auto zeroRegister = new Fiber(() {
-                mixin("asm pure nothrow @nogc { naked; xorpd "~REG~", "~REG~"; ret; }");
-            });
-            long[2] before = [0xFFFFFFFF_FFFFFFFF, 0xFFFFFFFF_FFFFFFFF], after;
-
-            mixin("asm pure nothrow @nogc { movdqu "~REG~", before; }");
-            zeroRegister.call();
-            mixin("asm pure nothrow @nogc { movdqu after, "~REG~"; }");
-
-            assert(before == after);
-        }
-
-        testNonvolatileRegister!("R12")();
-        testNonvolatileRegister!("R13")();
-        testNonvolatileRegister!("R14")();
-        testNonvolatileRegister!("R15")();
-        testNonvolatileRegister!("RDI")();
-        testNonvolatileRegister!("RSI")();
-        testNonvolatileRegister!("RBX")();
-
-        testNonvolatileRegisterSSE!("XMM6")();
-        testNonvolatileRegisterSSE!("XMM7")();
-        testNonvolatileRegisterSSE!("XMM8")();
-        testNonvolatileRegisterSSE!("XMM9")();
-        testNonvolatileRegisterSSE!("XMM10")();
-        testNonvolatileRegisterSSE!("XMM11")();
-        testNonvolatileRegisterSSE!("XMM12")();
-        testNonvolatileRegisterSSE!("XMM13")();
-        testNonvolatileRegisterSSE!("XMM14")();
-        testNonvolatileRegisterSSE!("XMM15")();
-    }
-}
-
-
-version (D_InlineAsm_X86_64)
-{
-    unittest
-    {
-        void testStackAlignment()
-        {
-            void* pRSP;
-            asm pure nothrow @nogc
-            {
-                mov pRSP, RSP;
-            }
-            assert((cast(size_t)pRSP & 0xF) == 0);
-        }
-
-        auto fib = new Fiber(&testStackAlignment);
-        fib.call();
-    }
-}
+};

@@ -9,13 +9,15 @@
  * Source:    $(DRUNTIMESRC core/thread/fiber.d)
  */
 
-module dmd.myFiber;
+module core.thread.myFiber;
 
 version(LDC)
 {
-   public import dmd.myFiber_ldc;
+   import dmd.myFiber_ldc;
+   mixin(module_string);
 }
 else
 {
-    public import dmd.myFiber_dmd;
+    import dmd.myFiber_dmd;
+    mixin(module_string);
 }
