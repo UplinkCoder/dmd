@@ -1,6 +1,6 @@
 module dmd.taskgroup;
 
-import dmd.myFiber;
+import core.thread.myFiber;
 import core.stdc.stdio;
 import core.thread.osthread;
 import core.atomic;
@@ -238,6 +238,7 @@ shared struct Task
     shared (void*) delegate (shared void*) fn;
     shared (void*) taskData;
     TaskGroup* taskGroup;
+    void* result;
 
     shared Task*[] children;
     shared size_t n_children_completed;
@@ -312,7 +313,7 @@ class TaskFiber : Fiber
     void doTask()
     {
         assert(state() != State.TERM, "Attempting to start a finished task");
-        currentTask.fn(currentTask.taskData);
+        currentTask.result = currentTask.fn(currentTask.taskData);
     }
 
     bool hasCompleted() shared
