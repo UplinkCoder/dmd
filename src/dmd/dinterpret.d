@@ -6446,11 +6446,39 @@ Expression interpretRegion(Expression e, InterState* istate, CTFEGoal goal = CTF
  */
 Expression interpret(UnionExp* pue, Statement s, InterState* istate)
 {
-    if (!s)
-        return null;
-    scope Interpreter v = new Interpreter(pue, istate, CTFEGoal.Nothing);
-    s.accept(v);
-    return v.result;
+    import dmd.taskgroup;
+    shared TaskGroup* interpretGroup =
+        cast(shared) new TaskGroup("Interpret_statement", TaskGroupFlags.ImmediateTaskCompletion);
+
+    struct TaskClosure
+    {
+        UnionExp* pue;
+        Statement s;
+        InterState* istate;
+    }
+    auto closure = new TaskClosure(pue, s, istate);
+
+    interpretGroup.addTask((shared void* ro)
+    {
+        auto closure = cast(TaskClosure*) ro;
+        auto s = closure.s;
+        auto pue = closure.pue;
+        auto istate = closure.istate;
+
+        if (!s)
+            return null;
+        scope Interpreter v = new Interpreter(pue, istate, CTFEGoal.Nothing);
+        s.accept(v);
+        return cast(shared void*) v.result;
+
+    }, cast(shared void*) closure, false);
+
+    interpretGroup.awaitCompletionOfAllTasks();
+    import std.conv : to;
+    assert(interpretGroup.n_used == 1, "interpret group should only have 1 task");
+
+    auto task0 = interpretGroup.tasks[0];
+    return cast(typeof(return)) task0.result;
 }
 
 ///
