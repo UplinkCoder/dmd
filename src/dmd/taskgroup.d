@@ -1,6 +1,6 @@
 module dmd.taskgroup;
 
-import core.thread.fiber;
+import dmd.myFiber;
 import core.stdc.stdio;
 import core.thread.osthread;
 import core.atomic;
@@ -301,8 +301,9 @@ class TaskFiber : Fiber
     this(Task* currentTask)
     {
         assert(currentTask.hasFiber && currentTask.currentFiber is null);
-        super(&doTask, ushort.max);
-        // use large stack of ushort.max
+        super(&doTask, ushort.max * 8);
+        // use large stack of ushort.max * 8
+        // otherwise we can crash in the parser or deeper semantic
         this.currentTask = currentTask;
         currentTask.currentFiber = cast(shared)this;
         hasTask = true;
