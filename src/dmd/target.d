@@ -561,7 +561,7 @@ extern (C++) struct Target
      * Returns:
      *      true if the operation is supported or type is not a vector
      */
-    extern (C++) bool isVectorOpSupported(Type type, ubyte op, Type t2 = null)
+    extern (C++) bool isVectorOpSupported(Type type, uint op, Type t2 = null)
     {
         import dmd.tokens;
 
