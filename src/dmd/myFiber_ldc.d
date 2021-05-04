@@ -12,6 +12,7 @@
 module dmd.myFiber_ldc;
 
 enum module_string = q{
+#line 16 "src/dmd/myFiber_ldc.d"
 import core.thread.osthread;
 
 version (LDC)
