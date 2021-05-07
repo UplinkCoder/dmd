@@ -1006,7 +1006,7 @@ private:
                 void* guard = m_pmem + sz - guardPageSize;
             }
             m_size = sz;
-/+
+
             static if ( __traits( compiles, mmap ) )
             {
                 if (guardPageSize)
@@ -1027,7 +1027,7 @@ private:
                 // Supported only for mmap allocated memory - results are
                 // undefined if applied to memory not obtained by mmap
             }
-            +/
+            
         }
 
         Thread.add( m_ctxt );

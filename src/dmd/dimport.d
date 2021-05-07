@@ -1,3 +1,4 @@
+
 /**
  * A `Dsymbol` representing a renamed import.
  *
@@ -268,7 +269,6 @@ extern (C++) final class Import : Dsymbol
                 // can traverse them before the import gets semantic (Issue: 21501)
                 if (!aliasId && !names.dim)
                     addPackageAccess(sc.scopesym);
-
                 return null;
             }
         }

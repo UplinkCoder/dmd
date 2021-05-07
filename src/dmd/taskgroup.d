@@ -1,3 +1,4 @@
+
 module dmd.taskgroup;
 
 import core.thread.myFiber;
@@ -10,7 +11,77 @@ enum n_threads = 4;
 
 Thread[n_threads] unorderedBackgroundThreads;
 shared TaskQueue[n_threads] unorderedBackgroundQueue;
+shared FiberPool[n_threads] unorderedBackgroundFibers;
 shared bool[n_threads] killThread;
+
+struct FiberPool
+{
+    TaskFiber[512] fibers;
+    uint freeBitfield = ~0;
+
+    uint nextFree()
+    {
+        pragma(inline, true);
+        import core.bitop : bsf;
+        return freeBitfield ? bsf(freeBitfield)  : 0;
+    }
+
+    uint n_free()
+    {
+        pragma(inline, true);
+        import core.bitop : popcnt;
+        return popcnt(freeBitfield);
+    }
+
+    uint n_used()
+    {
+        pragma(inline, true);
+        import core.bitop : popcnt;
+        return cast(uint) (fibers.length - popcnt(freeBitfield));
+    }
+
+    bool isFull()
+    {
+        pragma(inline, true);
+        return !n_free();
+    }
+
+    void initFiberPool()
+    {
+        foreach(int idx, ref f;fibers)
+        {
+            f = new TaskFiber(null, &this, idx);
+        }
+    }
+
+    bool isInitialized()
+    {
+        pragma(inline, true);
+        return fibers[0] !is null;
+    }
+
+    void free(TaskFiber* fiber)
+    {
+        const fiberIdx = fiber.idx;
+        assert(fiberIdx < fibers.length);
+        freeBitfield |= (1 << fiberIdx);
+    }
+
+    TaskFiber* getNext() return
+    {
+        if (n_free())
+        {
+            printf("freeBitfield before: %x\n", freeBitfield);
+            const fiberIdx = nextFree();
+            printf("%d fiberIdx\n", fiberIdx);
+            freeBitfield &= ~(1 << fiberIdx);
+            printf("freeBitfield after: %x\n", freeBitfield);
+            return &fibers[fiberIdx];
+        }
+        assert(0);
+        //return null;
+    }
+}
 
 // debug = ImmediateTaskCompletion;
 /// Ticket Lock ordered syncronisation mechanism
@@ -123,9 +194,13 @@ extern (C) struct TaskQueue
                 continue;
             }
             // we have the lock now
-
+            printf("got lock\n");
             // we may have to wait again
-            if (next_entry_to_read == -1 && next_entry_to_write) return null;
+            if (next_entry_to_read == -1 && next_entry_to_write)
+            {
+                printf("No task for us\n");
+                return null;
+            }
             else
             {
                 auto task = tasks[next_entry_to_read];
@@ -187,7 +262,7 @@ void initBackgroundThreads()
                 {
                     printf("[BackgroundThread] running for %s\n", ro.toChars());
                 }
-                    if (task.hasCompleted_) assert(0);
+                if (task.hasCompleted_) assert(0);
 
                 task.assignFiber();
                 task.callFiber();
@@ -198,6 +273,7 @@ void initBackgroundThreads()
                 }
                 else
                 {
+                    printf("task %p did not complete ... readding to queue\n", task);
                     myQueue.addTaskToQueue(cast(shared)task, thread_idx + 1);
                 }
             }
@@ -209,6 +285,7 @@ void initBackgroundThreads()
 
 void killBackgroundThreads()
 {
+    printf("Killing all threads\n");
     foreach(i; 0 .. unorderedBackgroundThreads.length)
         killThread[i] = true;
 }
@@ -232,6 +309,47 @@ void dispatchToBackgroundThread(shared Task* task)
     uint queueID = atomicFetchAdd(queueCounter, 1) % cast(uint)(unorderedBackgroundQueue.length);
     unorderedBackgroundQueue[queueID].addTaskToQueue(task, queueID + 1);
 }
+shared (TaskFiber)* getFiberFromPool(uint queueID, shared Task* task)
+{
+    __gshared FiberPool g_pool;
+    if (!g_pool.isInitialized())
+    {
+        g_pool.initFiberPool();
+    }
+    shared(TaskFiber)* result = null;
+
+    // if queueID is zero this is not a background task, and hence has no deticated queuePool
+    if (queueID == 0)
+    {
+        if (!g_pool.isFull())
+        {
+            result = cast(shared(TaskFiber)*) g_pool.getNext();
+            result.currentTask = task;
+            result.currentTask.hasFiber = true;
+            result.currentTask.currentFiber = result;
+            result.hasTask = true;
+        }
+    }
+    else
+    {
+        auto pool = cast()unorderedBackgroundFibers[queueID - 1];
+        // TODO initialize per Thread fiber pools in the thread handler
+        if (!pool.isInitialized())
+        {
+            pool.initFiberPool();
+        }
+        if (!pool.isFull())
+        {
+            result = cast(shared(TaskFiber)*) pool.getNext();
+            result.currentTask = task;
+            result.currentTask.hasFiber = true;
+            result.currentTask.currentFiber = result;
+            result.hasTask = true;
+        }
+    }
+    printf("get Fiber from Pool: %p\n", result);
+    return result;
+}
 
 shared struct Task
 {
@@ -246,7 +364,7 @@ shared struct Task
     uint queueID;
     bool isBackgroundTask;
 
-    shared TaskFiber currentFiber;
+    shared (TaskFiber)* currentFiber;
     align(16) shared bool hasCompleted_;
     align(16) shared bool hasFiber;
     align(16) shared bool fiberIsExecuting;
@@ -271,7 +389,8 @@ shared struct Task
         {
             if (cas(&hasFiber, false, true))
             {
-                currentFiber = cast(shared)new TaskFiber(cast(Task*)&this);
+                //currentFiber = cast(shared)new TaskFiber(&this);
+                currentFiber = getFiberFromPool(queueID, (cast(Task*)&this));
             }
         }
     }
@@ -282,11 +401,11 @@ shared struct Task
         // therefore it cannot happen that a task gets completed by another thread.
         assert(hasFiber && !hasCompleted_);
         {
-            auto unshared_fiber = cast()currentFiber;
+            auto unshared_fiber = cast(TaskFiber*)currentFiber;
             if (unshared_fiber.state() != unshared_fiber.State.EXEC &&
                 cas(cast()&fiberIsExecuting, false, true))
             {
-                (cast()currentFiber).call();
+                (unshared_fiber).call();
                 atomicFence();
                 fiberIsExecuting = false;
             }
@@ -297,27 +416,61 @@ shared struct Task
 class TaskFiber : Fiber
 {
     Task* currentTask;
+    FiberPool* pool;
+    int idx;
     align(16) shared bool hasTask;
 
-    this(Task* currentTask)
+    this(Task* currentTask, FiberPool* pool = null, int idx = 0)
     {
-        assert(currentTask.hasFiber && currentTask.currentFiber is null);
+
+        this.pool = pool;
+        if (pool) this.idx = idx;
         super(&doTask, ushort.max * 8);
         // use large stack of ushort.max * 8
         // otherwise we can crash in the parser or deeper semantic
-        this.currentTask = currentTask;
-        currentTask.currentFiber = cast(shared)this;
-        hasTask = true;
+
+        // currentTask will be null when initalizing a FiberPool
+        if (currentTask)
+        {
+            assert(currentTask.hasFiber && currentTask.currentFiber is null);
+            this.currentTask = currentTask;
+            currentTask.currentFiber = cast(shared TaskFiber*)this;
+            //hasTask = true;
+        }
     }
 
     void doTask()
     {
-        assert(state() != State.TERM, "Attempting to start a finished task");
-        currentTask.result = currentTask.fn(currentTask.taskData);
+        if (currentTask)
+        {
+            hasTask = true;
+            printf("Running task for '%s'\n", currentTask.taskGroup.name.ptr);
+            assert(state() != State.TERM, "Attempting to start a finished task");
+            currentTask.result = currentTask.fn(currentTask.taskData);
+            {
+                string s = stateToString(state());
+                printf("Task state after calling fn: %s\n", s.ptr);
+            }
+        }
+
+    }
+
+    static string stateToString(typeof(new Fiber((){}).state()) state)
+    {
+        final switch (state)
+        {
+            case state.TERM:
+               return "Done";
+            case state.HOLD:
+               return "Suspended";
+            case state.EXEC:
+               return "Running";
+        }
     }
 
     bool hasCompleted() shared
     {
+        // printf("querying hasCompleted for '%s'\n", currentTask.taskGroup.name.ptr);
         if (!atomicLoad(hasTask))
         {
             // if a fiber has no task it must have completed at a previous point;
@@ -326,16 +479,24 @@ class TaskFiber : Fiber
         }
         assert(currentTask && currentTask.hasFiber);
         auto state = (cast()this).state();
+        printf("hasCompleted: {State: %s} {origin: %s:%d}\n", stateToString(state).ptr, currentTask.originInfo.filename.ptr, cast(int)currentTask.originInfo.line);
         if (state == State.TERM)
         {
             if (cas(&hasTask, true, false))
             {
                 if (cas(&currentTask.hasCompleted_, false, true))
                 {
+                    printf("n_completed before: %d\n", cast(int)atomicLoad(currentTask.taskGroup.n_completed));
                     atomicFetchAdd(currentTask.taskGroup.n_completed, 1);
-
+                    printf("Registering completion with taskgroup %s\n", currentTask.taskGroup.name.ptr);
+                    printf("n_completed after: %d\n", cast(int)atomicLoad(currentTask.taskGroup.n_completed));
                     assert(currentTask.hasFiber);
                     atomicStore(currentTask.hasFiber, false);
+                    auto pool = cast(FiberPool*) currentTask.currentFiber.pool;
+                    if (pool)
+                    {
+                        pool.free((cast(TaskFiber*)currentTask.currentFiber));
+                    }
                     currentTask.currentFiber = null;
                     currentTask = null;
                     atomicStore(hasTask, false);
@@ -391,6 +552,11 @@ struct TaskGroup
     shared(Task)* addTask(shared(void*) delegate (shared void*) fn, shared void* taskData, bool background_task = false,
         shared Task* originator = getCurrentTask(), size_t line = __LINE__, string file = __FILE__) shared
     {
+        import dmd.root.rootobject;
+        printf("AddTask {taskData: '%s'} {origin: %s:%d}\n", (cast(RootObject)taskData).toChars(),
+            file.ptr, cast(int)line,
+        );
+
         if (tasks.length <= n_used)
         {
             shared size_t n_tasks;
@@ -425,7 +591,9 @@ struct TaskGroup
             if(!(task.hasCompleted || task.currentFiber.hasCompleted()))
             {
                 import dmd.root.rootobject;
-                fprintf(stderr, "[TaskGroup: %s] No immediate task completion possible for '%s'\n", this.name.ptr, (cast(RootObject)task.taskData).toChars());
+                fprintf(stderr, "[TaskGroup: %s] No immediate task completion possible for '%s' (origin: %s:%d)\n", this.name.ptr, (cast(RootObject)task.taskData).toChars(),
+                    task.originInfo.filename.ptr, task.originInfo.line,
+                );
             }
         }
 
@@ -461,6 +629,7 @@ struct TaskGroup
     
     void runTask () shared
     {
+        printf("runTask({n_used: %d, n_completed: %d})\n", cast(int)n_used, cast(int)n_completed);
         if (n_completed == n_used)
             return ;
         // if task group is done, don't try to run anything.
@@ -476,17 +645,17 @@ struct TaskGroup
                 break;
             }
         }
-
+/+
         if (currentTask is null)
         {
-            char[255] assertMessageBuffer = '0';
+            char[512] assertMessageBuffer = '0';
             size_t messageLength = sprintf(assertMessageBuffer.ptr, 
-                "All tasks seem to have completed but n_used is %zu and n_completed is %zu which means that %ld tasks have not registered completion",
-                n_used, n_completed, (cast(long)(n_used - n_completed))
+                "All tasks seem to have completed but n_used is %zu and n_completed is %zu which means that %ld tasks have not registered completion (tg: %s)",
+                n_used, n_completed, (cast(long)(n_used - n_completed)), name.ptr
             );
             assert(currentTask, cast(string)assertMessageBuffer[0 .. messageLength]);
         }
-
++/
         if (currentTask !is null)
         {
             while (currentTask.children.length)

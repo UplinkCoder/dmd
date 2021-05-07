@@ -407,14 +407,17 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     import dmd.taskgroup;
 
     version(MULTITHREAD)
+    {
         enum MULTITHREAD = true;
+        pragma(msg, "Mutithreaded build ... this may be dangerous!");
+    }
     else
         enum MULTITHREAD = false;
 
     static if (MULTITHREAD)
         initBackgroundThreads();
 
-    shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length, TaskGroupFlags.ImmediateTaskCompletion);
+    shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
 
     foreach (m; modules)
     {
@@ -423,6 +426,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             auto m = cast(Module) data;
             m.read(Loc.initial);
             m.step = Module.Step.Loaded;
+                printf("Loading has completed\n");
             return null;
         }, cast(shared void*)m, MULTITHREAD);
     }
@@ -439,7 +443,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     bool anydocfiles = false;
     size_t filecount = modules.dim;
 
-    shared TaskGroup* parserGroup = cast(shared) new TaskGroup("parser", filecount);
+    shared TaskGroup* parserGroup = cast(shared) new TaskGroup("parser", filecount, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
 
     foreach(m;modules)
     {
@@ -484,7 +488,6 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         }
         if (m.isDocFile)
         {
-            printf("is ddocfile returned true\n");
             anydocfiles = true;
             gendocfile(m);
             // Remove m from list of modules

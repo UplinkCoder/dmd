@@ -514,7 +514,7 @@ extern (C++) struct UnionExp
     extern (C++) Expression copy()
     {
         Expression e = exp();
-        //if (e.size > sizeof(u)) printf("%s\n", Token::toChars(e.op));
+        if (e.size > u.sizeof) printf("%s\n", Token.toChars(e.op));
         assert(e.size <= u.sizeof);
         switch (e.op)
         {

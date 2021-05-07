@@ -1172,6 +1172,8 @@ void processEnvironment()
     string[] dflags = ["-version=MARS", "-w", "-de", env["PIC_FLAG"], env["MODEL_FLAG"], "-J"~env["G"], "-I" ~ srcDir];
     if (env["HOST_DMD_KIND"] != "gdc")
         dflags ~= ["-dip25"]; // gdmd doesn't support -dip25
+    if (env.getDefault("MULTITHREAD", null).length)
+        dflags ~= ["-version=MULTITHREAD"];
 
     // TODO: add support for dObjc
     auto dObjc = false;
