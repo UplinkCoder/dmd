@@ -426,12 +426,13 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             auto m = cast(Module) data;
             m.read(Loc.initial);
             m.step = Module.Step.Loaded;
-                printf("Loading has completed\n");
             return null;
         }, cast(shared void*)m, MULTITHREAD);
     }
 
     loader.awaitCompletionOfAllTasks();
+    printf("Loading has completed\n");
+
     // TODO in theory we don't have to await the completion of all tasks here.
     // If we kept the load status of the module inside the module
     // (and we do since the code was meant to load asyncronously).
@@ -453,7 +454,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
             m.parse();
             m.step = Module.Step.Parsed;
             return null;
-        }, cast(shared void*)m, MULTITHREAD);
+        }, cast(shared void*)m, false);
     }
 
     parserGroup.awaitCompletionOfAllTasks();
