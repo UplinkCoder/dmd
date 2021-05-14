@@ -115,7 +115,7 @@ extern (C++) struct Mem
         return p ? p : error();
     }
 
-    __gshared bool _isGCEnabled = true;
+    __gshared bool _isGCEnabled = false;
 
     // fake purity by making global variable immutable (_isGCEnabled only modified before startup)
     enum _pIsGCEnabled = cast(immutable bool*) &_isGCEnabled;
@@ -152,6 +152,16 @@ __gshared void* heapp;
 
 extern (D) void* allocmemoryNoFree(size_t m_size) nothrow @nogc
 {
+    import dmd.root.ticket;
+    static shared TicketCounter counter;
+    auto ticket = counter.drawTicket();
+    scope(exit)
+        counter.releaseTicket(ticket);
+
+    while (counter.currentlyServing != ticket)
+    {
+        // busy wait
+    }
     // 16 byte alignment is better (and sometimes needed) for doubles
     m_size = (m_size + 15) & ~15;
 
