@@ -8,8 +8,8 @@ import core.thread.osthread;
 import core.atomic;
 import dmd.root.ticket;
 
-
-enum n_threads = 1;
+@("tracy"):
+enum n_threads = 16;
 
 __gshared Thread[n_threads] unorderedBackgroundThreads;
 shared TaskQueue[n_threads] unorderedBackgroundQueue;
@@ -35,6 +35,7 @@ void initalize()
 
 struct FiberPool
 {
+@("tracy"):
     TaskFiber[64] fibers = null;
     void* fiberPoolStorage = null;
 
@@ -121,10 +122,11 @@ import dmd.root.ticket;
 
 extern (C) struct TaskQueue
 {
-    shared TicketCounter counter;
+@("tracy"):
+    shared TicketCounter queueLock;
 
     // these can only be touched when locked
-    shared Task*[32] tasks;
+    shared Task*[4096] tasks;
     align(16) shared int next_entry_to_write = 0;
     align(16) shared int next_entry_to_read = -1;
 
@@ -140,19 +142,19 @@ extern (C) struct TaskQueue
                 "next entry to write should not be greater than tasks.length this indicates a logic error.");
             // possibly pause ?            
         }
-        auto myTicket = counter.drawTicket();
+        auto myTicket = queueLock.drawTicket();
         scope (exit)
         {
-            counter.releaseTicket(myTicket);
+            queueLock.releaseTicket(myTicket);
             assert(task);
         }
             
 
-        printf("currentlyServing: %d, nextTickit: %d\n", counter.currentlyServing, counter.nextTicket);
+        printf("currentlyServing: %d, nextTickit: %d\n", queueLock.currentlyServing, queueLock.nextTicket);
 
         for (;;)
         {
-            if (!counter.servingMe(myTicket))
+            if (!queueLock.servingMe(myTicket))
             {
                 continue;
             }
@@ -166,7 +168,9 @@ extern (C) struct TaskQueue
                     "next entry to write should not be greater than tasks.length this indicates a logic error.");
 
                 // if the task queue is full we need to redraw a ticket
-                counter.redrawTicket(myTicket);
+                // printf("No more entries ... redrawing\n");
+
+                queueLock.redrawTicket(myTicket);
                 continue;
             }
 
@@ -186,7 +190,7 @@ extern (C) struct TaskQueue
                 else
                 {
                     // printf("No more entries ... redrawing\n");
-                    counter.redrawTicket(myTicket);
+                    queueLock.redrawTicket(myTicket);
                     continue;
                 }
             }
@@ -213,13 +217,13 @@ extern (C) struct TaskQueue
             return null;
         }
 
-        auto myTicket = counter.drawTicket();
+        auto myTicket = queueLock.drawTicket();
         scope (exit)
-            counter.releaseTicket(myTicket);
+            queueLock.releaseTicket(myTicket);
 
         for (;;)
         {
-            if (!counter.servingMe(myTicket))
+            if (!queueLock.servingMe(myTicket))
             {
                 // perhaps mmPause ?
                 continue;
@@ -230,7 +234,7 @@ extern (C) struct TaskQueue
             if (next_entry_to_read == -1 && next_entry_to_write)
             {
                 // printf("TaskQueue is empty now.\n");
-                counter.redrawTicket(myTicket);
+                queueLock.redrawTicket(myTicket);
                 continue;
             }
             else
@@ -300,6 +304,7 @@ void initBackgroundThreads()
                 if (task.hasCompleted_) assert(0);
                 if (!task.hasFiber)
                 {
+                    // technically we should aquire the taskLock here.
                     task.assignFiber();
                 }
                 task.callFiber();
@@ -339,7 +344,7 @@ struct OriginInformation
     uint line;
     shared Task* originator;
 }
-
+@("tracy")
 void dispatchToBackgroundThread(shared Task* task)
 {
     auto ticket = task.taskLock.drawTicket();
@@ -352,6 +357,7 @@ void dispatchToBackgroundThread(shared Task* task)
     uint queueID = atomicFetchAdd(queueCounter, 1) % cast(uint)(unorderedBackgroundQueue.length);
     unorderedBackgroundQueue[queueID].addTaskToQueue(task, queueID + 1);
 }
+@("tracy")
 shared (TaskFiber)* getFiberFromPool(uint queueID, shared Task* task)
 {
     __gshared FiberPool g_pool;
@@ -438,15 +444,10 @@ shared struct Task
 
     shared TicketCounter taskLock;
 
-    uint creation_ticket;
+    Ticket creation_ticket;
 
     bool hasCompleted(string file = __FILE__, int line = __LINE__) shared
     {
-        auto ticket = taskLock.drawTicket();
-        scope(exit) taskLock.releaseTicket(ticket);
-        while(!taskLock.servingMe(ticket))
-        {}
-
         // printf("[%s:+%d]asking has Completed \n", file.ptr, line);
         return (atomicLoad(hasCompleted_) || (atomicLoad(hasFiber) && !fiberIsExecuting && currentFiber.hasCompleted()));
     }
@@ -565,6 +566,13 @@ class TaskFiber : Fiber
 
     bool hasCompleted() shared
     {
+        auto ticket = currentTask.taskLock.drawTicket();
+        Task* safePtrForLockRelease = currentTask;
+
+        scope(exit) safePtrForLockRelease.taskLock.releaseTicket(ticket);
+        while(!currentTask.taskLock.servingMe(ticket))
+        {}
+
         // printf("querying hasCompleted for '%s'\n", currentTask.taskGroup.name.ptr);
         if (!atomicLoad(hasTask))
         {
@@ -614,6 +622,7 @@ enum DefaultTaskGroupFlags = TaskGroupFlags.None | TaskGroupFlags.ImmediateTaskC
 
 struct TaskGroup
 {
+@("tracy"):
     string name;
     TaskGroupFlags flags;
 
@@ -634,7 +643,6 @@ struct TaskGroup
 
     private void allocate_tasks(size_t n) shared
     {
-
         import dmd.root.rmem;
 
         assert(tasks.length < n);
@@ -655,9 +663,9 @@ struct TaskGroup
         {}
 
         import dmd.root.rootobject;
-        // printf("AddTask {taskData: '%s'} {origin: %s:%d}\n", (cast(RootObject)taskData).toChars(),
-        //    file.ptr, cast(int)line,
-        // );
+        printf("AddTask {taskData: '%s'} {origin: %s:%d}\n", (cast(RootObject)taskData).toChars(),
+           file.ptr, cast(int)line,
+        );
 
         if (tasks.length <= n_used)
         {
@@ -674,10 +682,10 @@ struct TaskGroup
         *task = Task(fn, taskData, &this, background_task);
         task.creation_ticket = myTicket;
 
-
+/+
         if (originator) // technically we need to take a lock here!
             originator.children ~= task;
-
++/
         if (background_task && !(flags & TaskGroupFlags.ImmediateTaskCompletion))
         {
             dispatchToBackgroundThread(task);
@@ -693,7 +701,10 @@ struct TaskGroup
         if (flags & TaskGroupFlags.ImmediateTaskCompletion)
         {
             groupLock.releaseTicket(myTicket);
+            auto myTaskTicket = task.taskLock.drawTicket();
+
             task.assignFiber();
+            task.taskLock.releaseTicket(myTaskTicket);
             task.callFiber();
             myTicket = groupLock.drawTicket();
 
@@ -753,7 +764,11 @@ struct TaskGroup
         shared Task* currentTask;
 
         auto myTicket = groupLock.drawTicket();
-        scope(exit) groupLock.releaseTicket(myTicket);
+        scope(exit) 
+        {
+            if (groupLock.servingMe(myTicket))
+                groupLock.releaseTicket(myTicket);
+        }
         while(!groupLock.servingMe(myTicket))
         {}
 
@@ -818,8 +833,11 @@ struct TaskGroup
                     currentTask.assignFiber();
                 }
                 assert(!currentTask.isBackgroundTask);
-                currentTask.callFiber();
+                // after fiber assignment is done the task could try to add a new Task.
+                // reqlinquish the group lock here.
 
+                groupLock.releaseTicket(myTicket);
+                currentTask.callFiber();
                 if (parent)
                 {
                     atomicFetchAdd(parent.n_children_completed, 1);

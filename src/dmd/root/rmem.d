@@ -158,7 +158,7 @@ extern (D) void* allocmemoryNoFree(size_t m_size) nothrow @nogc
     scope(exit)
         counter.releaseTicket(ticket);
 
-    while (counter.currentlyServing != ticket)
+    while (!counter.servingMe(ticket))
     {
         // busy wait
     }
