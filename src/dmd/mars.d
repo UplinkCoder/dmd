@@ -406,6 +406,13 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     import dmd.taskgroup;
 
+    bool tasks = params.tasks;
+
+    if (tasks)
+    {
+        printf("Using tasks\n");
+    }
+
     version(MULTITHREAD)
     {
         enum MULTITHREAD = true;
@@ -417,20 +424,29 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     static if (MULTITHREAD)
         initBackgroundThreads();
 
-    shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
-
-    foreach (m; modules)
+    if (tasks)
     {
-        loader.addTask((shared void* data)
-        {
-            auto m = cast(Module) data;
-            m.read(Loc.initial);
-            m.step = Module.Step.Loaded;
-            return null;
-        }, cast(shared void*)m, MULTITHREAD);
-    }
+        shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
 
-    loader.awaitCompletionOfAllTasks();
+        foreach (m; modules)
+        {
+            loader.addTask((shared void* data)
+            {
+                auto m = cast(Module) data;
+                m.read(Loc.initial);
+                m.step = Module.Step.Loaded;
+                return null;
+            }, cast(shared void*)m, MULTITHREAD);
+        }
+        loader.awaitCompletionOfAllTasks();
+    }
+    else
+    {
+        foreach(m; modules)
+        {
+            m.read(Loc.initial);
+        }
+    }
     //printf("Loading has completed\n");
 
     // TODO in theory we don't have to await the completion of all tasks here.
@@ -444,23 +460,34 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     bool anydocfiles = false;
     size_t filecount = modules.dim;
 
-    shared TaskGroup* parserGroup = cast(shared) new TaskGroup("parser", filecount, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
-
-    foreach(m;modules)
+    if (tasks)
     {
-        parserGroup.addTask((shared void* data) {
-            auto m = cast(Module) data;
-            assert(m.step == Module.Step.Loaded);
+        shared TaskGroup* parserGroup = cast(shared) new TaskGroup("parser", filecount, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
+
+        foreach(m;modules)
+        {
+            parserGroup.addTask((shared void* data) {
+                auto m = cast(Module) data;
+                assert(m.step == Module.Step.Loaded);
+                if (params.verbose)
+                    message("parse     %s", m.toChars());
+                m.parse();
+                m.step = Module.Step.Parsed;
+                return null;
+            }, cast(shared void*)m, MULTITHREAD);
+        }
+
+        parserGroup.awaitCompletionOfAllTasks();
+    }
+    else
+    {
+        foreach(m;modules)
+        {
             if (params.verbose)
                 message("parse     %s", m.toChars());
             m.parse();
-            m.step = Module.Step.Parsed;
-            return null;
-        }, cast(shared void*)m, MULTITHREAD);
+        }
     }
-
-    parserGroup.awaitCompletionOfAllTasks();
-
 
     for (size_t filei = 0, modi = 0; filei < filecount; filei++, modi++)
     {
@@ -533,24 +560,37 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     if (global.errors)
         removeHdrFilesAndFail(params, modules);
 
-    shared TaskGroup importAllGroup = TaskGroup("importAll", modules.length, MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.None);
 
-    // load all unconditional imports for better symbol resolving
-    foreach (m; modules)
+    if (tasks)
     {
-        importAllGroup.addTask((shared void* ro)
+        shared TaskGroup importAllGroup = TaskGroup("importAll", modules.length, MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.None);
+
+        // load all unconditional imports for better symbol resolving
+        foreach (m; modules)
         {
-            auto m = cast(Module) ro;
-            if (params.verbose)
-                    message("importall %s", m.toChars());
-            assert(m.step == Module.Step.Parsed);
-            m.importAll(null);
-            return null;
-        }, cast(shared void*)m, false);
+            importAllGroup.addTask((shared void* ro)
+            {
+                auto m = cast(Module) ro;
+                if (params.verbose)
+                        message("importall %s", m.toChars());
+                assert(m.step == Module.Step.Parsed);
+                m.importAll(null);
+                return null;
+            }, cast(shared void*)m, false);
+        }
+
+        importAllGroup.awaitCompletionOfAllTasks();
     }
+    else
+    {
+        foreach(m;modules)
+        {
+            if (params.verbose)
+                message("importall %s", m.toChars());
+            m.importAll(null);
+        }
 
-    importAllGroup.awaitCompletionOfAllTasks();
-
+    }
     static if (MULTITHREAD)
         killBackgroundThreads();
 
@@ -1901,6 +1941,10 @@ bool parseCommandLine(const ref Strings arguments, const size_t argc, ref Param 
                 goto Lerror;
             else
                 params.trace = true;
+        }
+        else if (arg == "-tasks")
+        {
+            params.tasks = true;
         }
         else if (arg == "-v") // https://dlang.org/dmd.html#switch-v
             params.verbose = true;

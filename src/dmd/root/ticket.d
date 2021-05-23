@@ -29,13 +29,13 @@ struct TicketCounter
         string file;
         int line;
     }
-    Loc[128] waiters;
+    Loc[64] waiters;
     int n_waiters;
 
     Ticket drawTicket(string func = __FUNCTION__, string file = __FILE__, int line = __LINE__) shared
     {
         pragma(inline, true);
-        waiters[core.atomic.atomicOp!"+="(this.n_waiters, 1) % 128] = Loc(func, file, line);
+        waiters[core.atomic.atomicOp!"+="(this.n_waiters, 1) % 64] = Loc(func, file, line);
         return Ticket(atomicFetchAdd(nextTicket, 1));
     }
 
@@ -44,7 +44,6 @@ struct TicketCounter
         lastAquiredLoc = Loc("free","free", 0);
         __itt_sync_releasing(cast(void*) &this);
         pragma(inline, true);
-        assert(ticket.ticket == currentlyServing);
         atomicFetchAdd(currentlyServing, 1);
     }
 

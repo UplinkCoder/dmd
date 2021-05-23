@@ -9,7 +9,7 @@ import core.atomic;
 import dmd.root.ticket;
 
 @("tracy"):
-enum n_threads = 16;
+enum n_threads = 4;
 
 __gshared Thread[n_threads] unorderedBackgroundThreads;
 shared TaskQueue[n_threads] unorderedBackgroundQueue;
@@ -150,7 +150,7 @@ extern (C) struct TaskQueue
         }
             
 
-        printf("currentlyServing: %d, nextTickit: %d\n", queueLock.currentlyServing, queueLock.nextTicket);
+        // printf("currentlyServing: %d, nextTickit: %d\n", queueLock.currentlyServing, queueLock.nextTicket);
 
         for (;;)
         {
@@ -419,8 +419,7 @@ shared struct Task
     invariant { if (hasFiber)
         {
             import std.stdio;
-            if (currentFiber) writeln(TaskFiber.stateToString((cast(TaskFiber*)currentFiber).state()));
-            // assert(currentFiber);
+            assert(currentFiber);
             import core.stdc.stdlib : abort;
             if (!currentFiber) abort();
         }
@@ -490,7 +489,6 @@ shared struct Task
 
         // a TaskFiber may only be executed by the thread that created it
         // therefore it cannot happen that a task gets completed by another thread.
-        auto task = this;
         assert(hasFiber && !hasCompleted_);
         {
             if (!currentFiber) assert(0);
@@ -544,7 +542,7 @@ class TaskFiber : Fiber
             assert(state() != State.TERM, "Attempting to start a finished task");
             currentTask.result = currentTask.fn(currentTask.taskData);
             {
-                string s = stateToString(state());
+                // string s = stateToString(state());
                 // printf("Task state after calling fn: %s\n", s.ptr);
             }
         }
@@ -660,10 +658,12 @@ struct TaskGroup
             groupLock.releaseTicket(myTicket);
 
         while(!groupLock.servingMe(myTicket))
-        {}
+        {
+            printf("Wating for groupLock\n");
+        }
 
         import dmd.root.rootobject;
-        printf("AddTask {taskData: '%s'} {origin: %s:%d}\n", (cast(RootObject)taskData).toChars(),
+         printf("AddTask {group: '%s'} {origin: %s:%d}\n", this.name.ptr,
            file.ptr, cast(int)line,
         );
 
@@ -774,7 +774,7 @@ struct TaskGroup
 
         foreach(ref task; tasks[0 .. n_used])
         {
-            if ((!task.isBackgroundTask) && (!atomicLoad(task.hasCompleted_)) && (!task.hasCompleted()))
+            if ((!task.isBackgroundTask) && (!atomicLoad(task.hasCompleted_)))
             {
                 currentTask = &task;
                 break;

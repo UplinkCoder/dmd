@@ -1309,20 +1309,32 @@ extern (C++) final class Module : Package
         }
 
         import dmd.taskgroup;
-        shared TaskGroup* importAllNestedGroup = cast(shared)new TaskGroup("Module.importAll", members.dim);
 
-        for (size_t i = 0; i < members.dim; i++)
+        if (global.params.tasks)
         {
-            Dsymbol s = (*members)[i];
-            importAllNestedGroup.addTask((shared void* arg)
-            {
-                auto s = cast (Dsymbol) arg;
-                s.importAll(sc);
-                return null;
-            }, cast(shared void*)s, false);
-        }
+            shared TaskGroup* importAllNestedGroup = cast(shared)new TaskGroup("Module.importAll", members.dim);
 
-        importAllNestedGroup.awaitCompletionOfAllTasks();
+            for (size_t i = 0; i < members.dim; i++)
+            {
+                Dsymbol s = (*members)[i];
+                importAllNestedGroup.addTask((shared void* arg)
+                {
+                    auto s = cast (Dsymbol) arg;
+                    s.importAll(sc);
+                    return null;
+                }, cast(shared void*)s, false);
+            }
+
+            importAllNestedGroup.awaitCompletionOfAllTasks();
+        }
+        else
+        {
+            for (size_t i = 0; i < members.dim; i++)
+            {
+                Dsymbol s = (*members)[i];
+                s.importAll(sc);
+            }
+        }
 
         sc = sc.pop();
         sc.pop(); // 2 pops because Scope.createGlobal() created 2

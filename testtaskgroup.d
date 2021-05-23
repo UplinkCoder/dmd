@@ -16,6 +16,8 @@ void main(string[] args)
     bool task1_completed = 0;
     bool task2_completed = 0;
 
+    enum child_tasks = 128;
+
     if (multithread)
         initBackgroundThreads();
 
@@ -24,9 +26,9 @@ void main(string[] args)
             killBackgroundThreads();
 
     size_t line = __LINE__;
-    shared TaskGroup tg = TaskGroup("tg1", 3 + 2048, TaskGroupFlags.None);
+    shared TaskGroup tg = TaskGroup("tg1", 3 + (child_tasks * 2), TaskGroupFlags.None);
     tg.addTask((shared void* x) { // line + 2
-        foreach(i; 0 .. 1024)
+        foreach(i; 0 .. child_tasks)
         {
         auto task1 = tg.addTask((shared void* x) { // line + 5
             task1_completed = true;
