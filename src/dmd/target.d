@@ -1383,8 +1383,8 @@ struct TargetCPP
         else if (p.storageClass & STC.lazy_)
         {
             // Mangle as delegate
-            Type td = new TypeFunction(ParameterList(), t, LINK.d);
-            td = new TypeDelegate(td);
+            auto tf = new TypeFunction(ParameterList(), t, LINK.d);
+            auto td = new TypeDelegate(tf);
             t = merge(t);
         }
         return t;
