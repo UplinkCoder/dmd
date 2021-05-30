@@ -166,6 +166,7 @@ extern (C++) struct Param
                             // https://digitalmars.com/d/archives/digitalmars/D/Binding_rvalues_to_ref_parameters_redux_325087.html
                             // Implementation: https://github.com/dlang/dmd/pull/9817
     bool tasks = false;     // Use taskification path
+    bool mt = false;        // Use multiple threads
 
     CppStdRevision cplusplus = CppStdRevision.cpp11;    // version of C++ standard to support
 

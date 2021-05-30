@@ -407,26 +407,19 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     import dmd.taskgroup;
 
     bool tasks = params.tasks;
+    bool mt = params.mt;
 
     if (tasks)
     {
         printf("Using tasks\n");
     }
 
-    version(MULTITHREAD)
-    {
-        enum MULTITHREAD = true;
-        pragma(msg, "Mutithreaded build ... this may be dangerous!");
-    }
-    else
-        enum MULTITHREAD = false;
-
-    static if (MULTITHREAD)
+    if (mt)
         initBackgroundThreads();
 
     if (tasks)
     {
-        shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
+        shared TaskGroup* loader = cast(shared) new TaskGroup("loader", modules.length, (mt ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
 
         foreach (m; modules)
         {
@@ -436,7 +429,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
                 m.read(Loc.initial);
                 m.step = Module.Step.Loaded;
                 return null;
-            }, cast(shared void*)m, MULTITHREAD);
+            }, cast(shared void*)m, mt);
         }
         loader.awaitCompletionOfAllTasks();
     }
@@ -462,7 +455,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     if (tasks)
     {
-        shared TaskGroup* parserGroup = cast(shared) new TaskGroup("parser", filecount, (MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
+        shared TaskGroup* parserGroup = cast(shared) new TaskGroup("parser", filecount, (mt ? TaskGroupFlags.None : TaskGroupFlags.ImmediateTaskCompletion));
 
         foreach(m;modules)
         {
@@ -474,7 +467,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
                 m.parse();
                 m.step = Module.Step.Parsed;
                 return null;
-            }, cast(shared void*)m, MULTITHREAD);
+            }, cast(shared void*)m, mt);
         }
 
         parserGroup.awaitCompletionOfAllTasks();
@@ -563,7 +556,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
 
     if (tasks)
     {
-        shared TaskGroup importAllGroup = TaskGroup("importAll", modules.length, MULTITHREAD ? TaskGroupFlags.None : TaskGroupFlags.None);
+        shared TaskGroup importAllGroup = TaskGroup("importAll", modules.length, mt ? TaskGroupFlags.None : TaskGroupFlags.None);
 
         // load all unconditional imports for better symbol resolving
         foreach (m; modules)
@@ -591,8 +584,7 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
         }
 
     }
-    static if (MULTITHREAD)
-        killBackgroundThreads();
+    if (mt) killBackgroundThreads();
 
 
     if (global.errors)
@@ -1945,6 +1937,10 @@ bool parseCommandLine(const ref Strings arguments, const size_t argc, ref Param 
         else if (arg == "-tasks")
         {
             params.tasks = true;
+        }
+        else if (arg == "-mt")
+        {
+            params.mt = true;
         }
         else if (arg == "-v") // https://dlang.org/dmd.html#switch-v
             params.verbose = true;
