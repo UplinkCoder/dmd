@@ -444,6 +444,7 @@ shared struct Task
     shared TicketCounter taskLock;
 
     Ticket creation_ticket;
+    uint completion_attempts;
 
     bool hasCompleted(string file = __FILE__, int line = __LINE__) shared
     {
@@ -485,20 +486,27 @@ shared struct Task
         auto ticket = taskLock.drawTicket();
         scope(exit) taskLock.releaseTicket(ticket);
         while(!taskLock.servingMe(ticket))
-        {}
+        {
+            printf("TaskLoc blocked by: %s\n", taskLock.lastAquiredLoc.func.ptr);
+        }
 
         // a TaskFiber may only be executed by the thread that created it
         // therefore it cannot happen that a task gets completed by another thread.
         assert(hasFiber && !hasCompleted_);
         {
-            if (!currentFiber) assert(0);
+            if (!currentFiber || fiberIsExecuting) assert(0);
 
             auto unshared_fiber = cast(TaskFiber*)currentFiber;
             auto state = unshared_fiber.state();
+            assert(state != state.TERM, "attempting to call completed fiber ... this means we have not set ourselfs to completed the first time around\n");
             if (state == state.HOLD &&
                 cas(cast()&fiberIsExecuting, false, true))
             {
+                atomicOp!("+=")(completion_attempts, 1);
+                // asm @trusted pure nothrow { int 3; } 
                 (unshared_fiber).call();
+                if (completion_attempts > 500)
+                    printf("Task does not appear to complete\n");
                 atomicFence();
                 fiberIsExecuting = false;
             }
@@ -542,8 +550,8 @@ class TaskFiber : Fiber
             assert(state() != State.TERM, "Attempting to start a finished task");
             currentTask.result = currentTask.fn(currentTask.taskData);
             {
-                // string s = stateToString(state());
-                // printf("Task state after calling fn: %s\n", s.ptr);
+                string s = stateToString(state());
+                printf("Task state after calling fn: %s\n", s.ptr);
             }
         }
 
@@ -663,7 +671,7 @@ struct TaskGroup
         }
 
         import dmd.root.rootobject;
-         printf("AddTask {group: '%s'} {origin: %s:%d}\n", this.name.ptr,
+        printf("AddTask {group: '%s'} {origin: %s:%d}\n", this.name.ptr,
            file.ptr, cast(int)line,
         );
 
@@ -770,7 +778,9 @@ struct TaskGroup
                 groupLock.releaseTicket(myTicket);
         }
         while(!groupLock.servingMe(myTicket))
-        {}
+        {
+            printf("Wating for groupLock .. lastAquire by: %s\n", groupLock.lastAquiredLoc.func.ptr);
+        }
 
         foreach(ref task; tasks[0 .. n_used])
         {
@@ -799,7 +809,7 @@ struct TaskGroup
                 parent = currentTask;
                 foreach(ref task; currentTask.children)
                 {
-                    if ((!task.isBackgroundTask) && (!atomicLoad(task.hasCompleted_)) && (!task.hasCompleted()))
+                    if ((!task.isBackgroundTask || !MULTITHREAD) && (!atomicLoad(task.hasCompleted_)) && (!task.hasCompleted()))
                     {
                         currentTask = task;
                         break;
@@ -818,12 +828,12 @@ struct TaskGroup
             }
 
 
-            if ((!currentTask.isBackgroundTask) && currentTask.fn)
+            if ((!currentTask.isBackgroundTask || !MULTITHREAD) && currentTask.fn)
             {
                 import dmd.root.rootobject;
                 if (auto ro = cast(RootObject) currentTask.taskData)
                 {
-                    // printf("running for %s\n", ro.toChars());
+                    printf("running for '%s' in taskGroup: %s\n", ro.toChars(), currentTask.taskGroup.name.ptr);
                 }
 
                 assert(!currentTask.hasCompleted_);
@@ -838,6 +848,7 @@ struct TaskGroup
 
                 groupLock.releaseTicket(myTicket);
                 currentTask.callFiber();
+                currentTask.currentFiber.hasCompleted();
                 if (parent)
                 {
                     atomicFetchAdd(parent.n_children_completed, 1);

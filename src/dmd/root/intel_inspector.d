@@ -5,7 +5,7 @@ import core.stdc.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
 
-extern (C) @nogc nothrow __gshared {
+extern (C) @nogc pure nothrow __gshared {
     void dummy (void *p) {}
 
 /**

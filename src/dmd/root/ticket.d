@@ -41,9 +41,9 @@ struct TicketCounter
 
     void releaseTicket(Ticket ticket) shared
     {
+        pragma(inline, true);
         lastAquiredLoc = Loc("free","free", 0);
         __itt_sync_releasing(cast(void*) &this);
-        pragma(inline, true);
         atomicFetchAdd(currentlyServing, 1);
     }
 
@@ -62,10 +62,10 @@ struct TicketCounter
         return result;
     }
 
-    void redrawTicket(ref Ticket ticket) shared
+    void redrawTicket(ref Ticket ticket, string func = __FUNCTION__, string file = __FILE__, int line = __LINE__) shared
     {
         pragma(inline, true);
         releaseTicket(ticket);
-        ticket = drawTicket();
+        ticket = drawTicket(func, file, line);
     }
 }
