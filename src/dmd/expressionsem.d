@@ -3016,7 +3016,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             }
             buffer.write4(0);
             e.setData(buffer.extractData(), newlen, 4);
-            e.type = new TypeDArray(Type.tdchar.immutableOf());
+            if (sc && sc.flags & SCOPE.Cfile)
+                e.type = Type.tuns32.pointerTo();
+            else
+                e.type = Type.tdchar.immutableOf().arrayOf();
             e.committed = 1;
             break;
 
@@ -3038,7 +3041,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             }
             buffer.writeUTF16(0);
             e.setData(buffer.extractData(), newlen, 2);
-            e.type = new TypeDArray(Type.twchar.immutableOf());
+            if (sc && sc.flags & SCOPE.Cfile)
+                e.type = Type.tuns16.pointerTo();
+            else
+                e.type = Type.twchar.immutableOf().arrayOf();
             e.committed = 1;
             break;
 
@@ -3047,7 +3053,10 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             goto default;
 
         default:
-            e.type = new TypeDArray(Type.tchar.immutableOf());
+            if (sc && sc.flags & SCOPE.Cfile)
+                e.type = Type.tchar.pointerTo();
+            else
+                e.type = Type.tchar.immutableOf().arrayOf();
             break;
         }
         e.type = e.type.typeSemantic(e.loc, sc);
