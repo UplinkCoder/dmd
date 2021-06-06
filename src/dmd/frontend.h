@@ -4993,8 +4993,6 @@ public:
     void accept(Visitor* v);
 };
 
-extern bool hasNonConstPointers(Expression* e);
-
 extern Initializer* initializerSemantic(Initializer* init, Scope* sc, Type* t, NeedInterpret needInterpret);
 
 extern Expression* initializerToExpression(Initializer* init, Type* itype = nullptr);
