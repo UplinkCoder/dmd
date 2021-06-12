@@ -5085,6 +5085,8 @@ class CInitializer final : public Initializer
 {
 public:
     Array<DesigInit > initializerList;
+    Type* type;
+    bool sem;
     void accept(Visitor* v);
     ~CInitializer();
 };
