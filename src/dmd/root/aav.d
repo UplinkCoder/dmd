@@ -11,6 +11,7 @@
 
 module dmd.root.aav;
 
+import core.atomic;
 import core.stdc.string;
 import dmd.root.rmem;
 import dmd.root.ticket;
@@ -46,7 +47,7 @@ struct AA
     size_t nodes; // total number of aaA nodes
     aaA*[4] binit; // initial value of b[]
     aaA aafirst; // a lot of these AA's have only one entry
-    shared TicketCounter aaLock;
+    shared TestSetLock writeLock;
 }
 
 /****************************************************
@@ -62,29 +63,36 @@ private size_t dmd_aaLen(const AA* aa) pure nothrow @nogc @safe
  * Add entry for key if it is not already there, returning a pointer to a null Value.
  * Create the associative array if it does not already exist.
  */
+static shared TestSetLock g_newAALock;
 private Value* dmd_aaGet(AA** paa, Key key) nothrow
 {
     //printf("paa = %p\n", paa);
+LtryAgain:
     if (!*paa)
-    {
-        static shared TicketCounter newAALock;
-        auto myTicket = newAALock.drawTicket();
-        scope(exit) 
-          newAALock.releaseTicket(myTicket);
-        while(!newAALock.servingMe(myTicket))
-        {}
-
-        AA* a = cast(AA*)mem.xmalloc(AA.sizeof);
-        a.b = cast(aaA**)a.binit;
-        a.b_length = 4;
-        a.nodes = 0;
-        a.binit[0] = null;
-        a.binit[1] = null;
-        a.binit[2] = null;
-        a.binit[3] = null;
-        *paa = a;
-        assert((*paa).b_length == 4);
+    {         
+        if(g_newAALock.tryLock())
+        {
+            // if we got the lock we can proceed 
+            AA* a = cast(AA*)mem.xmalloc(AA.sizeof);
+            a.b = cast(aaA**)a.binit;
+            a.b_length = 4;
+            a.nodes = 0;
+            a.binit[0] = null;
+            a.binit[1] = null;
+            a.binit[2] = null;
+            a.binit[3] = null;
+            a.writeLock.unlocked = true;
+            atomicStore(*paa, a);
+            assert((*paa).b_length == 4);
+            g_newAALock.unlock();
+        }
+        else
+        {
+            // if we didn't get the lock we need to check all over again
+            goto LtryAgain;
+        }
     }
+
     //printf("paa = %p, *paa = %p\n", paa, *paa);
     assert((*paa).b_length);
     size_t i = hash(cast(size_t)key) & ((*paa).b_length - 1);
@@ -98,34 +106,36 @@ private Value* dmd_aaGet(AA** paa, Key key) nothrow
     }
     // Not found, create new elem
     //printf("create new one\n");
-    size_t nodes = ++(*paa).nodes;
-    if (nodes != 1)
-    {
-        shared aaLock = (*paa).aaLock;
-        auto myTicket = aaLock.drawTicket();
-        scope(exit) 
-          aaLock.releaseTicket(myTicket);
-        while(!aaLock.servingMe(myTicket))
-        {}
 
-        e = cast(aaA*)mem.xmalloc(aaA.sizeof);
+    shared writeLock = &(*paa).writeLock;
+
+    if(writeLock.tryLock())
+    {
+        scope(exit) writeLock.unlock();
+        size_t nodes = ++(*paa).nodes;
+        if (nodes != 1)
+        {
+            e = cast(aaA*)mem.xmalloc(aaA.sizeof);
+        }
+        else
+        {
+            e = &(*paa).aafirst;
+        }
+        //e = new aaA();
+        e.next = null;
+        e.key = key;
+        e.value = null;
+        *pe = e;
+        //printf("length = %d, nodes = %d\n", (*paa)->b_length, nodes);
+        if (nodes > (*paa).b_length * 2)
+        {
+            //printf("rehash\n");
+            dmd_aaRehash(paa);
+        }
+        return &e.value;
     }
     else
-    {
-        e = &(*paa).aafirst;
-    }
-    //e = new aaA();
-    e.next = null;
-    e.key = key;
-    e.value = null;
-    *pe = e;
-    //printf("length = %d, nodes = %d\n", (*paa)->b_length, nodes);
-    if (nodes > (*paa).b_length * 2)
-    {
-        //printf("rehash\n");
-        dmd_aaRehash(paa);
-    }
-    return &e.value;
+        goto LtryAgain;
 }
 
 /*************************************************
@@ -246,14 +256,6 @@ unittest
  */
 private void dmd_aaRehash(AA** paa) nothrow
 {
-    auto aaLock = (*paa).aaLock;
-    auto myTicket = aaLock.drawTicket();
-    scope(exit) 
-        aaLock.releaseTicket(myTicket);
-    while(!aaLock.servingMe(myTicket))
-    {}
-
-
     //printf("Rehash\n");
     if (*paa)
     {

@@ -1367,7 +1367,7 @@ auto sourceFiles()
             console.d entity.d errors.d filecache.d globals.d id.d identifier.d lexer.d tokens.d utf.d
         ") ~ fileArray(env["ROOT"], "
             array.d bitarray.d ctfloat.d file.d filename.d hash.d outbuffer.d port.d region.d rmem.d
-            rootobject.d stringtable.d intel_inspector.d ticket.d reent_lock.d
+            rootobject.d stringtable.d intel_inspector.d ticket.d reent_lock.d perfcounter.d
         "),
         root: fileArray(env["ROOT"], "
             aav.d longdouble.d man.d response.d speller.d string.d strtold.d

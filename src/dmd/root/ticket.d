@@ -69,3 +69,19 @@ struct TicketCounter
         ticket = drawTicket(func, file, line);
     }
 }
+
+
+struct TestSetLock
+{
+    align(16) shared bool unlocked = true;
+    bool tryLock() shared nothrow
+    {
+       pragma(inline, true);
+       return cas(&unlocked, true, false);
+    }
+    void unlock() shared nothrow
+    {
+        pragma(inline, true);
+        atomicStore(unlocked, true);
+    }
+}
