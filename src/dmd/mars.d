@@ -164,36 +164,6 @@ private int tryMain(size_t argc, const(char)** argv, ref Param params)
     global._init();
 
     import dmd.taskgroup;
-    initBackgroundThreads();
-
-    // Check for malformed input
-    if (argc < 1 || !argv)
-    {
-    Largs:
-        error(Loc.initial, "missing or null command line arguments");
-        fatal();
-    }
-    // Convert argc/argv into arguments[] for easier handling
-    Strings arguments = Strings(argc);
-    for (size_t i = 0; i < argc; i++)
-    {
-        if (!argv[i])
-            goto Largs;
-        arguments[i] = argv[i];
-    }
-    if (!responseExpand(arguments)) // expand response files
-        error(Loc.initial, "can't open response file");
-    //for (size_t i = 0; i < arguments.dim; ++i) printf("arguments[%d] = '%s'\n", i, arguments[i]);
-    files.reserve(arguments.dim - 1);
-    // Set default values
-    params.argv0 = arguments[0].toDString;
-
-    // Temporary: Use 32 bits OMF as the default on Windows, for config parsing
-    static if (TARGET.Windows)
-    {
-        params.is64bit = false;
-        params.mscoff = false;
-    }
 
     if (parseCommandlineAndConfig(argc, argv, params, files))
         return EXIT_FAILURE;
