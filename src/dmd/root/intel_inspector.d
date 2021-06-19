@@ -5,23 +5,30 @@ import core.stdc.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
 
+
 extern (C) @nogc pure nothrow __gshared {
-    void dummy (void *p) {}
+    void dummy (void*) {};
 
-/**
- * @brief Quit spin loop without acquiring spin object
- */
+    void __itt_sync_create (void *addr, const char *objtype, const char *objname, int attribute)
+    = (void *addr, const char *objtype, const char *objname, int attribute){};
+    /**
+    * @brief Quit spin loop without acquiring spin object
+    */
     void function (void* addr) __itt_sync_cancel = &dummy;
-/**
- * @brief Successful spin loop completion (sync object acquired)
- */
+    /**
+    * @brief Successful spin loop completion (sync object acquired)
+    */
     void function (void* addr) __itt_sync_acquired = &dummy;
-/**
- * @brief Start sync object releasing code. Is called before the lock release call.
- */
+    /**
+    * @brief Start sync object releasing code. Is called before the lock release call.
+    */
     void function (void* addr) __itt_sync_releasing = &dummy;
-}
 
+    /**
+    * @brief Start sync object spinloc k code.
+    */
+    void function (void* addr) __itt_sync_prepare = &dummy;
+}
 shared static this()
 {
     auto insp_dir_c = getenv("INSPECTOR_2021_DIR");
@@ -36,6 +43,7 @@ shared static this()
             __itt_sync_cancel = cast(typeof(__itt_sync_cancel))dlsym(lib, "__itt_sync_cancel");
             __itt_sync_acquired = cast(typeof(__itt_sync_acquired))dlsym(lib, "__itt_sync_acquired");
             __itt_sync_releasing = cast(typeof(__itt_sync_releasing))dlsym(lib, "__itt_sync_releasing");
+            __itt_sync_prepare = cast(typeof(__itt_sync_prepare))dlsym(lib, "__itt_sync_prepare");
 
             return ;
         }

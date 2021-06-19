@@ -57,8 +57,7 @@ struct TicketCounter
             __itt_sync_acquired(cast(void*) &this);
             lastAquiredLoc = Loc(func, file, line);
         }
-
-
+       
         return result;
     }
 
@@ -76,12 +75,17 @@ struct TestSetLock
     align(16) shared bool unlocked = true;
     bool tryLock() shared nothrow
     {
-       pragma(inline, true);
-       return cas(&unlocked, true, false);
+        pragma(inline, true);
+        auto result = cas(&unlocked, true, false);
+
+        if (result)
+            __itt_sync_acquired(cast(void*) &this);
+        return result;
     }
     void unlock() shared nothrow
     {
         pragma(inline, true);
+        __itt_sync_releasing(cast(void*) &this);
         atomicStore(unlocked, true);
     }
 }

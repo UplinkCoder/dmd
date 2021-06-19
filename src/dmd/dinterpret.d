@@ -4892,6 +4892,11 @@ public:
         if (result)
             return;
 
+        // Check for ReflectionBulitin
+        result = evaluateIfReflect(pue, istate, e.loc, fd, e.arguments, pthis);
+        if (result)
+            return;
+
         if (!fd.fbody)
         {
             e.error("`%s` cannot be interpreted at compile time, because it has no available source code", fd.toChars());
@@ -7387,6 +7392,39 @@ private Expression evaluateIfBuiltin(UnionExp* pue, InterState* istate, const re
     }
     return e;
 }
+
+private Expression evaluateIfReflect(UnionExp* pue, InterState* istate, const ref Loc loc, FuncDeclaration fd, Expressions* arguments, Expression pthis)
+{
+    Expression e = null;
+    size_t nargs = arguments ? arguments.dim : 0;
+    import dmd.reflect;
+
+    if (!pthis)
+    {
+        auto reflect_kind = reflectKind(fd);
+        if (reflect_kind != REFLECT.Invalid)
+        {
+            Expressions args = Expressions(nargs);
+            foreach (i, ref arg; args)
+            {
+                Expression earg = (*arguments)[i];
+                earg = interpret(earg, istate);
+                if (exceptionOrCantInterpret(earg))
+                    return earg;
+                arg = earg;
+            }
+            e = eval_reflect(loc, reflect_kind, &args);
+            if (!e)
+            {
+                error(loc, "cannot evaluate unknown reflection function `%s` at compile time", fd.toChars());
+                e = CTFEExp.cantexp;
+            }
+        }
+    }
+
+    return e;
+}
+
 
 private Expression evaluatePostblit(InterState* istate, Expression e)
 {

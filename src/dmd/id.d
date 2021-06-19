@@ -358,6 +358,10 @@ immutable Msgtable[] msgtable =
     { "core" },
     { "etc" },
     { "attribute" },
+    // Reflection
+    { "reflect" },
+    { "declarationsFromTokenString" },
+    // Bultin Math
     { "math" },
     { "sin" },
     { "cos" },
