@@ -106,7 +106,7 @@ bool evalStaticCondition(Scope* sc, Expression original, Expression e, out bool 
             return false;
         }
 
-        e = e.ctfeInterpret();
+        e = e.ctfeInterpret(sc);
 
         if (e.isBool(true))
             return true;

@@ -105,7 +105,7 @@ bool expressionsToString(ref OutBuffer buf, Scope* sc, Expressions* exps)
         sc2.endCTFE();
 
         // allowed to contain types as well as expressions
-        auto e4 = ctfeInterpretForPragmaMsg(e3);
+        auto e4 = ctfeInterpretForPragmaMsg(e3, sc);
         if (!e4 || e4.op == TOK.error)
             return true;
 

@@ -2410,7 +2410,7 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
                     sc = sc.endCTFE();
 
                     // pragma(msg) is allowed to contain types as well as expressions
-                    e = ctfeInterpretForPragmaMsg(e);
+                    e = ctfeInterpretForPragmaMsg(e, sc);
                     if (e.op == TOK.error)
                     {
                         errorSupplemental(ps.loc, "while evaluating `pragma(msg, %s)`", arg.toChars());

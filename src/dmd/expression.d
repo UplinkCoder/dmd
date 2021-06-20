@@ -1643,9 +1643,9 @@ extern (C++) abstract class Expression : ASTNode
 
     // Entry point for CTFE.
     // A compile-time result is required. Give an error if not possible
-    final Expression ctfeInterpret()
+    extern (D) final Expression ctfeInterpret(Scope* sc = null, uint line = __LINE__, string file = __FILE__)
     {
-        return .ctfeInterpret(this);
+        return .ctfeInterpret(this, sc, line, file);
     }
 
     final int isConst()

@@ -416,7 +416,7 @@ extern(C++) Initializer initializerSemantic(Initializer init, Scope* sc, ref Typ
             {
                 return i;
             }
-            i.exp = i.exp.ctfeInterpret();
+            i.exp = i.exp.ctfeInterpret(sc);
             if (i.exp.op == TOK.voidExpression)
                 error(i.loc, "variables cannot be initialized with an expression of type `void`. Use `void` initialization instead.");
         }

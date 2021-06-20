@@ -1551,7 +1551,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     e = e.expressionSemantic(sc);
                     e = resolveProperties(sc, e);
                     sc = sc.endCTFE();
-                    e = ctfeInterpretForPragmaMsg(e);
+                    e = ctfeInterpretForPragmaMsg(e, sc);
                     if (e.op == TOK.error)
                     {
                         errorSupplemental(pd.loc, "while evaluating `pragma(msg, %s)`", (*pd.args)[i].toChars());

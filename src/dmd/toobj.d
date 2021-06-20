@@ -307,6 +307,11 @@ void toObjFile(Dsymbol ds, bool multiobj)
 
         override void visit(FuncDeclaration fd)
         {
+            import dmd.reflect;
+            bool dont_emit = (fd.linkage == 0 && isReflect(fd));
+            if (dont_emit)
+                return;
+
             // in glue.c
             FuncDeclaration_toObjFile(fd, multiobj);
         }

@@ -25,6 +25,7 @@ import dmd.constfold;
 import dmd.ctfeexpr;
 import dmd.dclass;
 import dmd.declaration;
+import dmd.dscope;
 import dmd.dstruct;
 import dmd.dsymbol;
 import dmd.dsymbolsem;
@@ -58,8 +59,9 @@ import dmd.visitor;
  * functions and may invoke a function that contains `ErrorStatement` in its body.
  * If that, the "CTFE failed because of previous errors" error is raised.
  */
-public Expression ctfeInterpret(Expression e)
+public Expression ctfeInterpret(Expression e, Scope* lookupScope = null, uint line = __LINE__, string file = __FILE__)
 {
+    // printf("Calling: %s from %s:+%d lookupScope: %p\n", __FUNCTION__.ptr, file.ptr, line, lookupScope);
     switch (e.op)
     {
         case TOK.int64:
@@ -93,6 +95,8 @@ public Expression ctfeInterpret(Expression e)
         return ErrorExp.get();
 
     auto rgnpos = ctfeGlobals.region.savePos();
+	if (!ctfeGlobals.lookupScope)
+		ctfeGlobals.lookupScope = lookupScope;
 
     Expression result = interpret(e, null);
 
@@ -104,14 +108,15 @@ public Expression ctfeInterpret(Expression e)
         result = ErrorExp.get();
 
     ctfeGlobals.region.release(rgnpos);
-
+	if (lookupScope)
+		ctfeGlobals.lookupScope = null;
     return result;
 }
 
 /* Run CTFE on the expression, but allow the expression to be a TypeExp
  *  or a tuple containing a TypeExp. (This is required by pragma(msg)).
  */
-public Expression ctfeInterpretForPragmaMsg(Expression e)
+public Expression ctfeInterpretForPragmaMsg(Expression e, Scope* lookupScope)
 {
     if (e.op == TOK.error || e.op == TOK.type)
         return e;
@@ -126,7 +131,7 @@ public Expression ctfeInterpretForPragmaMsg(Expression e)
 
     auto tup = e.isTupleExp();
     if (!tup)
-        return e.ctfeInterpret();
+        return e.ctfeInterpret(lookupScope);
 
     // Tuples need to be treated separately, since they are
     // allowed to contain a TypeExp in this case.
@@ -134,7 +139,7 @@ public Expression ctfeInterpretForPragmaMsg(Expression e)
     Expressions* expsx = null;
     foreach (i, g; *tup.exps)
     {
-        auto h = ctfeInterpretForPragmaMsg(g);
+        auto h = ctfeInterpretForPragmaMsg(g, lookupScope);
         if (h != g)
         {
             if (!expsx)
@@ -207,6 +212,8 @@ struct CtfeGlobals
     Region region;
 
     CtfeStack stack;
+
+	Scope* lookupScope;
 
     int callDepth = 0;        // current number of recursive calls
 
@@ -4893,6 +4900,11 @@ public:
         if (result)
             return;
 
+        // Check for ReflectionBulitin
+        result = evaluateIfReflect(pue, istate, e.loc, fd, e.arguments, pthis, ctfeGlobals.lookupScope);
+        if (result)
+            return;
+
         if (!fd.fbody)
         {
             e.error("`%s` cannot be interpreted at compile time, because it has no available source code", fd.toChars());
@@ -7352,6 +7364,40 @@ private Expression evaluateIfBuiltin(UnionExp* pue, InterState* istate, const re
     }
     return e;
 }
+
+private Expression evaluateIfReflect(UnionExp* pue, InterState* istate, const ref Loc loc, FuncDeclaration fd, Expressions* arguments, Expression pthis, Scope* lookupScope)
+{
+    Expression e = null;
+    size_t nargs = arguments ? arguments.dim : 0;
+    import dmd.reflect;
+
+    if (!pthis)
+    {
+        auto reflect_kind = reflectKind(fd);
+        if (reflect_kind != REFLECT.Invalid)
+        {
+            Expressions args = Expressions(nargs);
+            foreach (i, ref arg; args)
+            {
+                Expression earg = (*arguments)[i];
+                earg = interpret(earg, istate);
+                if (exceptionOrCantInterpret(earg))
+                    return earg;
+                arg = earg;
+            }
+            e = eval_reflect(loc, reflect_kind, &args, lookupScope);
+            //if (e) ctfeInterpret(e);
+            if (!e)
+            {
+                error(loc, "cannot evaluate unknown reflection function `%s` at compile time", fd.toChars());
+                e = CTFEExp.cantexp;
+            }
+        }
+    }
+
+    return e;
+}
+
 
 private Expression evaluatePostblit(InterState* istate, Expression e)
 {
