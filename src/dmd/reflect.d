@@ -215,7 +215,7 @@ import dmd.dimport;
 import dmd.identifier;
 import dmd.dsymbolsem;
 
-/// loads core.reflect from druntime and builds a table
+/// loads core.reflect from druntime and builds tables
 /// so we can make sure the runtime functions and classes are in sync
 /// with this code.
 void initialize()
@@ -256,7 +256,9 @@ import dmd.denum;
 __gshared ASTCodegen.Dsymbols* core_reflect = new ASTCodegen.Dsymbols;
 __gshared ASTCodegen.ClassDeclaration[] core_reflect_classes;
 __gshared ASTCodegen.EnumDeclaration[] core_reflect_enums;
-void fillReflectClasses()
+
+/// Gather all classes in core.reflect.*
+private void fillReflectClasses()
 {
     foreach(m;*core_reflect)
     {
@@ -269,7 +271,9 @@ void fillReflectClasses()
         }
     }
 }
-void fillReflectEnums()
+
+/// Gather all enums in core.reflect.*
+private void fillReflectEnums()
 {
     foreach(m;*core_reflect)
     {
@@ -307,7 +311,7 @@ StringExp makeString(const char* s, Loc loc = Loc.initial)
 }
 
 
-ClassReferenceExp makeReflectionClassLiteral(Scope* sc, Loc loc = Loc.initial)
+private ClassReferenceExp makeReflectionClassLiteral(Scope* sc, Loc loc = Loc.initial)
 {
     assert(sc !is null, "Scope must not be null when creating reflection class for scopes");
     const ivalue = cast(size_t)(cast(void*)sc);
@@ -325,7 +329,7 @@ ClassReferenceExp makeReflectionClassLiteral(Scope* sc, Loc loc = Loc.initial)
 ClassReferenceExp makeReflectionClassLiteral(ASTNode n, Scope* sc)
 {
     import dmd.asttypename;
-    //printf("%s: '%s' {astTypeName: %s}}\n", 
+    //printf("%s: '%s' {astTypeName: %s}}\n",
     //    __FUNCTION__.ptr, n.toChars() ,n.astTypeName().ptr);
     scope reflectionVisitor = new ReflectionVisitor(sc);
     n.accept(reflectionVisitor);
@@ -382,9 +386,53 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         return ed;
     }
 
+    static private bool matches(Type expType, Type targetType)
+    {
+        bool typeIsCorrect = expType.equivalent(targetType);
+        // if the types are not equivalent it still may be the case that the expression is a subtype
+        // of the field it's put in. let's look for base-classes and compare
+        if (!typeIsCorrect)
+        {
+            auto ctype = expType.isTypeClass();
+            if (ctype)
+            {
+                auto cd = ctype.sym;
+                while(cd.baseClass)
+                {
+                    cd = cd.baseClass;
+                    if (cd.type.equivalent(targetType))
+                    {
+                        typeIsCorrect = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return typeIsCorrect;
+    }
 
     void finalize()
     {
+        enum debug_core_reflect = 0;
+        static if (debug_core_reflect)
+        {
+            uint currentField = 0;
+            auto currentElement = elements.length - cd.fields.length;
+            auto test = cd;
+            while(test.baseClass)
+            {
+                foreach(field;test.fields)
+                {
+                    auto expType = (*elements)[currentElement++].type;
+                    auto fieldType = field.type;
+                    assert(matches(expType, fieldType),
+                       test.toString ~ " seems to mismatch at " ~ field.toString);
+                }
+                currentElement -= test.fields.length;
+                test = test.baseClass;
+                currentElement -= test.fields.length;
+            }
+        }
         data = new StructLiteralExp(loc, cast(StructDeclaration)cd, elements);
         result = new ClassReferenceExp(loc, data, cd.type.immutableOf());
     }
@@ -397,8 +445,37 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         visit(cast(Type)t);
         leaf = 1;
 
-        assert(cd.fields[0].toString() == "sym");
-        elements.push = makeReflectionClassLiteral(t.sym, lookupScope);
+        auto enumDecl = makeReflectionClassLiteral(t.sym, lookupScope);
+        fillField((cd.fields)[0], "sym", elements, enumDecl);
+    }
+
+    override void visit(StringExp e)
+    {
+        assert(leaf);
+        auto oldLeaf = leaf;
+        leaf = 0;
+        visit(cast(Expression)e);
+        leaf = oldLeaf;
+        cd = getCd("StringLiteral");
+        fillField((cd.fields)[0], "string_", elements, e);
+        if (leaf)
+            finalize();
+    }
+
+    override void visit(IntegerExp e)
+    {
+        assert(leaf);
+        auto oldLeaf = leaf;
+        leaf = 0;
+        visit(cast(Expression)e);
+        leaf = oldLeaf;
+        cd = getCd("IntegerLiteral");
+        auto oldType = e.type;
+        e.type = Type.tuns64;
+        fillField((cd.fields)[0], "value", elements, e.syntaxCopy());
+        e.type = oldType;
+        if (leaf)
+            finalize();
     }
 
     override void visit(ASTCodegen.TypePointer t)
@@ -407,19 +484,19 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         visit(cast(TypeNext)t);
     }
 
-    override void visit(ASTCodegen.TypeSlice t)
+    override void visit(ASTCodegen.TypeSArray t)
+    {
+        cd = getCd("TypeArray");
+        visit(cast(TypeNext)t);
+        fillField((cd.fields)[0], "dim", elements, t.dim);
+    }
+
+    override void visit(ASTCodegen.TypeDArray t)
     {
         cd = getCd("TypeSlice");
         visit(cast(TypeNext)t);
     }
 
-    override void visit(ASTCodegen.TypeSArray t)
-    {
-        cd = getCd("TypeArray");
-        visit(cast(TypeNext)t);
-        assert(cd.fields[0].toString() == "dim", cd.fields[0].toString());
-        elements.push = t.dim;
-    }
 
     override void visit(ASTCodegen.TypeNext t)
     {
@@ -439,8 +516,8 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         visit(cast(Type)t);
         leaf = oldLeaf;
 
-        assert(base.fields[0].toString() == "nextOf", base.fields[0].toString());
-        elements.push = makeReflectionClassLiteral(resolved, lookupScope);
+        auto tnext = makeReflectionClassLiteral(resolved, lookupScope);
+        fillField((base.fields)[0], "nextOf", elements, tnext);
 
         if (leaf)
             finalize();
@@ -475,14 +552,17 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         alignSize = t.isTypeFunction() ? 0 : t.alignsize();
 
         elements.setDim(4);
-        assert((*cd.members)[0].toString() == "kind", (*cd.members)[0].toString());
-        (*elements)[0] = makeString(t.kind());//tyToTypeKind(cast(ENUMTY)t.ty);
-        assert((*cd.members)[1].toString() == "alignSize", (*cd.members)[1].toString());
-        (*elements)[1] = new IntegerExp(loc, alignSize, Type.tuns32);
-        assert((*cd.members)[2].toString() == "size", (*cd.members)[2].toString());
-        (*elements)[2] = new IntegerExp(loc, size, Type.tuns64);
-        assert((*cd.members)[3].toString() == "identifier", (*cd.members)[3].toString());
-        (*elements)[3] = makeString(t.toChars(), loc);
+        auto kind = makeString(t.kind());//tyToTypeKind(cast(ENUMTY)t.ty);
+        fillField((cd.fields)[0], "kind", elements, kind, 0);
+
+        auto alignSizeExp = new IntegerExp(loc, alignSize, Type.tuns32);
+        fillField((cd.fields)[1], "alignSize", elements, alignSizeExp, 1);
+
+        auto sizeExp = new IntegerExp(loc, size, Type.tuns64);
+        fillField((cd.fields)[2], "size", elements, sizeExp, 2);
+
+        auto identifier = makeString(t.toChars(), loc);
+        fillField((cd.fields)[3], "identifier", elements, identifier, 3);
 
         if (leaf)
             finalize();
@@ -490,23 +570,51 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             cd = oldCd;
     }
 
+    private extern (D) void fillField(VarDeclaration vd, string fieldName, Expressions* elements, Expression exp, int expIndex = -1,
+        string file = __FILE__, uint line = __LINE__)
+    {
+        import dmd.utils;
+
+        string loc = "+" ~ itos(line) ~ " " ~ file;
+        assert(vd.toString() == fieldName,
+            "[" ~ loc ~ "] " ~ "Expected to fill field: '" ~ fieldName ~ "' but got '" ~ vd.toString()  ~ "'"
+        );
+
+        assert(exp, "[" ~ loc ~ "] " ~ "Null Expression passed");
+
+        assert(matches(exp.type, vd.type),
+            "[" ~ loc ~ "] " ~ "mismatched types between field '" ~ vd.type.toString() ~ "'"
+            ~ " and expression '" ~ exp.type.toString ~ "'");
+
+        if (expIndex >= 0)
+        {
+            (*elements)[expIndex] = exp;
+        }
+        else
+        {
+            elements.push = exp;
+        }
+    }
+
     override void visit(ASTCodegen.Parameter p)
     {
         assert(leaf);
         cd = getCd("FunctionParameter");
         elements.setDim(2);
-        assert((*cd.members)[0].toString() == "type", (*cd.members)[0].toString());
-        (*elements)[0] = makeReflectionClassLiteral(p.type, lookupScope);
-        
-        assert((*cd.members)[1].toString() == "identifier", (*cd.members)[1].toString());
+
+        fillField((cd.fields)[0], "type", elements, makeReflectionClassLiteral(p.type, lookupScope), 0);
+
+        Expression identifier;
         if (p.ident)
         {
-            (*elements)[1] = makeString(p.ident.toChars(), loc);
+            identifier = makeString(p.ident.toChars(), loc);
         }
         else
         {
-            (*elements)[1] = new NullExp(loc, Type.tstring);
+            identifier = new NullExp(loc, Type.tstring);
         }
+
+        fillField((cd.fields)[1], "identifier", elements, identifier, 1);
 
         finalize();
     }
@@ -516,19 +624,18 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         auto oldCd = cd;
         cd = getCd("Declaration");
 
-        assert((*cd.members)[0].toString() == "name", (*cd.members)[0].toString());
-        elements.push = makeString(d.ident.toChars(), loc);
-        
-        assert((*cd.members)[1].toString() == "attributes", (*cd.members)[1].toString());
-        // also null for now TODO FIXME
-        auto e0 = new Expressions(0);
-        elements.push = new ArrayLiteralExp(loc, getCd("Node").type.arrayOf, e0);
-        
-        assert((*cd.members)[2].toString() == "linkage", (*cd.members)[2].toString());
-        visit(d.linkage);
+        fillField((cd.fields)[0], "name", elements, makeString(d.ident.toChars(), loc));
 
-        assert((*cd.members)[3].toString() == "comment", (*cd.members)[3].toString());
-        elements.push = makeString(d.comment, loc);
+        auto e0 = new Expressions(0);
+        fillField((cd.fields)[1], "attributes", elements,
+            new ArrayLiteralExp(loc, getCd("Node").type.arrayOf, e0)
+        );
+
+        fillField((cd.fields)[2], "linkage", elements,
+            LINKtoLinkage(d.linkage)
+        );
+
+        fillField((cd.fields)[3], "comment", elements, makeString(d.comment, loc));
 
         if (leaf)
             finalize();
@@ -547,46 +654,36 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         visit(cast(Type)ft);
         leaf = 1;
 
-        assert((cd.fields)[0].toString() == "returnType", (cd.fields)[0].toString());
-        elements.push = makeReflectionClassLiteral(ft.next, lookupScope);
-
         cd = funcTypeCd;
-        assert((*cd.members)[1].toString() == "parameterTypes", (*cd.members)[1].toString());
+
+        auto returnType = makeReflectionClassLiteral(ft.next, lookupScope);
+        printf("ft.next: %s, returnTypeReflectionClass: %s\n", ft.next.toString().ptr, returnType.toString().ptr);
+        fillField((cd.fields)[0], "returnType", elements, returnType);
+
         auto nParams = ft.parameterList.length;
 
         Expressions* parameterTypeElements = new Expressions(nParams);
+        auto cParameter = getCd("FunctionParameter");
         foreach(i, p;ft.parameterList)
         {
-            (*parameterTypeElements)[i] = makeReflectionClassLiteral(p, lookupScope);
+            auto para = makeReflectionClassLiteral(p, lookupScope);
+            assert(matches(para.type, cParameter.type));
+            (*parameterTypeElements)[i] = para;
         }
-        auto cParameter = getCd("FunctionParameter");
 
         auto parameterTypeArray = new ArrayLiteralExp(loc,
             cParameter.type.arrayOf,
             parameterTypeElements,
         );
-        elements.push = parameterTypeArray;
+        fillField((cd.fields)[1], "parameterTypes", elements, parameterTypeArray);
 
         finalize();
     }
 
-    void visit(LINK linkage)
+    static Expression LINKtoLinkage(LINK linkage)
     {
         EnumDeclaration ed = getEd("Linkage");
         string lookFor;
-        /+
-            enum Linkage
-            {
-                Default, /// maybe invalid?
-
-                D,
-                C,
-                CPP,
-                Windows,
-                ObjC,
-                System,
-            }
-         +/ 
 
         final switch(linkage)
         {
@@ -619,13 +716,32 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
             if (em.toString() == lookFor)
             {
-                elements.push(em.value);
-                return ;
+                return (em.value);
             }
         }
 
         assert(0, "Linkage." ~ lookFor ~ " could not be found in LinkageEnum");
 
+    }
+
+    override void visit(ASTCodegen.Initializer i)
+    {
+        printf("visiting initializer\n");
+    }
+
+    override void visit(ASTCodegen.ExpInitializer i)
+    {
+        import dmd.asttypename;
+        printf("visiting exp-initializer\n");
+        (i.exp).accept(this);
+        printf("i.exp: %s\n", astTypeName(i.exp).ptr);
+    }
+
+    override void visit(Expression e)
+    {
+        cd = getCd("Expression");
+        auto type = makeReflectionClassLiteral(e.type, lookupScope);
+        fillField((cd.fields)[0], "type", elements, type);
     }
 
     override void visit (ASTCodegen.VarDeclaration vd)
@@ -637,11 +753,12 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         
         cd = getCd("VariableDeclaration");
 
-        assert((*cd.members)[0].toString() == "type", (*cd.members)[0].toString());
         assert(vd.type);
         auto type = makeReflectionClassLiteral(vd.type, lookupScope);
-        assert(type);
-        elements.push = type;
+
+        fillField((cd.fields)[0], "type", elements, type);
+        auto _init = makeReflectionClassLiteral(vd._init, lookupScope);
+        fillField((cd.fields)[1], "_init", elements, _init);
 
         if (leaf)
             finalize();
@@ -655,9 +772,9 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         leaf = oldLeaf;
 
         cd = getCd("FunctionDeclaration");
-
-        assert((cd.fields)[0].toString() == "type", (cd.fields)[0].toString());
-        elements.push = makeReflectionClassLiteral(cast(TypeFunction) fd.type, lookupScope);
+        auto type = makeReflectionClassLiteral(cast(TypeFunction)fd.type, lookupScope);
+        fillField((cd.fields)[0], "type", elements, type);
+        
         // second element is core.reflect.decl.VariableDeclaration[] parameters;
         assert((cd.fields)[1].toString() == "parameters", (cd.fields)[1].toString());
         const nParameters = fd.parameters ? fd.parameters.length : 0;
@@ -668,12 +785,13 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             (*parameterElements)[i] = makeReflectionClassLiteral(p, lookupScope);
         }
         auto parameterArrray = new ArrayLiteralExp(loc, (cd.fields[1]).type, parameterElements);
-        elements.push = parameterArrray;
-        
+      
+        fillField((cd.fields)[1], "parameters", elements, parameterArrray);
+
         // third element is core.reflect.stmt.Statement fbody
-        assert((cd.fields)[2].toString() == "fbody", (cd.fields)[2].toString());
-        // also null for now TODO FIXME
-        elements.push = new NullExp(loc, getCd("Statement").type);
+        // TODO FIXME: serialize the body statement into here
+        auto fbody = new NullExp(loc, getCd("Statement").type);
+        fillField((cd.fields)[2], "fbody", elements, fbody);
 
         if (leaf)
             finalize();
