@@ -56,7 +56,8 @@ extern (C++) class Initializer : ASTNode
     Loc loc;
     InitKind kind;
 
-    override DYNCAST dyncast() const nothrow pure {
+    override DYNCAST dyncast() const nothrow pure
+    {
         return DYNCAST.initializer;
     }
 
