@@ -5583,6 +5583,7 @@ extern (C++) abstract class TypeQualified : Type
             case statement:
             case condition:
             case templateparameter:
+            case initializer:
             }
             idents[i] = id;
         }
