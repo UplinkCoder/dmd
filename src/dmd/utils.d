@@ -312,8 +312,8 @@ static immutable fastPow10tbl = [
 string itos(const uint val) pure @trusted nothrow
 {
     immutable length = fastLog10(val) + 1;
-    char[] result;
-    result.length = length;
+
+    char[] result = new char[](length);
 
     foreach (i; 0 .. length)
     {
