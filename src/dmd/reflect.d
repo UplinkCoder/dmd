@@ -333,10 +333,11 @@ ClassReferenceExp makeReflectionClassLiteral(ASTNode n, Scope* sc)
     {
         return *cast(ClassReferenceExp*)cre;
     }
-
+/+
     import dmd.asttypename;
     printf("%s: '%s' {astTypeName: %s}}\n",
-        __FUNCTION__.ptr, n.toChars() ,n.astTypeName().ptr);
+        __FUNCTION__.ptr, n.toChars(), n.astTypeName().ptr);
++/
     scope reflectionVisitor = new ReflectionVisitor(n, sc);
     n.accept(reflectionVisitor);
 
@@ -439,7 +440,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
     void finalize()
     {
-        enum debug_core_reflect = 1;
+        enum debug_core_reflect = 0;
         static if (debug_core_reflect)
         {
             uint currentField = 0;
@@ -670,8 +671,6 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         auto p = placeholder(oldCd ? oldCd : cd);
         cache[cast(void*)d] = p;
 
-        printf("D: %s, (%p)\n", d.toChars, cast(void*)d);
-
         fillField((cd.fields)[0], "name", elements, makeString(d.ident.toChars(), loc));
 
         auto e0 = new Expressions(0);
@@ -705,7 +704,6 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         cd = funcTypeCd;
 
         auto returnType = makeReflectionClassLiteral(ft.next, lookupScope);
-        printf("ft.next: %s, returnTypeReflectionClass: %s\n", ft.next.toString().ptr, returnType.toString().ptr);
         fillField((cd.fields)[0], "returnType", elements, returnType);
 
         auto nParams = ft.parameterList.length;
@@ -774,15 +772,14 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
     override void visit(ASTCodegen.Initializer i)
     {
-        printf("visiting initializer\n");
+
     }
 
     override void visit(ASTCodegen.ExpInitializer i)
     {
         import dmd.asttypename;
-        printf("visiting exp-initializer\n");
         (i.exp).accept(this);
-        printf("i.exp: %s\n", astTypeName(i.exp).ptr);
+
     }
 
     override void visit(ASTCodegen.EnumDeclaration ed)
@@ -798,7 +795,6 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         fillField(cd.fields[0], "type", elements, type);
 
         auto memberCd = getCd("EnumMember");
-
 
         auto nMembers = ed.members.length;
         Expressions* enumMembers = new Expressions(nMembers);
@@ -834,64 +830,137 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     }
 
 
+    override void visit(ASTCodegen.IdentifierExp e)
+    {
+        // (cast(Expression)e) = expressionSemantic(e, lookupScope);
+        assert(0, "Unresolved expression detected");
+    }
+
+
     override void visit(Expression e)
     {
+        assert(!leaf);
+        auto oldCd = cd;
         cd = getCd("Expression");
 
-        assert(e.type);
+        if(!e.type)
+        {
+            assert(0, "Expression '" ~ e.toString ~ "' is supposed to have a type");
+        }
         auto type = makeReflectionClassLiteral(e.type, lookupScope);
-        assert(type);
+        assert(type, e.toString());
         fillField((cd.fields)[0], "type", elements, type);
+
+        if (!leaf)
+            cd = oldCd;
     }
 
     override void visit (ASTCodegen.VarDeclaration vd)
     {
+        cd = getCd("VariableDeclaration");
+
         auto oldLeaf = leaf;
         leaf = 0;
         visit(cast(Declaration)vd);
         leaf = oldLeaf;
-        
-        cd = getCd("VariableDeclaration");
 
         assert(vd.type);
         auto type = makeReflectionClassLiteral(vd.type, lookupScope);
         fillField((cd.fields)[0], "type", elements, type);
 
-        auto _init = makeReflectionClassLiteral(vd._init, lookupScope);
+
+        auto _init = vd.init ? makeReflectionClassLiteral(vd._init, lookupScope) : new NullExp(loc, getCd("Expression").type);
         fillField((cd.fields)[1], "_init", elements, _init);
 
         if (leaf)
             finalize();
     }
 
+    override void visit(ASTCodegen.CompoundStatement ce)
+    {
+        cd = getCd("BlockStatement");
+
+        auto nStatements = ce.statements ? ce.statements.length : 0;
+        Expressions* statementElems = new Expressions(nStatements);
+        if (nStatements) foreach(i, s; *ce.statements)
+        {
+            (*statementElems)[i] = makeReflectionClassLiteral(s, lookupScope);
+        }
+        auto statements =
+            new ArrayLiteralExp(loc, getCd("Statement").type.arrayOf, statementElems);
+
+        fillField(cd.fields[0], "statements", elements, statements);
+
+        if (leaf)
+            finalize();
+    }
+
+    override void visit(ASTCodegen.ReturnStatement s)
+    {
+        assert(leaf);
+
+        cd = getCd("ReturnStatement");
+        auto exp = s.exp ? makeReflectionClassLiteral(s.exp, lookupScope) : new NullExp(loc, getCd("Expression").type);
+        fillField(cd.fields[0], "exp", elements, exp);
+
+        if (leaf)
+            finalize();
+    }
+
+    override void visit(ASTCodegen.VarExp e)
+    {
+        assert(leaf);
+        cd = getCd("VariableExpression");
+
+        auto oldLeaf = leaf;
+        leaf = 0;
+        visit(cast(Expression)e);
+        leaf = oldLeaf;
+
+        auto var = makeReflectionClassLiteral(e.var, lookupScope);
+        fillField((cd.fields)[0], "var", elements, var);
+
+        if (leaf)
+            finalize();
+    }
+
+
     override void visit(ASTCodegen.FuncDeclaration fd)
     {
+        cd = getCd("FunctionDeclaration");
+
         auto oldLeaf = leaf;
         leaf = 0;
         visit(cast(Declaration)fd);
         leaf = oldLeaf;
 
-        cd = getCd("FunctionDeclaration");
+        bool semaDone = fd.functionSemantic();
+        bool sema3Done = fd.functionSemantic3();
+
         auto type = makeReflectionClassLiteral(cast(TypeFunction)fd.type, lookupScope);
         fillField((cd.fields)[0], "type", elements, type);
-        
+
         // second element is core.reflect.decl.VariableDeclaration[] parameters;
         assert((cd.fields)[1].toString() == "parameters", (cd.fields)[1].toString());
         const nParameters = fd.parameters ? fd.parameters.length : 0;
-        
+
         Expressions* parameterElements = new Expressions(nParameters);
         if (nParameters) foreach(i, p; *fd.parameters)
         {
             (*parameterElements)[i] = makeReflectionClassLiteral(p, lookupScope);
         }
         auto parameterArrray = new ArrayLiteralExp(loc, (cd.fields[1]).type, parameterElements);
-      
+
         fillField((cd.fields)[1], "parameters", elements, parameterArrray);
 
+        auto oldlookupScope = lookupScope;
+        lookupScope = fd._scope;
         // third element is core.reflect.stmt.Statement fbody
         // TODO FIXME: serialize the body statement into here
-        auto fbody = new NullExp(loc, getCd("Statement").type);
+        auto fbody = fd.fbody ? makeReflectionClassLiteral(fd.fbody, lookupScope)
+            : new NullExp(loc, getCd("Statement").type);
         fillField((cd.fields)[2], "fbody", elements, fbody);
+        lookupScope = oldlookupScope;
 
         if (leaf)
             finalize();
@@ -947,7 +1016,7 @@ extern(C++) final class ExpandDeclVisitor : SemanticTimeTransitiveVisitor
         auto oldVisibilty = currentVisibility;
         currentVisibility = vd.visibility;
         scope(exit) currentVisibility = oldVisibilty;
-        
+
         foreach(s;*vd.decl)
         {
             //printf("s: %s, (%s)\n", s.toChars(), astTypeName(s).ptr);
