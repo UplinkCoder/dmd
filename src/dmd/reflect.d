@@ -14,6 +14,8 @@ import dmd.astcodegen;
 import dmd.astenums;
 import core.stdc.stdio;
 
+enum emitFunctionBodies = false;
+
 enum REFLECT
 {
     Invalid,
@@ -121,15 +123,9 @@ Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* ar
         {
             initialize();
             import dmd.parse;
-            ClassDeclaration cd;
-            foreach(c;core_reflect_classes)
-            {
-                if (c.toString == "Declaration")
-                {
-                    cd = c;
-                    break;
-                }
-            }
+
+            ClassDeclaration cd = ReflectionVisitor.getCd("Declaration");
+
             assert((*args).length == 1);
             Expression args0 = (*args)[0];
             import core.stdc.stdio;
@@ -159,6 +155,24 @@ Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* ar
                 {
                     (*expressions)[i] = makeReflectionClassLiteral(vd, lookupScope);
                 }
+                else if (auto ed = d.isEnumDeclaration())
+                {
+                    (*expressions)[i] = makeReflectionClassLiteral(ed, lookupScope);
+                }
+                else
+                {
+                    import dmd.asttypename;
+                    printf("d: %s (%s) \n", d.toChars(), astTypeName(d).ptr);
+                    printf("creating delcaration is unsupported\n");
+                    // (*expressions)[i] = makeReflectionClassLiteral(d, lookupScope);
+                    (*expressions)[i] = new NullExp(d.loc, cd.type);
+                }
+/+
+                else if (auto imp = d.isImport())
+                {
+                    printf("found an import\n");
+                }
++/                
             }
             auto result = new ArrayLiteralExp(loc, cd.type.arrayOf, expressions);
 
@@ -583,7 +597,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         auto oldCd = cd;
         cd = getCd("Type");
         t = t.merge2();
-        auto p = placeholder();
+        auto p = placeholder(oldCd ? oldCd : cd);
         cache[cast(void*)t] = p;
 
 
@@ -694,14 +708,12 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     {
         assert(leaf);
 
-        auto funcTypeCd = cd = getCd("FunctionType");
+        cd = getCd("FunctionType");
         auto base = cd.baseClass;
 
         leaf = 0;
         visit(cast(Type)ft);
         leaf = 1;
-
-        cd = funcTypeCd;
 
         auto returnType = makeReflectionClassLiteral(ft.next, lookupScope);
         fillField((cd.fields)[0], "returnType", elements, returnType);
@@ -957,7 +969,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         lookupScope = fd._scope;
         // third element is core.reflect.stmt.Statement fbody
         // TODO FIXME: serialize the body statement into here
-        auto fbody = fd.fbody ? makeReflectionClassLiteral(fd.fbody, lookupScope)
+        auto fbody = (fd.fbody && emitFunctionBodies) ? makeReflectionClassLiteral(fd.fbody, lookupScope)
             : new NullExp(loc, getCd("Statement").type);
         fillField((cd.fields)[2], "fbody", elements, fbody);
         lookupScope = oldlookupScope;

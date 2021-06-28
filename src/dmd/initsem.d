@@ -568,7 +568,7 @@ extern(C++) Initializer initializerSemantic(Initializer init, Scope* sc, ref Typ
             return i;
         }
         if (needInterpret)
-            i.exp = i.exp.ctfeInterpret();
+            i.exp = i.exp.ctfeInterpret(sc);
         else
             i.exp = i.exp.optimize(WANTvalue);
         //printf("-ExpInitializer::semantic(): "); i.exp.print();
