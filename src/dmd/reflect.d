@@ -261,7 +261,7 @@ void initialize()
         if (s.mod.members) foreach(sym;*s.mod.members)
         {
             scope expandVisitorX = new ExpandDeclVisitor(true);
-            sym.accept(expandVisitorX);
+            if (sym != s) sym.accept(expandVisitorX);
             core_reflect.append(expandVisitorX.syms);
         }
         //        printf("\ncore.reflect syms: %s\n", core_reflect.toChars());
@@ -1140,17 +1140,19 @@ extern(C++) final class ExpandDeclVisitor : SemanticTimeTransitiveVisitor
     override void visit(ASTCodegen.Dsymbol ds)
     {
         //printf("ds: %s (%s)\n", ds.toChars(), astTypeName(ds).ptr);
-        ds.accept(this);
+        // ds.accept(this);
     }
 
     override void visit(ASTCodegen.AttribDeclaration ad)
     {
         //printf("ad: %s  (%s)\n", ad.toChars(), astTypeName(ad).ptr);
-        ad.accept(this);
+        // ad.accept(this);
     }
 
     override void visit(ASTCodegen.LinkDeclaration ld)
     {
+         if (!for_core_reflect)
+             return ;
         //printf("ld: %s, (%s)\n", ld.toChars(), astTypeName(ld).ptr);
         auto oldLinkage = currentLinkage;
         currentLinkage = ld.linkage;
@@ -1165,6 +1167,9 @@ extern(C++) final class ExpandDeclVisitor : SemanticTimeTransitiveVisitor
 
     override void visit(ASTCodegen.VisibilityDeclaration vd)
     {
+         if (!for_core_reflect)
+             return ;
+
         //printf("vd: %s, (%s)\n", vd.toChars(), astTypeName(vd).ptr);
         auto oldVisibilty = currentVisibility;
         currentVisibility = vd.visibility;
@@ -1179,6 +1184,9 @@ extern(C++) final class ExpandDeclVisitor : SemanticTimeTransitiveVisitor
 
     override void visit(ASTCodegen.StorageClassDeclaration sd)
     {
+         if (!for_core_reflect)
+             return ;
+
         //printf("sd: %s, (%s)\n", sd.toChars(), astTypeName(sd).ptr);
         auto oldStorageClass = currentStorageClass;
         currentStorageClass  = sd.stc;
@@ -1193,17 +1201,23 @@ extern(C++) final class ExpandDeclVisitor : SemanticTimeTransitiveVisitor
 
     override void visit(ASTCodegen.FuncDeclaration fd)
     {
-        fd.linkage = currentLinkage;
-        fd.storage_class = currentStorageClass;
-        fd.visibility = currentVisibility;
+        if (for_core_reflect)
+        {
+            fd.linkage = currentLinkage;
+            fd.storage_class = currentStorageClass;
+            fd.visibility = currentVisibility;
+        }
         syms.push(fd);
     }
 
     override void visit(ASTCodegen.VarDeclaration vd)
     {
-        vd.linkage = currentLinkage;
-        vd.storage_class = currentStorageClass;
-        vd.visibility = currentVisibility;
+        if (for_core_reflect)
+        {
+            vd.linkage = currentLinkage;
+            vd.storage_class = currentStorageClass;
+            vd.visibility = currentVisibility;
+        }
         syms.push(vd);
     }
 
