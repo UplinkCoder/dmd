@@ -483,6 +483,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         if (auto placeholder = (cast(void*)node) in cache)
         {
             placeholder.value = data;
+            placeholder.type = cd.type;
             result = *placeholder;
         }
         else
