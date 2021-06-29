@@ -645,6 +645,19 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     }
 
 
+    override void visit(ASTCodegen.TypeBasic t)
+    {
+        assert(leaf);
+        cd = getCd("TypeBasic");
+
+        leaf = 0;
+        visit(cast(Type)t);
+        leaf = 1;
+
+        if (leaf)
+            finalize();
+    }
+
     override void visit(ASTCodegen.Type t)
     {
         auto oldCd = cd;
@@ -1070,7 +1083,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             {
                 (*fieldElements)[i] = makeReflectionClassLiteral(f, lookupScope);
             }
-            auto fields = new ArrayLiteralExp(loc, (cd.fields[0]).type, fieldElements);
+            auto fields = new ArrayLiteralExp(loc, (cd.fields[1]).type, fieldElements);
             fillField(cd.fields[1], "fields", elements, fields);
         }
     }
