@@ -536,6 +536,41 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             finalize();
     }
 
+    override void visit(ASTCodegen.TypeClass t)
+    {
+        assert(leaf);
+
+        cd = getCd("TypeClass");
+
+        leaf = 0;
+        visit(cast(Type)t);
+        leaf = 1;
+
+        import dmd.asttypename;
+        auto sym = makeReflectionClassLiteral(t.sym, lookupScope);
+        fillField(cd.fields[0], "sym", elements, sym);
+
+        if (leaf)
+            finalize();
+    }
+
+    override void visit(ASTCodegen.TypeStruct t)
+    {
+        assert(leaf);
+
+        cd = getCd("TypeStruct");
+
+        leaf = 0;
+        visit(cast(Type)t);
+        leaf = 1;
+
+        auto sym = makeReflectionClassLiteral(t.sym, lookupScope);
+        fillField(cd.fields[0], "sym", elements, sym);
+
+        if (leaf)
+            finalize();
+    }
+
     override void visit(FuncExp e)
     {
         assert(leaf);
