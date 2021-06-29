@@ -567,7 +567,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         auto fbody = e.fd.fbody ? makeReflectionClassLiteral(e.fd.fbody, lookupScope)
             : new NullExp(loc, getCd("Statement").type);
 
-        fillField((cd.fields)[1], "fBody", elements, fbody);
+        fillField((cd.fields)[1], "fbody", elements, fbody);
         lookupScope = oldlookupScope;
 
         if (leaf)
