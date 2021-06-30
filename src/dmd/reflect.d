@@ -14,7 +14,7 @@ import dmd.astcodegen;
 import dmd.astenums;
 import core.stdc.stdio;
 
-enum emitFunctionBodies = false;
+enum emitFunctionBodies = true;
 
 enum REFLECT
 {
@@ -176,7 +176,7 @@ Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* ar
                 {
                     printf("found an import\n");
                 }
-+/               
++/
             }
             auto result = new ArrayLiteralExp(loc, cd.type.arrayOf, expressions);
 
@@ -351,11 +351,15 @@ ClassReferenceExp makeReflectionClassLiteral(ASTNode n, Scope* sc)
     {
         return *cast(ClassReferenceExp*)cre;
     }
-/+
+
     import dmd.asttypename;
-    printf("%s: '%s' {astTypeName: %s}}\n",
+    printf("+%s: '%s' {astTypeName: %s}}\n",
         __FUNCTION__.ptr, n.toChars(), n.astTypeName().ptr);
-+/
+    scope(exit)
+        printf("-%s: '%s' {astTypeName: %s}}\n",
+            __FUNCTION__.ptr, n.toChars(), n.astTypeName().ptr);
+
+
     scope reflectionVisitor = new ReflectionVisitor(n, sc);
     n.accept(reflectionVisitor);
 
@@ -463,7 +467,8 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         static if (debug_core_reflect)
         {
             uint currentField = 0;
-            auto currentElement = elements.length - cd.fields.length;
+            int currentElement = cast(int) (elements.length - cd.fields.length);
+            assert(currentElement >= 0, "cd.fields longer than elements cd:" ~ cd.toString());
             auto test = cd;
             while(test.baseClass)
             {
@@ -477,6 +482,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
                 currentElement -= test.fields.length;
                 test = test.baseClass;
                 currentElement -= test.fields.length;
+                assert(currentElement >= 0, "at base: '" ~ test.toString() ~ "' fields longer than elements cd:" ~ cd.toString());
             }
         }
         data = new StructLiteralExp(loc, cast(StructDeclaration)cd, elements);
@@ -512,7 +518,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         assert(leaf);
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Expression)e);
+        handleExp(e);
         leaf = oldLeaf;
         cd = getCd("StringLiteral");
         fillField((cd.fields)[0], "string_", elements, e);
@@ -525,7 +531,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         assert(leaf);
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Expression)e);
+        handleExp(e);
         leaf = oldLeaf;
         cd = getCd("IntegerLiteral");
         auto oldType = e.type;
@@ -580,7 +586,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         assert(leaf);
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Expression)e);
+        handleExp(e);
         leaf = oldLeaf;
 
         cd = getCd("FunctionLiteral");
@@ -840,6 +846,69 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         finalize();
     }
 
+    static Expression opToBinaryOp(TOK op)
+    {
+        auto ed = getEd("BinaryOp");
+        string lookFor;
+
+        switch(op)
+        {
+            case TOK.add :
+                lookFor = "Add";
+                break;
+            case TOK.min :
+                lookFor = "Min";
+                break;
+            case TOK.mul :
+                lookFor = "Mul";
+                break;
+            case TOK.div :
+                lookFor = "Div";
+                break;
+            case TOK.mod :
+                lookFor = "Mod";
+                break;
+            case TOK.leftShift :
+                lookFor = "Shl";
+                break;
+            case TOK.rightShift :
+                lookFor = "Shr";
+                break;
+            case TOK.concatenate :
+                lookFor = "Cat";
+                break;
+            case TOK.in_ :
+                lookFor = "In";
+                break;
+            case TOK.equal :
+                lookFor = "Eq";
+                break;
+            case TOK.notEqual :
+                lookFor = "Neq";
+                break;
+            case TOK.identity :
+                lookFor = "Is";
+                break;
+            case TOK.notIdentity :
+                lookFor = "Nis";
+                break;
+            default : assert(0, "Translation from TOK." ~ enumToString(op) ~ " to BinaryOp is not implemented.");
+        }
+
+        foreach(i, m;*ed.members)
+        {
+            EnumMember em = m.isEnumMember();
+            assert(em);
+
+            if (em.toString() == lookFor)
+            {
+                return (em.value);
+            }
+        }
+
+        assert(0, "BinaryOp." ~ lookFor ~ " could not be found in BinaryOp enum");
+    }
+
     static Expression LINKtoLinkage(LINK linkage)
     {
         EnumDeclaration ed = getEd("Linkage");
@@ -952,7 +1021,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     }
 
 
-    override void visit(Expression e)
+    void handleExp(Expression e)
     {
         assert(!leaf);
         auto oldCd = cd;
@@ -1053,7 +1122,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Expression)e);
+        handleExp(e);
         leaf = oldLeaf;
 
         auto var = makeReflectionClassLiteral(e.var, lookupScope);
@@ -1061,6 +1130,61 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
         if (leaf)
             finalize();
+    }
+
+    import dmd.asttypename;
+    override void visit(Expression e)
+    {
+        assert(0, "Expression not supported " ~ astTypeName(e) ~ ".");
+    }
+
+    void handleBinExp(BinExp e)
+    {
+        assert(leaf);
+        cd = getCd("BinaryExpression");
+
+        auto oldLeaf = leaf;
+        leaf = 0;
+        handleExp(e);
+        leaf = oldLeaf;
+
+        {
+            auto op = opToBinaryOp(e.op);
+            fillField(cd.fields[0], "op", elements, op);
+        }
+
+        {
+            auto left = makeReflectionClassLiteral(e.e1, lookupScope);
+            fillField(cd.fields[1], "left", elements, left);
+        }
+
+        {
+            auto right = makeReflectionClassLiteral(e.e2, lookupScope);
+            fillField(cd.fields[2], "right", elements, right);
+        }
+
+        if (leaf)
+            finalize();
+    }
+
+    override void visit(AddExp e)
+    {
+        handleBinExp(e);
+    }
+
+    override void visit(MinExp e)
+    {
+        handleBinExp(e);
+    }
+
+    override void visit(MulExp e)
+    {
+        handleBinExp(e);
+    }
+
+    override void visit(DivExp e)
+    {
+        handleBinExp(e);
     }
 
     override void visit(ASTCodegen.StructDeclaration d)
@@ -1305,5 +1429,18 @@ extern(C++) final class ExpandDeclVisitor : SemanticTimeTransitiveVisitor
     {
         ed.dsymbolSemantic(null);
         syms.push(ed);
+    }
+}
+
+private string enumToString(E)(E v)
+{
+    static assert(is(E == enum),
+        "emumToString is only meant for enums");
+    final switch (v)
+    {
+        foreach(m; __traits(allMembers, E))
+        {
+            mixin("case E." ~ m ~ ": return \"" ~ m ~ "\";");
+        }
     }
 }
