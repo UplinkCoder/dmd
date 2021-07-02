@@ -319,6 +319,7 @@ import dmd.dstruct;
 import dmd.dsymbol;
 import dmd.mtype;
 import dmd.ast_node;
+import dmd.statement;
 
 StringExp makeString(const char* s, Loc loc = Loc.initial)
 {
@@ -543,6 +544,8 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         handleExp(e);
         leaf = oldLeaf;
         cd = getCd("StringLiteral");
+        e = cast(StringExp)e.copy();
+        e.type = Type.tstring;
         fillField((cd.fields)[0], "string_", elements, e);
         if (leaf)
             finalize();
@@ -698,8 +701,13 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     {
         import dmd.typesem;
         // type identifiers are unresolved. try to resolve them!
-        auto t = typeSemantic(ti, loc, lookupScope);
-        visit(t);
+        // auto t = typeSemantic(ti, loc, lookupScope);
+        // we can not run type smenatic here because we don't know if it is a type.
+        Dsymbol out_scope;
+        auto sym_id = ti.ident;
+        auto s = lookupScope.search(loc, sym_id, &out_scope);
+        if (s) printf("s: %s\n", s.toChars());
+       //  visit(t);
     }
 
     override void visit(TypeTypeof tt)
@@ -911,11 +919,16 @@ LnormalPath:
             ignoreImports = true;
 
             auto nMembers = (s.members ? s.members.length : 0);
-            Expressions* membersElements = new Expressions(nMembers);
+            Expressions* membersElements = new Expressions();
 
             if (nMembers) foreach(i, m;*s.members)
             {
-                (*membersElements)[i] = makeReflectionClassLiteral(m, s._scope, ignoreImports);
+                import dmd.asttypename;
+                auto r  = makeReflectionClassLiteral(m, s._scope, ignoreImports);
+                if (!r)
+                    printf("Reflection class createion not handled for: '%s' (%s)\n", m.toChars(), astTypeName(m).ptr);
+                else
+                    membersElements.push = r;
             }
 
             auto members = new ArrayLiteralExp(loc, memberCdType.arrayOf(), membersElements);
@@ -1139,7 +1152,7 @@ LnormalPath:
                 lookFor = "Add";
                 break;
             case TOK.min :
-                lookFor = "Min";
+                lookFor = "Sub";
                 break;
             case TOK.mul :
                 lookFor = "Mul";
@@ -1343,8 +1356,9 @@ LnormalPath:
 
     override void visit(ASTCodegen.IdentifierExp e)
     {
-        // (cast(Expression)e) = expressionSemantic(e, lookupScope);
-        assert(0, "Unresolved expression detected");
+        import dmd.expressionsem;
+        (cast(Expression)e) = expressionSemantic(e, lookupScope);
+        assert(!e.isIdentifierExp(), "Unresolved expression detected");
     }
 
 
@@ -1418,10 +1432,17 @@ LnormalPath:
         cd = getCd("BlockStatement");
 
         auto nStatements = ce.statements ? ce.statements.length : 0;
-        Expressions* statementElems = new Expressions(nStatements);
+        Expressions* statementElems = new Expressions(0);
         if (nStatements) foreach(i, s; *ce.statements)
         {
-            (*statementElems)[i] = makeReflectionClassLiteral(s, lookupScope, ignoreImports);
+            auto refl_stmt = makeReflectionClassLiteral(s, lookupScope, ignoreImports);
+            if (!refl_stmt)
+            {
+                import dmd.asttypename;
+                printf("Statement type not handled by reflection: '%s' (%s)\n", s.toChars(), s.astTypeName().ptr);
+            }
+            else
+                statementElems.push = refl_stmt;
         }
         auto statements =
             new ArrayLiteralExp(loc, getCd("Statement").type.arrayOf, statementElems);
@@ -1431,6 +1452,35 @@ LnormalPath:
         if (leaf)
             finalize();
     }
+
+    override void visit(ImportStatement s)
+    {
+        assert(leaf);
+
+        cd = getCd("ImportStatement");
+
+        auto nImports = s.imports ? s.imports.length : 0;
+
+        Expressions* importElements = new Expressions();
+        if (nImports) foreach(i;*s.imports)
+        {
+            import dmd.dimport;
+            auto imp = i.isImport();
+            assert(imp);
+            auto imp_refl = makeReflectionClassLiteral(imp, lookupScope, ignoreImports);
+            if (imp_refl)
+            {
+                importElements.push = imp_refl;
+            }
+        }
+
+        auto imports = new ArrayLiteralExp(loc, getCd("Import").type.arrayOf(), importElements);
+        fillField(cd.fields[0], "imports", elements, imports);
+
+        if (leaf)
+            finalize();
+    }
+
 
     override void visit(ASTCodegen.ReturnStatement s)
     {
