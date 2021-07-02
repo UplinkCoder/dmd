@@ -976,10 +976,13 @@ LnormalPath:
             Expression parent;
             if (s.parent)
             {
+                if (s.isImport())
+                    goto LnullParent;
                 parent = makeReflectionClassLiteral(s.parent, lookupScope, ignoreImports);
             }
             else
             {
+            LnullParent:
                 parent = new NullExp(loc, getCd("Symbol").type);
             }
             assert(parent);
@@ -1066,7 +1069,7 @@ LnormalPath:
             auto packageElements = new Expressions(imp.packages.length);
             foreach(i, p;imp.packages)
             {
-                (*packageElements)[i] = makeString(imp.id.toChars());
+                (*packageElements)[i] = makeString(p.toChars());
             }
             auto packages = new ArrayLiteralExp(loc, Type.tstring.arrayOf(), packageElements);
             fillField((cd.fields)[0], "packages", elements, packages);
