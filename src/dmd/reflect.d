@@ -115,7 +115,7 @@ static bool isScope(Expression e)
 
 Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* args, Scope* lookupScope)
 {
-    printf("arguments: %s\n", args.toChars());
+    // printf("arguments: %s\n", args.toChars());
     final switch(reflect_kind)
     {
         case REFLECT.Invalid :
@@ -167,8 +167,8 @@ Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* ar
                 else
                 {
                     import dmd.asttypename;
-                    printf("d: %s (%s) \n", d.toChars(), astTypeName(d).ptr);
-                    printf("creating delcaration is unsupported\n");
+                    //printf("d: %s (%s) \n", d.toChars(), astTypeName(d).ptr);
+                    //printf("creating delcaration is unsupported\n");
                     // (*expressions)[i] = makeReflectionClassLiteral(d, lookupScope);
                     (*expressions)[i] = new NullExp(d.loc, cd.type);
                 }
@@ -353,6 +353,7 @@ private ClassReferenceExp makeReflectionClassLiteral(Scope* sc, Loc loc = Loc.in
 
 ClassReferenceExp makeReflectionClassLiteral(ASTNode n, Scope* sc, bool ignoreImports)
 {
+/+
     import dmd.asttypename;
 
     bool dont_print = false;
@@ -374,9 +375,10 @@ ClassReferenceExp makeReflectionClassLiteral(ASTNode n, Scope* sc, bool ignoreIm
         printf("-%s: '%s' {astTypeName: %s}}\n",
             __FUNCTION__.ptr, n.toChars(), n.astTypeName().ptr);
     }
++/
     if (auto cre = (cast(void*) n) in ReflectionVisitor.cache)
     {
-        printf("Found '%s' in cache\n", n.toChars());
+        // printf("Found '%s' in cache\n", n.toChars());
         return *cast(ClassReferenceExp*)cre;
     }
 
@@ -479,7 +481,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     ClassReferenceExp placeholder(ClassDeclaration pcd = null, int line = __LINE__)
     {
         auto ncd = (pcd ? pcd : cd);
-        printf("[+%d] Making placeholder of class: %s\n", line, ncd.toChars());
+        // printf("[+%d] Making placeholder of class: %s\n", line, ncd.toChars());
 
         auto placeholder_data = new StructLiteralExp(loc, cast(StructDeclaration)ncd, elements);
         return new ClassReferenceExp(loc, placeholder_data, ncd.type.immutableOf());
@@ -487,7 +489,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
     void finalize()
     {
-        printf("before finalisation: \n");
+        // printf("before finalisation: \n");
 
         enum debug_core_reflect = 1;
         static if (debug_core_reflect)
@@ -523,7 +525,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             result = new ClassReferenceExp(loc, data, cd.type.immutableOf());
         }
 
-        printf("finalized result: %s\n", result.toChars());
+        // printf("finalized result: %s\n", result.toChars());
     }
 
     override void visit(ASTCodegen.TemplateDeclaration d)
@@ -724,7 +726,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         Dsymbol out_scope;
         auto sym_id = ti.ident;
         auto s = lookupScope.search(loc, sym_id, &out_scope);
-        if (s) printf("s: %s\n", s.toChars());
+        // if (s) printf("s: %s\n", s.toChars());
        //  visit(t);
     }
 
@@ -940,7 +942,7 @@ LnormalPath:
 
         cd = getCd("Package");
 
-        printf("[handlePackage] oldcd: %s\n", (oldcd ? oldcd.toChars() : "null") );
+        // printf("[handlePackage] oldcd: %s\n", (oldcd ? oldcd.toChars() : "null") );
 
         auto oldleaf = leaf;
         leaf = 0;
@@ -961,7 +963,7 @@ LnormalPath:
         scope(exit)
             cd = oldcd;
 
-        printf("[handleScopeSymbol] oldcd: %s\n", oldcd.toChars());
+        // printf("[handleScopeSymbol] oldcd: %s\n", oldcd.toChars());
 
         cd = getCd("ScopeSymbol");
 
@@ -1007,7 +1009,7 @@ LnormalPath:
         else
         {
             import dmd.asttypename;
-            printf("about to make placehoder for: '%s' (%s)\n", s.toChars(), astTypeName(s).ptr);
+            // printf("about to make placehoder for: '%s' (%s)\n", s.toChars(), astTypeName(s).ptr);
             cache[cast(void*)s] = placeholder(oldcd ? oldcd : cd);
         }
         assert(!leaf);
@@ -1113,7 +1115,7 @@ LnormalPath:
     {
         if (ignoreImports)
         {
-            printf("Ignoring import\n");
+            // printf("Ignoring import\n");
             return ;
         }
         assert(leaf);
@@ -1155,7 +1157,7 @@ LnormalPath:
             Expression mod;
             if (imp.mod)
             {
-                printf("Getting mod via 'makeReflectionClassLiteral'\n");
+                // printf("Getting mod via 'makeReflectionClassLiteral'\n");
                 mod = makeReflectionClassLiteral(imp.mod, lookupScope, ignoreImports);
             }
             else
@@ -1366,7 +1368,7 @@ LnormalPath:
     {
         // just a passthrough
         import dmd.asttypename;
-        printf("astTypeName(i.exp): %s\n", astTypeName(i.exp).ptr);
+        // printf("astTypeName(i.exp): %s\n", astTypeName(i.exp).ptr);
         i.exp.accept(this);
     }
 
@@ -1562,8 +1564,6 @@ LnormalPath:
 
         cd = getCd("ReturnStatement");
         auto exp = s.exp ? makeReflectionClassLiteral(s.exp, lookupScope, ignoreImports) : new NullExp(loc, getCd("Expression").type);
-        fprintf(stderr, "ret.loc: %s\n", s.loc.toChars());
-        fprintf(stderr, "exp.typename %s\n", astTypeName(s.exp).ptr);
 
         fillField(cd.fields[0], "exp", elements, exp);
 
