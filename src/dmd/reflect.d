@@ -14,7 +14,7 @@ import dmd.astcodegen;
 import dmd.astenums;
 import core.stdc.stdio;
 
-enum emitFunctionBodies = true;
+enum emitFunctionBodies = false;
 
 enum REFLECT
 {
@@ -115,6 +115,7 @@ static bool isScope(Expression e)
 
 Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* args, Scope* lookupScope)
 {
+    printf("arguments: %s\n", args.toChars());
     final switch(reflect_kind)
     {
         case REFLECT.Invalid :
@@ -202,8 +203,8 @@ Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* ar
             auto se = name_string.isStringExp();
             assert(se);
             auto name = se.peekString();
-
-            auto scope_value = (*lookupScopeExp.isClassReferenceExp().value.elements)[0];
+            auto scope_value_index = 0 + ReflectionVisitor.getCd("Node").fields.length;
+            auto scope_value = (*lookupScopeExp.isClassReferenceExp().value.elements)[scope_value_index];
             assert(scope_value);
             auto lsie = scope_value.isIntegerExp();
             assert(lsie);
@@ -336,12 +337,16 @@ private ClassReferenceExp makeReflectionClassLiteral(Scope* sc, Loc loc = Loc.in
     assert(sc !is null, "Scope must not be null when creating reflection class for scopes");
     const ivalue = cast(size_t)(cast(void*)sc);
     auto cd = ReflectionVisitor.getCd("Scope");
-    ClassReferenceExp result;
-    Expressions* elements = new Expressions(1);
+    Expressions* elements = new Expressions();
+    if (cd.baseClass.fields.length)
+    {
+        elements.push(IntegerExp.literal!0);
+        (*elements)[0].type = Type.tuns64;
+    }
     assert((cd.fields)[0].toString() == "internalPointer", (cd.fields)[0].toString());
-    (*elements)[0] = new IntegerExp(loc, ivalue, Type.tvoidptr);
+    elements.push = new IntegerExp(loc, ivalue, Type.tvoidptr);
     auto data = new StructLiteralExp(loc, cast(StructDeclaration)cd, elements);
-    result = new ClassReferenceExp(loc, data, cd.type.immutableOf());
+    auto result = new ClassReferenceExp(loc, data, cd.type.immutableOf());
 
     return result;
 }
@@ -521,13 +526,18 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         printf("finalized result: %s\n", result.toChars());
     }
 
+    override void visit(ASTCodegen.TemplateDeclaration d)
+    {
+    }
+
     override void visit(ASTCodegen.TypeEnum t)
     {
         assert(leaf);
-        leaf = 0;
-        visit(cast(Type)t);
-        leaf = 1;
         cd = getCd("TypeEnum");
+
+        leaf = 0;
+        handleType(t);
+        leaf = 1;
 
         auto enumDecl = makeReflectionClassLiteral(t.sym, lookupScope, ignoreImports);
         fillField((cd.fields)[0], "sym", elements, enumDecl);
@@ -553,6 +563,9 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
     override void visit(IntegerExp e)
     {
+        if (!e.type.isintegral())
+            return ;
+
         assert(leaf);
         auto oldLeaf = leaf;
         leaf = 0;
@@ -574,7 +587,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         cd = getCd("TypeClass");
 
         leaf = 0;
-        visit(cast(Type)t);
+        handleType(t);
         leaf = 1;
 
         import dmd.asttypename;
@@ -594,7 +607,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         auto struct_sym = t.sym;
 
         leaf = 0;
-        visit(cast(Type)t);
+        handleType(t);
         leaf = 1;
 
         auto sym = makeReflectionClassLiteral(struct_sym, lookupScope, ignoreImports);
@@ -633,8 +646,8 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         lookupScope = e.fd._scope;
         // third element is core.reflect.stmt.Statement fbody
         // TODO FIXME: serialize the body statement into here
-        auto fbody = e.fd.fbody ? makeReflectionClassLiteral(e.fd.fbody, lookupScope, ignoreImports)
-            : new NullExp(loc, getCd("Statement").type);
+        auto fbody = ((e.fd.fbody && emitFunctionBodies) ? makeReflectionClassLiteral(e.fd.fbody, lookupScope, ignoreImports)
+            : new NullExp(loc, getCd("Statement").type));
 
         fillField((cd.fields)[1], "fbody", elements, fbody);
         lookupScope = oldlookupScope;
@@ -643,17 +656,18 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             finalize();
     }
 
+
     override void visit(ASTCodegen.TypePointer t)
     {
         cd = getCd("TypePointer");
-        visit(cast(TypeNext)t);
+        handleTypeNext(cast(TypeNext)t);
     }
 
     override void visit(ASTCodegen.TypeSArray t)
     {
         cd = getCd("TypeArray");
         leaf = 0;
-        visit(cast(TypeNext)t);
+        handleTypeNext(cast(TypeNext)t);
         leaf = 1;
 
         auto oldType = t.dim.type;
@@ -668,15 +682,19 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     override void visit(ASTCodegen.TypeDArray t)
     {
         cd = getCd("TypeSlice");
-        visit(cast(TypeNext)t);
+        handleTypeNext(cast(TypeNext)t);
     }
 
 
-    override void visit(ASTCodegen.TypeNext t)
+    void handleTypeNext(ASTCodegen.TypeNext t)
     {
+        auto oldCd = cd;
+        scope(exit)
+            cd = oldCd;
+
         // assert that we came from direct child of of type next;
-        auto base = cd.baseClass;
-        assert(base.toString() == "TypeNext", base.toString());
+        cd = cd.baseClass;
+        assert(cd.toString() == "TypeNext", cd.toString());
 
         auto oldLeaf = leaf;
         import dmd.typesem;
@@ -687,11 +705,11 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         }
 
         leaf = 0;
-        visit(cast(Type)t);
+        handleType(t);
         leaf = oldLeaf;
 
         auto tnext = makeReflectionClassLiteral(resolved, lookupScope, ignoreImports);
-        fillField((base.fields)[0], "nextOf", elements, tnext);
+        fillField((cd.fields)[0], "nextOf", elements, tnext);
 
         if (leaf)
             finalize();
@@ -725,17 +743,52 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         cd = getCd("TypeBasic");
 
         leaf = 0;
-        visit(cast(Type)t);
+        handleType(t);
         leaf = 1;
 
         if (leaf)
             finalize();
     }
 
-    override void visit(Type t)
+    void handleNode(ASTNode n)
     {
+        assert(!leaf);
         auto oldCd = cd;
-        cd = getCd("Type");
+        scope(exit)
+            cd = oldCd;
+
+        cd = cd.baseClass;
+        assert(cd.toString == "Node");
+
+        static if (is(typeof(n.serial)))
+        {
+            if (cd.fields.length && cd.fields[0].toString == "serial")
+            {
+                auto serial = new IntegerExp(loc, n.serial, Type.tuns64);
+                fillField((cd.fields)[0], "serial", elements, serial);
+            }
+        }
+    }
+
+    void handleStatement(Statement s)
+    {
+        assert(!leaf);
+        auto oldCd = cd;
+        scope(exit)
+            cd = oldCd;
+        cd = cd.baseClass;
+        assert(cd.toString() == "Statement");
+
+        handleNode(s);
+    }
+
+    void handleType(Type t)
+    {
+        assert(!leaf);
+        auto oldCd = cd;
+        cd = cd.baseClass;
+        assert(cd.toString() == "Type");
+
         t = t.merge2();
         if (cast(void*)t in cache) {}
         else
@@ -744,6 +797,7 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             cache[cast(void*)t] = p;
         }
 
+        handleNode(t);
 
         ulong size;
         uint alignSize;
@@ -766,6 +820,12 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
             size = 0;
             alignSize = 0;
         }
+        // the following else if is temporary TODO FIXME
+        else if (auto tf = t.isTypeEnum())
+        {
+            size = 0;
+            alignSize = 0;
+        }
         else
         {
 LnormalPath:
@@ -773,15 +833,14 @@ LnormalPath:
             alignSize = t.alignsize();
         }
 
-        elements.setDim(4);
         auto kind = makeString(t.kind());//tyToTypeKind(cast(ENUMTY)t.ty);
-        fillField((cd.fields)[0], "kind", elements, kind, 0);
+        fillField((cd.fields)[0], "kind", elements, kind);
 
         auto alignSizeExp = new IntegerExp(loc, alignSize, Type.tuns32);
-        fillField((cd.fields)[1], "alignSize", elements, alignSizeExp, 1);
+        fillField((cd.fields)[1], "alignSize", elements, alignSizeExp);
 
         auto sizeExp = new IntegerExp(loc, size, Type.tuns64);
-        fillField((cd.fields)[2], "size", elements, sizeExp, 2);
+        fillField((cd.fields)[2], "size", elements, sizeExp);
 
         {
             if (!t.deco)
@@ -790,7 +849,7 @@ LnormalPath:
             }
             auto identifier = makeString((t.deco ? t.toChars() : null), loc);
 
-            fillField((cd.fields)[3], "identifier", elements, identifier, 3);
+            fillField((cd.fields)[3], "identifier", elements, identifier);
         }
 
         if (leaf)
@@ -799,7 +858,7 @@ LnormalPath:
             cd = oldCd;
     }
 
-    private extern (D) void fillField(VarDeclaration vd, string fieldName, Expressions* elements, Expression exp, int expIndex = -1,
+    private extern (D) void fillField(VarDeclaration vd, string fieldName, Expressions* elements, Expression exp,
         string file = __FILE__, uint line = __LINE__)
     {
         import dmd.utils;
@@ -815,23 +874,21 @@ LnormalPath:
             "[" ~ loc ~ "] " ~ "mismatched types between field '" ~ vd.type.toString() ~ "'"
             ~ " and expression '" ~ exp.type.toString ~ "'");
 
-        if (expIndex >= 0)
-        {
-            (*elements)[expIndex] = exp;
-        }
-        else
-        {
-            elements.push = exp;
-        }
+        elements.push = exp;
     }
 
     override void visit(ASTCodegen.Parameter p)
     {
         assert(leaf);
-        cd = getCd("FunctionParameter");
-        elements.setDim(2);
 
-        fillField((cd.fields)[0], "type", elements, makeReflectionClassLiteral(p.type, lookupScope, ignoreImports), 0);
+        cd = getCd("FunctionParameter");
+
+        leaf = 0;
+        handleNode(p);
+        leaf = 1;
+
+        auto type = makeReflectionClassLiteral(p.type, lookupScope, ignoreImports);
+        fillField((cd.fields)[0], "type", elements, type);
 
         Expression identifier;
         if (p.ident)
@@ -843,16 +900,18 @@ LnormalPath:
             identifier = new NullExp(loc, Type.tstring);
         }
 
-        fillField((cd.fields)[1], "identifier", elements, identifier, 1);
+        fillField((cd.fields)[1], "identifier", elements, identifier);
 
         finalize();
     }
 
-    override void visit(Declaration d)
+    void handleDeclaration(Declaration d)
     {
 
         auto oldCd = cd;
         cd = getCd("Declaration");
+
+        handleNode(d);
 
         fillField((cd.fields)[0], "name", elements, makeString(d.ident ? d.ident.toChars() : null, loc));
 
@@ -952,6 +1011,8 @@ LnormalPath:
             cache[cast(void*)s] = placeholder(oldcd ? oldcd : cd);
         }
         assert(!leaf);
+
+        handleNode(s);
 
         {
             Expression _scope;
@@ -1102,7 +1163,7 @@ LnormalPath:
                 mod = new NullExp(loc, getCd("Module").type);
             }
 
-            printf("mod: %s ... mod.type: %s\n", mod.toChars(), mod.type.toChars());
+            // printf("mod: %s ... mod.type: %s\n", mod.toChars(), mod.type.toChars());
             fillField((cd.fields)[4], "mod", elements, mod);
         }
 
@@ -1118,7 +1179,7 @@ LnormalPath:
         auto base = cd.baseClass;
 
         leaf = 0;
-        visit(cast(Type)ft);
+        handleType(ft);
         leaf = 1;
 
         auto returnType = makeReflectionClassLiteral(ft.next, lookupScope, ignoreImports);
@@ -1315,7 +1376,7 @@ LnormalPath:
 
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Declaration)ed);
+        handleDeclaration(cast(Declaration)ed);
         leaf = oldLeaf;
 
         auto type = makeReflectionClassLiteral(ed.type, lookupScope, ignoreImports);
@@ -1346,7 +1407,7 @@ LnormalPath:
 
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Declaration)m);
+        handleDeclaration(cast(Declaration)m);
         leaf = oldLeaf;
 
         auto value = makeReflectionClassLiteral(m.value(), lookupScope, ignoreImports);
@@ -1360,7 +1421,7 @@ LnormalPath:
     override void visit(ASTCodegen.IdentifierExp e)
     {
         import dmd.expressionsem;
-        (cast(Expression)e) = expressionSemantic(e, lookupScope);
+        e = cast(IdentifierExp)expressionSemantic(e, lookupScope);
         assert(!e.isIdentifierExp(), "Unresolved expression detected");
     }
 
@@ -1370,6 +1431,8 @@ LnormalPath:
         assert(!leaf);
         auto oldCd = cd;
         cd = getCd("Expression");
+
+        handleNode(e);
 
         if(!e.type)
         {
@@ -1394,7 +1457,7 @@ LnormalPath:
         dsymbolSemantic(vd, lookupScope);
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Declaration)vd);
+        handleDeclaration(cast(Declaration)vd);
         leaf = oldLeaf;
         {
             assert(vd.type);
@@ -1406,9 +1469,15 @@ LnormalPath:
             if (vd._init)
             {
                 _init = makeReflectionClassLiteral(vd._init, lookupScope, ignoreImports);
+                if (!_init)
+                {
+                    printf("Couldn't handle init: '%s'\n", vd._init.toChars());
+                    goto LnullInit;
+                }
             }
             else
             {
+            LnullInit:
                 _init = new NullExp(loc, getCd("Expression").type);
             }
             fillField((cd.fields)[1], "_init", elements, _init);
@@ -1422,7 +1491,7 @@ LnormalPath:
             }
             else
             {
-                 offset = IntegerExp.create(loc, vd.offset, Type.tuns32);
+                 offset = IntegerExp.create(loc, vd.offset, Type.tuns64);
             }
             fillField((cd.fields)[2], "offset", elements, offset);
         }
@@ -1433,6 +1502,8 @@ LnormalPath:
     override void visit(ASTCodegen.CompoundStatement ce)
     {
         cd = getCd("BlockStatement");
+
+        handleStatement(ce);
 
         auto nStatements = ce.statements ? ce.statements.length : 0;
         Expressions* statementElems = new Expressions(0);
@@ -1477,7 +1548,7 @@ LnormalPath:
             }
         }
 
-        auto imports = new ArrayLiteralExp(loc, getCd("Import").type.arrayOf(), importElements);
+        auto imports = new ArrayLiteralExp(loc, getCd("Symbol").type.arrayOf(), importElements);
         fillField(cd.fields[0], "imports", elements, imports);
 
         if (leaf)
@@ -1491,6 +1562,9 @@ LnormalPath:
 
         cd = getCd("ReturnStatement");
         auto exp = s.exp ? makeReflectionClassLiteral(s.exp, lookupScope, ignoreImports) : new NullExp(loc, getCd("Expression").type);
+        fprintf(stderr, "ret.loc: %s\n", s.loc.toChars());
+        fprintf(stderr, "exp.typename %s\n", astTypeName(s.exp).ptr);
+
         fillField(cd.fields[0], "exp", elements, exp);
 
         if (leaf)
@@ -1518,6 +1592,18 @@ LnormalPath:
     override void visit(Expression e)
     {
         assert(0, "Expression not supported " ~ astTypeName(e) ~ ".");
+    }
+
+    override void visit(CallExp e)
+    {
+        assert(leaf);
+        cd = getCd("CallExpression");
+        leaf = 0;
+        handleExp(e);
+        leaf = 1;
+
+        if (leaf)
+            finalize();
     }
 
     override void visit(NullExp e)
@@ -1582,13 +1668,14 @@ LnormalPath:
 
     override void visit(ASTCodegen.StructDeclaration d)
     {
+        assert(leaf);
+
         cd = getCd("StructDeclaration");
         cache[cast(void*)d] = placeholder();
 
-        auto oldLeaf = leaf;
         leaf = 0;
         visit(cast(AggregateDeclaration) d);
-        leaf = oldLeaf;
+        leaf = 1;
 
         if (leaf)
             finalize();
@@ -1596,13 +1683,14 @@ LnormalPath:
 
     override void visit(ASTCodegen.ClassDeclaration d)
     {
+        assert(leaf);
+
         cd = getCd("ClassDeclaration");
         cache[cast(void*)d] = placeholder();
 
-        auto oldLeaf = leaf;
         leaf = 0;
         visit(cast(AggregateDeclaration) d);
-        leaf = oldLeaf;
+        leaf = 1;
 
         auto onStack = IntegerExp.createBool(d.stack);
         fillField(cd.fields[0], "onStack", elements, onStack);
@@ -1618,13 +1706,9 @@ LnormalPath:
 
         auto oldCd = cd;
         scope(exit) cd = oldCd;
-
         cd = getCd("AggregateDeclaration");
 
-        auto oldLeaf = leaf;
-        leaf = 0;
-        visit(cast(Declaration)d);
-        leaf = oldLeaf;
+        handleDeclaration(cast(Declaration)d);
 
         {
             auto type = makeReflectionClassLiteral(d.type, lookupScope, ignoreImports);
@@ -1650,7 +1734,7 @@ LnormalPath:
 
         auto oldLeaf = leaf;
         leaf = 0;
-        visit(cast(Declaration)fd);
+        handleDeclaration(cast(Declaration)fd);
         leaf = oldLeaf;
 
         bool semaDone = fd.functionSemantic();
@@ -1676,8 +1760,8 @@ LnormalPath:
         lookupScope = fd._scope;
         // third element is core.reflect.stmt.Statement fbody
         // TODO FIXME: serialize the body statement into here
-        auto fbody = (fd.fbody && emitFunctionBodies) ? makeReflectionClassLiteral(fd.fbody, lookupScope, ignoreImports)
-            : new NullExp(loc, getCd("Statement").type);
+        auto fbody = ((fd.fbody && emitFunctionBodies) ? makeReflectionClassLiteral(fd.fbody, lookupScope, ignoreImports)
+            : new NullExp(loc, getCd("Statement").type));
         fillField((cd.fields)[2], "fbody", elements, fbody);
         lookupScope = oldlookupScope;
 
