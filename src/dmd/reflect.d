@@ -661,8 +661,14 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
 
     override void visit(ASTCodegen.TypePointer t)
     {
+        assert(leaf);
         cd = getCd("TypePointer");
+        leaf = 0;
         handleTypeNext(cast(TypeNext)t);
+        leaf = 1;
+
+        if (leaf)
+            finalize();
     }
 
     override void visit(ASTCodegen.TypeSArray t)
@@ -685,6 +691,14 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     {
         cd = getCd("TypeSlice");
         handleTypeNext(cast(TypeNext)t);
+
+        leaf = 0;
+        handleTypeNext(cast(TypeNext)t);
+        leaf = 1;
+
+        if (leaf)
+            finalize();
+
     }
 
 
@@ -808,14 +822,15 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         {
             auto sym = ts.sym;
             auto forward_ref =
-                (sym.members && !sym.determineFields() && sym.type != Type.terror);
+                (!sym.members || sym.members && !sym.determineFields() && sym.type != Type.terror);
 
             if (forward_ref)
             {
                 size = ~0;
                 alignSize = ~0;
             }
-            goto LnormalPath;
+            else
+                goto LnormalPath;
         }
         else if (auto tf = t.isTypeFunction())
         {
