@@ -6465,7 +6465,8 @@ static if (is(BCGen))
 
             if (sv.vType == BCValueType.VoidValue && !ignoreVoid)
             {
-                bailout("Trying to read form an uninitialized variable: " ~ ve.toString);
+                Assert(imm32(0), addError(ve.loc, "Trying to to read from an uninitialized variable " ~ ve.toString));
+                // bailout("Trying to read form an uninitialized variable: " ~ ve.toString);
                 //TODO ve.error here ?
                 return ;
             }
@@ -8791,7 +8792,8 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
             else
             {
-                bailout("We cannot cast pointers");
+                // bailout("We cannot cast pointers");
+                Assert(imm32(0), addError(ce.loc, "pointer cast not supported in ctfe"));
             }
 
 
