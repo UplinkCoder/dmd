@@ -735,13 +735,13 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     {
         import dmd.typesem;
         // type identifiers are unresolved. try to resolve them!
-        // auto t = typeSemantic(ti, loc, lookupScope);
+        auto t = typeSemantic(ti, loc, lookupScope);
+        t.accept(this);
         // we can not run type smenatic here because we don't know if it is a type.
         Dsymbol out_scope;
         auto sym_id = ti.ident;
         auto s = lookupScope.search(loc, sym_id, &out_scope);
         // if (s) printf("s: %s\n", s.toChars());
-       //  visit(t);
     }
 
     override void visit(TypeTypeof tt)
