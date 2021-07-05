@@ -62,7 +62,7 @@ bool tooCostly(int cost)
  */
 extern (C++) final class InlineCostVisitor : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     int nested;
     bool hasthis;
@@ -243,7 +243,7 @@ public:
         {
             extern (C++) final class LambdaInlineCost : StoppableVisitor
             {
-                alias visit = super.visit;
+                alias visit = typeof(super).visit;
                 InlineCostVisitor icv;
 
             public:
@@ -397,7 +397,7 @@ public:
     override void visit(CallExp e)
     {
         //printf("CallExp.inlineCost3() %s\n", toChars());
-        // Bugzilla 3500: super.func() calls must be devirtualized, and the inliner
+        // Bugzilla 3500: typeof(super).func() calls must be devirtualized, and the inliner
         // can't handle that at present.
         if (e.e1.op == TOKdotvar && (cast(DotVarExp)e.e1).e1.op == TOKsuper)
             cost = COST_MAX;
@@ -446,7 +446,7 @@ final class InlineDoState
 extern (C++) final class DoInlineAs(Result) : Visitor
 if (is(Result == Statement) || is(Result == Expression))
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     InlineDoState ids;
     Result result;
@@ -1156,7 +1156,7 @@ Result doInlineAs(Result)(Expression e, InlineDoState ids)
  */
 extern (C++) final class InlineScanVisitor : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     FuncDeclaration parent;     // function being scanned
     // As the visit method cannot return a value, these variables

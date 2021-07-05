@@ -254,7 +254,7 @@ struct CompiledCtfeFunction
     {
         extern (C++) final class VarWalker : StoppableVisitor
         {
-            alias visit = super.visit;
+            alias visit = typeof(super).visit;
         public:
             CompiledCtfeFunction* ccf;
             bool hasErrors = false; /// Tree has hasErrors
@@ -335,7 +335,7 @@ struct CompiledCtfeFunction
 
 extern (C++) final class CtfeCompiler : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     CompiledCtfeFunction* ccf;
 
@@ -1060,7 +1060,7 @@ extern (C++) Expression interpret(FuncDeclaration fd, InterState* istate, Expres
 
 extern (C++) final class Interpreter : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     InterState* istate;
     CtfeGoal goal;

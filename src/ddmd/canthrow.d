@@ -37,7 +37,7 @@ extern (C++) bool canThrow(Expression e, FuncDeclaration func, bool mustNotThrow
     // stop walking if we determine this expression can throw
     extern (C++) final class CanThrow : StoppableVisitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
         FuncDeclaration func;
         bool mustNotThrow;
 

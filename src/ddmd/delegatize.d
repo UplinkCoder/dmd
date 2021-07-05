@@ -56,7 +56,7 @@ extern (C++) void lambdaSetParent(Expression e, Scope* sc)
 {
     extern (C++) final class LambdaSetParent : StoppableVisitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
         Scope* sc;
 
     public:
@@ -105,7 +105,7 @@ extern (C++) bool lambdaCheckForNestedRef(Expression e, Scope* sc)
 {
     extern (C++) final class LambdaCheckForNestedRef : StoppableVisitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Scope* sc;
         bool result;

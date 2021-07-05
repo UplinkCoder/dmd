@@ -47,7 +47,7 @@ extern (C++) Expression implicitCastTo(Expression e, Scope* sc, Type t)
 {
     extern (C++) final class ImplicitCastTo : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Type t;
         Scope* sc;
@@ -175,7 +175,7 @@ extern (C++) MATCH implicitConvTo(Expression e, Type t)
 {
     extern (C++) final class ImplicitConvTo : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Type t;
         MATCH result;
@@ -1420,7 +1420,7 @@ extern (C++) Expression castTo(Expression e, Scope* sc, Type t)
 {
     extern (C++) final class CastTo : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Type t;
         Scope* sc;
@@ -2479,7 +2479,7 @@ extern (C++) Expression inferType(Expression e, Type t, int flag = 0)
 {
     extern (C++) final class InferType : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Type t;
         int flag;
@@ -3465,7 +3465,7 @@ extern (C++) IntRange getIntRange(Expression e)
 {
     extern (C++) final class IntRangeVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     private:
         static uinteger_t getMask(uinteger_t v)
         {

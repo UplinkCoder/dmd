@@ -69,7 +69,7 @@ extern (C++) void Initializer_toDt(Initializer init, DtBuilder dtb)
             this.dtb = dtb;
         }
 
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
 
         override void visit(Initializer)
         {
@@ -226,7 +226,7 @@ extern (C++) void Expression_toDt(Expression e, DtBuilder dtb)
             this.dtb = dtb;
         }
 
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
 
         override void visit(Expression e)
         {
@@ -852,7 +852,7 @@ extern (C++) void Type_toDt(Type t, DtBuilder dtb)
             this.dtb = dtb;
         }
 
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
 
         override void visit(Type t)
         {
@@ -973,7 +973,7 @@ extern (C++) class TypeInfoDtVisitor : Visitor
         this.dtb = dtb;
     }
 
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 
     override void visit(TypeInfoDeclaration d)
     {

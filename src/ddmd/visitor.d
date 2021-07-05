@@ -1377,7 +1377,7 @@ extern (C++) class Visitor
 
 extern (C++) class StoppableVisitor : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     bool stop;
 

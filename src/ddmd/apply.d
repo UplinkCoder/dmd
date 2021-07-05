@@ -27,7 +27,7 @@ import ddmd.visitor;
  */
 extern (C++) final class PostorderExpressionVisitor : StoppableVisitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     StoppableVisitor v;
 

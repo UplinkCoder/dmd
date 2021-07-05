@@ -76,7 +76,7 @@ alias BUILTINyes = BUILTIN.BUILTINyes;
  */
 extern (C++) final class NrvoWalker : StatementRewriteWalker
 {
-    alias visit = super.visit;
+    alias visit = Visitor.visit;
 public:
     FuncDeclaration fd;
     Scope* sc;
@@ -4462,7 +4462,7 @@ extern (C++) final class FuncLiteralDeclaration : FuncDeclaration
 
     override AggregateDeclaration isThis()
     {
-        return tok == TOKdelegate ? super.isThis() : null;
+        return tok == TOKdelegate ? typeof(super).isThis() : null;
     }
 
     override bool isVirtual()
@@ -4497,7 +4497,7 @@ extern (C++) final class FuncLiteralDeclaration : FuncDeclaration
 
         extern (C++) final class RetWalker : StatementRewriteWalker
         {
-            alias visit = super.visit;
+            alias visit = typeof(super).visit;
         public:
             Scope* sc;
             Type tret;

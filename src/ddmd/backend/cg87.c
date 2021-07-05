@@ -965,7 +965,7 @@ code *fixresult87(elem *e,regm_t retregs,regm_t *pretregs)
  */
 
 // Reverse the order that the op is done in
-static const char oprev[9] = { -1,0,1,2,3,5,4,7,6 };
+static const char oprev[9] = { (char)-1,(char)0,(char)1,(char)2,(char)3,(char)5,(char)4,(char)7,(char)6 };
 
 code *orth87(elem *e,regm_t *pretregs)
 {

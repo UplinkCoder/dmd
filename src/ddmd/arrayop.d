@@ -257,7 +257,7 @@ extern (C++) void buildArrayIdent(Expression e, OutBuffer* buf, Expressions* arg
 {
     extern (C++) final class BuildArrayIdentVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
         OutBuffer* buf;
         Expressions* arguments;
 
@@ -407,7 +407,7 @@ extern (C++) Expression buildArrayLoop(Expression e, Parameters* fparams)
 {
     extern (C++) final class BuildArrayLoopVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
         Parameters* fparams;
         Expression result;
 

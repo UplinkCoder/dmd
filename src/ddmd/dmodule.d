@@ -1181,7 +1181,7 @@ extern (C++) final class Module : Package
             insearch = false;
         if (flags & IgnorePrivateImports)
             protection = Prot(PROTpublic); // only consider public imports
-        return super.isPackageAccessible(p, protection);
+        return typeof(super).isPackageAccessible(p, protection);
     }
 
     override Dsymbol symtabInsert(Dsymbol s)

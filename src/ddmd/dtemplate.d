@@ -3265,7 +3265,7 @@ MATCH deduceType(RootObject o, Scope* sc, Type tparam, TemplateParameters* param
 {
     extern (C++) final class DeduceType : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Scope* sc;
         Type tparam;
@@ -4701,7 +4701,7 @@ private bool reliesOnTident(Type t, TemplateParameters* tparams = null, size_t i
 {
     extern (C++) final class ReliesOnTident : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         TemplateParameters* tparams;
         size_t iStart;
@@ -8509,7 +8509,7 @@ bool definitelyValueParameter(Expression e)
     {
         e = (cast(DotVarExp)e).e1;
     }
-    // this.x.y and super.x.y couldn't possibly be valid values.
+    // this.x.y and typeof(super).x.y couldn't possibly be valid values.
     if (e.op == TOKthis || e.op == TOKsuper)
         return false;
 

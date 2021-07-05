@@ -20,7 +20,7 @@ import ddmd.visitor;
  */
 extern (C++) class StatementRewriteWalker : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 
     /* Point the currently visited statement.
      * By using replaceCurrent() method, you can replace AST during walking.

@@ -162,7 +162,7 @@ private void MODtoDecoBuffer(OutBuffer* buf, MOD mod)
 
 extern (C++) final class Mangler : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     OutBuffer* buf;
 

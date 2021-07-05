@@ -671,7 +671,7 @@ private void escapeByValue(Expression e, EscapeByResults* er)
     //printf("[%s] escapeByValue, e: %s\n", e.loc.toChars(), e.toChars());
     extern (C++) final class EscapeVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         EscapeByResults* er;
 
@@ -942,7 +942,7 @@ private void escapeByRef(Expression e, EscapeByResults* er)
     //printf("[%s] escapeByRef, e: %s\n", e.loc.toChars(), e.toChars());
     extern (C++) final class EscapeRefVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         EscapeByResults* er;
 

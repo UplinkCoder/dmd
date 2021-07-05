@@ -1,8 +1,8 @@
 module ddmd.ctfe.ctfe_bc;
 import ddmd.ctfe.bc_limits;
 import ddmd.expression;
-import ddmd.declaration : FuncDeclaration, VarDeclaration, Declaration,
-    SymbolDeclaration, STCref, CtorDeclaration;
+import ddmd.declaration;
+import ddmd.func;
 import ddmd.dsymbol;
 import ddmd.dstruct;
 import ddmd.dscope;
@@ -1420,7 +1420,7 @@ struct TypedStackAddr
 
 struct RetainedError // Name is still undecided
 {
-    import ddmd.tokens : Loc;
+    import ddmd.globals : Loc;
 
     Loc loc;
     string msg;
@@ -1949,7 +1949,7 @@ Expression toExpression(const BCValue value, Type expressionType,
 
 extern (C++) final class BCTypeVisitor : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
     Type topLevelType;
     uint prevAggregateTypeCount;
     Type[32] prevAggregateTypes;
@@ -2362,7 +2362,7 @@ extern (C++) final class BCV(BCGenT) : Visitor
     UncompiledCatches[ubyte.max] uncompiledCatches = void;
     SwitchState[16] switchStates = void;
 
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 
     const(BCType) toBCType(Type t)
     {

@@ -58,7 +58,7 @@ extern (C++) void semanticTypeInfo(Scope* sc, Type t)
 {
     extern (C++) final class FullTypeInfoVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Scope* sc;
 

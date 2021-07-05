@@ -44,7 +44,7 @@ static if (TARGET_LINUX || TARGET_OSX || TARGET_FREEBSD || TARGET_OPENBSD || TAR
      */
     extern (C++) final class CppMangleVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
         Objects components;
         OutBuffer buf;
         bool is_top_level;
@@ -944,7 +944,7 @@ else static if (TARGET_WINDOS)
 
     extern (C++) final class VisualCPPMangler : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
         const(char)*[VC_SAVED_IDENT_CNT] saved_idents;
         Type[VC_SAVED_TYPE_CNT] saved_types;
 

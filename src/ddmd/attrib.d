@@ -426,7 +426,7 @@ extern (C++) final class DeprecatedDeclaration : StorageClassDeclaration
      */
     override Scope* newScope(Scope* sc)
     {
-        auto scx = super.newScope(sc);
+        auto scx = typeof(super).newScope(sc);
         // The enclosing scope is deprecated as well
         if (scx == sc)
             scx = sc.push();
@@ -455,7 +455,7 @@ extern (C++) final class DeprecatedDeclaration : StorageClassDeclaration
     override void semantic2(Scope* sc)
     {
         getMessage();
-        super.semantic2(sc);
+        typeof(super).semantic2(sc);
     }
 
     const(char)* getMessage()
@@ -679,7 +679,7 @@ extern (C++) final class AlignDeclaration : AttribDeclaration
     override void semantic2(Scope* sc)
     {
         getAlignment(sc);
-        super.semantic2(sc);
+        typeof(super).semantic2(sc);
     }
 
     structalign_t getAlignment(Scope* sc)

@@ -26,7 +26,7 @@ import ddmd.visitor;
 
 extern (C++) final class ToCtypeVisitor : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     extern (D) this()
     {

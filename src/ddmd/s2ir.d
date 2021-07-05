@@ -170,7 +170,7 @@ extern (C++) class S2irVisitor : Visitor
         this.irs = irs;
     }
 
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 
     /****************************************
      * This should be overridden by each statement class.

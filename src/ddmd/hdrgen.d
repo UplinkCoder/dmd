@@ -81,7 +81,7 @@ extern (C++) void genhdrfile(Module m)
 
 extern (C++) final class PrettyPrintVisitor : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 public:
     OutBuffer* buf;
     HdrGenState* hgs;
@@ -3306,6 +3306,7 @@ extern (C++) const(char)* parametersTypeToChars(Parameters* parameters, int vara
 {
     OutBuffer buf;
     HdrGenState hgs;
+
     scope PrettyPrintVisitor v = new PrettyPrintVisitor(&buf, &hgs);
     v.parametersToBuffer(parameters, varargs);
     return buf.extractString();

@@ -8662,7 +8662,7 @@ extern (C++) final class DotIdExp : UnaExp
 
         //{ static int z; fflush(stdout); if (++z == 10) *(char*)0=0; }
 
-        /* Special case: rewrite this.id and super.id
+        /* Special case: rewrite this.id and typeof(super).id
          * to be classtype.id and baseclasstype.id
          * if we have no this pointer.
          */
@@ -15926,7 +15926,7 @@ extern (C++) final class CondExp : BinExp
     {
         extern (C++) final class DtorVisitor : StoppableVisitor
         {
-            alias visit = super.visit;
+            alias visit = typeof(super).visit;
         public:
             Scope* sc;
             CondExp ce;

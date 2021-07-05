@@ -278,7 +278,7 @@ void toObjFile(Dsymbol ds, bool multiobj)
 {
     extern (C++) final class ToObjFile : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         bool multiobj;
 

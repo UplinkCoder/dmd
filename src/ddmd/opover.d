@@ -66,7 +66,7 @@ extern (C++) static Identifier opId(Expression e)
 {
     extern (C++) final class OpIdVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Identifier id;
 
@@ -274,7 +274,7 @@ extern (C++) static Identifier opId_r(Expression e)
 {
     extern (C++) final class OpIdRVisitor : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Identifier id;
 
@@ -445,7 +445,7 @@ extern (C++) Expression op_overload(Expression e, Scope* sc)
 {
     extern (C++) final class OpOverload : Visitor
     {
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
     public:
         Scope* sc;
         Expression result;

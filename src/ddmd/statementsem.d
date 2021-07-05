@@ -50,7 +50,7 @@ import ddmd.visitor;
 
 private extern (C++) final class StatementSemanticVisitor : Visitor
 {
-    alias visit = super.visit;
+    alias visit = typeof(super).visit;
 
     Statement result;
     Scope* sc;

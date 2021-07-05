@@ -422,7 +422,7 @@ extern (C++) class ClassDeclaration : AggregateDeclaration
 
     override Scope* newScope(Scope* sc)
     {
-        auto sc2 = super.newScope(sc);
+        auto sc2 = typeof(super).newScope(sc);
         if (isCOMclass())
         {
             if (global.params.isWindows)
@@ -1535,7 +1535,7 @@ extern (C++) final class InterfaceDeclaration : ClassDeclaration
 
     override Scope* newScope(Scope* sc)
     {
-        auto sc2 = super.newScope(sc);
+        auto sc2 = typeof(super).newScope(sc);
         if (com)
             sc2.linkage = LINKwindows;
         else if (cpp)

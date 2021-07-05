@@ -949,7 +949,7 @@ elem *toElem(Expression e, IRState *irs)
             result = null;
         }
 
-        alias visit = super.visit;
+        alias visit = typeof(super).visit;
 
         /***************************************
          */

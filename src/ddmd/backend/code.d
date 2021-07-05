@@ -18,6 +18,8 @@ import ddmd.backend.code_x86;
 import ddmd.backend.outbuf;
 import ddmd.backend.type;
 
+alias code = ddmd.backend.code_x86.code;
+
 extern (C++):
 
 alias segidx_t = int;           // index into SegData[]
