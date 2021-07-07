@@ -88,7 +88,7 @@ void* mem_malloc2(uint);
  */
 bool ISREF(Declaration var)
 {
-    if (var.isOut() || var.isRef())
+    if (var.isReference())
     {
         return true;
     }
@@ -100,7 +100,7 @@ bool ISREF(Declaration var)
  */
 bool ISX64REF(Declaration var)
 {
-    if (var.isOut() || var.isRef())
+    if (var.isReference())
     {
         return false;
     }
