@@ -7389,7 +7389,7 @@ private Expression evaluateIfReflect(UnionExp* pue, InterState* istate, const re
             //if (e) ctfeInterpret(e);
             if (!e)
             {
-                error(loc, "cannot evaluate unknown reflection function `%s` at compile time", fd.toChars());
+                error(loc, "cannot evaluate unknown reflection function `%s(%s)` at compile time", fd.toChars(), args.toChars());
                 e = CTFEExp.cantexp;
             }
         }

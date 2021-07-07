@@ -213,13 +213,13 @@ Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* ar
             Dsymbol out_scope;
             auto sym_id = Identifier.idPool(name);
             auto sym = mylookupScope.search(loc, sym_id, &out_scope);
-            //printf("sym_id: %s\n", sym_id.toChars());
             if (sym)
             {
                 result = makeReflectionClassLiteral(sym, mylookupScope, false);
             }
             else
             {
+                printf("didn't find: sym_id: %s\n", sym_id.toChars());
                 result = new NullExp(loc, ReflectionVisitor.getCd("Node").type);
             }
             return result;
@@ -735,13 +735,19 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     {
         import dmd.typesem;
         // type identifiers are unresolved. try to resolve them!
+        auto old_errors = global.startGagging();
         auto t = typeSemantic(ti, loc, lookupScope);
-        t.accept(this);
+        auto hadErrors = global.endGagging(old_errors);
+        if (!hadErrors)
+        {
+            t.accept(this);
+            return ;
+        }
         // we can not run type smenatic here because we don't know if it is a type.
         Dsymbol out_scope;
         auto sym_id = ti.ident;
-        auto s = lookupScope.search(loc, sym_id, &out_scope);
-        // if (s) printf("s: %s\n", s.toChars());
+        if (sym_id) printf("TypeIdentifer: %s had errors resolving\n", sym_id.toChars());
+        // auto s = lookupScope.search(loc, sym_id, &out_scope);
     }
 
     override void visit(TypeTypeof tt)
