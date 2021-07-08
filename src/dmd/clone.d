@@ -425,8 +425,6 @@ bool needOpEquals(StructDeclaration sd)
                 continue;
             if (needOpEquals(ts.sym))
                 goto Lneed;
-            if (ts.sym.aliasthis) // https://issues.dlang.org/show_bug.cgi?id=14806
-                goto Lneed;
         }
         if (tvbase.isfloating())
         {
@@ -727,7 +725,7 @@ private bool needToHash(StructDeclaration sd)
     if (sd.xhash)
         goto Lneed;
 
-    /* If any of the fields has an opEquals, then we
+    /* If any of the fields has an toHash, then we
      * need it too.
      */
     for (size_t i = 0; i < sd.fields.dim; i++)
@@ -745,8 +743,6 @@ private bool needToHash(StructDeclaration sd)
             if (ts.sym.isUnionDeclaration())
                 continue;
             if (needToHash(ts.sym))
-                goto Lneed;
-            if (ts.sym.aliasthis) // https://issues.dlang.org/show_bug.cgi?id=14948
                 goto Lneed;
         }
         if (tvbase.isfloating())
