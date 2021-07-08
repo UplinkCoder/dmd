@@ -1073,7 +1073,6 @@ public:
     virtual bool checkValue();
     bool checkDeprecated(Scope* sc, Dsymbol* s);
     virtual Modifiable checkModifiable(Scope* sc, int32_t flag = 0);
-    virtual Expression* toBoolean(Scope* sc);
     virtual Expression* addDtorHook(Scope* sc);
     Expression* addressOf();
     Expression* deref();
@@ -4280,7 +4279,6 @@ class DeleteExp final : public UnaExp
 {
 public:
     bool isRAII;
-    Expression* toBoolean(Scope* sc);
     void accept(Visitor* v);
 };
 
@@ -4368,7 +4366,6 @@ public:
     Expression* toLvalue(Scope* sc, Expression* e);
     Expression* modifiableLvalue(Scope* sc, Expression* e);
     bool isBool(bool result);
-    Expression* toBoolean(Scope* sc);
     Expression* addDtorHook(Scope* sc);
     void accept(Visitor* v);
     static void allow(Expression* exp);
@@ -4434,7 +4431,6 @@ public:
     AssignExp(const Loc& loc, TOK tok, Expression* e1, Expression* e2);
     bool isLvalue();
     Expression* toLvalue(Scope* sc, Expression* ex);
-    Expression* toBoolean(Scope* sc);
     void accept(Visitor* v);
 };
 
@@ -4622,7 +4618,6 @@ public:
 class LogicalExp final : public BinExp
 {
 public:
-    Expression* toBoolean(Scope* sc);
     void accept(Visitor* v);
 };
 
@@ -4665,7 +4660,6 @@ public:
     bool isLvalue();
     Expression* toLvalue(Scope* sc, Expression* ex);
     Expression* modifiableLvalue(Scope* sc, Expression* e);
-    Expression* toBoolean(Scope* sc);
     void hookDtors(Scope* sc);
     void accept(Visitor* v);
 };
