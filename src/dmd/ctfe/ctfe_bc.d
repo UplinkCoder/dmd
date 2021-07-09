@@ -7098,9 +7098,9 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
     static bool canWorkWithType(const BCType bct) pure
     {
         return (bct.type.anyOf([BCTypeEnum.c8, BCTypeEnum.c16, BCTypeEnum.c32,
-                                BCTypeEnum.i8, BCTypeEnum.i32, BCTypeEnum.i64,
-                                BCTypeEnum.f23, BCTypeEnum.f52, BCTypeEnum.u32,
-                                BCTypeEnum.u16, BCTypeEnum.u8, BCTypeEnum.u64]));
+                                BCTypeEnum.i8, BCTypeEnum.i16, BCTypeEnum.i32, BCTypeEnum.i64,
+                                BCTypeEnum.u8, BCTypeEnum.u16, BCTypeEnum.u32, BCTypeEnum.u64,
+                                BCTypeEnum.f23, BCTypeEnum.f52]));
     }
 /+
     override void visit(ConstructExp ce)

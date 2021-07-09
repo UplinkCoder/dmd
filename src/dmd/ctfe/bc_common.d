@@ -988,7 +988,8 @@ template ensureIsBCGen(BCGenT)
 }
 
 /// commonType enum used for implicit conversion
-static immutable smallIntegerTypes = [BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8,
+static immutable smallIntegerTypes = [BCTypeEnum.u16, BCTypeEnum.u8,
+                                      BCTypeEnum.i16, BCTypeEnum.i8,
                                       BCTypeEnum.c32, BCTypeEnum.c16, BCTypeEnum.c8];
 
 BCTypeEnum commonTypeEnum(BCTypeEnum lhs, BCTypeEnum rhs) pure @safe
@@ -1024,6 +1025,12 @@ BCTypeEnum commonTypeEnum(BCTypeEnum lhs, BCTypeEnum rhs) pure @safe
     else if (lhs.anyOf(smallIntegerTypes) || rhs.anyOf(smallIntegerTypes))
     {
         commonType = BCTypeEnum.i32;
+    }
+
+    if (commonType == BCTypeEnum.init)
+    {
+        import std.stdio;
+        debug { if (!__ctfe) writeln("could not find common type for lhs: ", lhs, " and rhs: ", rhs); }
     }
 
     return commonType;
