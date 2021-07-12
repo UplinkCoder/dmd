@@ -203,8 +203,7 @@ Expression eval_reflect(const ref Loc loc, REFLECT reflect_kind, Expressions* ar
             auto se = name_string.isStringExp();
             assert(se);
             auto name = se.peekString();
-            auto scope_value_index = 0 + ReflectionVisitor.getCd("Node").fields.length;
-            auto scope_value = (*lookupScopeExp.isClassReferenceExp().value.elements)[scope_value_index];
+            auto scope_value = (*lookupScopeExp.isClassReferenceExp().value.elements)[0];
             assert(scope_value);
             auto lsie = scope_value.isIntegerExp();
             assert(lsie);
@@ -332,26 +331,42 @@ StringExp makeString(const char* s, Loc loc = Loc.initial)
 }
 
 
-private ClassReferenceExp makeReflectionClassLiteral(Scope* sc, Loc loc = Loc.initial)
+private ClassReferenceExp makeReflectionClassLiteral (Scope* sc, Loc loc = Loc.initial)
 {
     assert(sc !is null, "Scope must not be null when creating reflection class for scopes");
-    const ivalue = cast(size_t)(cast(void*)sc);
+
     auto cd = ReflectionVisitor.getCd("Scope");
+
+    ClassDeclaration node_cd = cd.baseClass;
+    assert(node_cd.ident.toString() == "Node", "Scope is expected to inherit directly from Node");
+
     Expressions* elements = new Expressions();
-    if (cd.baseClass.fields.length)
+
+    assert((node_cd.fields)[0].toString() == "internalPointer",
+        "first field of Node expected to be 'internalPointer' but it's '"
+        ~ (cd.fields)[0].toString() ~ "'"
+    );
+
+    const ivalue = cast(size_t)(cast(void*)sc);
+    elements.push = new IntegerExp(loc, ivalue, Type.tvoidptr.immutableOf());
+
+    if (node_cd.fields.length == 2)
     {
+        assert((node_cd.fields)[1].toString() == "serial",
+            "second field of Node expected to be 'serial' but it's '"
+            ~ (cd.fields)[1].toString() ~ "'"
+        );
         elements.push(IntegerExp.literal!0);
-        (*elements)[0].type = Type.tuns64;
+        (*elements)[1].type = Type.tuns64;
     }
-    assert((cd.fields)[0].toString() == "internalPointer", (cd.fields)[0].toString());
-    elements.push = new IntegerExp(loc, ivalue, Type.tvoidptr);
+
     auto data = new StructLiteralExp(loc, cast(StructDeclaration)cd, elements);
     auto result = new ClassReferenceExp(loc, data, cd.type.immutableOf());
 
     return result;
 }
 
-ClassReferenceExp makeReflectionClassLiteral(ASTNode n, Scope* sc, bool ignoreImports)
+ClassReferenceExp makeReflectionClassLiteral (ASTNode n, Scope* sc, bool ignoreImports)
 {
 /+
     import dmd.asttypename;
@@ -782,13 +797,23 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
         cd = cd.baseClass;
         assert(cd.toString == "Node");
 
+        auto internalPointer = new IntegerExp(loc, cast(size_t)(cast(void*)n), Type.tvoidptr.immutableOf());
+        fillField(cd.fields[0], "internalPointer", elements, internalPointer);
+
+        ulong serial_number = 0;
+
+        /// RootObject.serial is only in internal debug builds
         static if (is(typeof(n.serial)))
         {
-            if (cd.fields.length && cd.fields[0].toString == "serial")
-            {
-                auto serial = new IntegerExp(loc, n.serial, Type.tuns64);
-                fillField((cd.fields)[0], "serial", elements, serial);
-            }
+            serial_number = n.serial;
+        }
+
+        /// core.reflect.node.serial is only in internal debug builds
+        if (cd.fields.length == 2)
+        {
+            assert(cd.fields[1].toString == "serial");
+            auto serial = new IntegerExp(loc, serial_number, Type.tuns64);
+            fillField((cd.fields)[1], "serial", elements, serial);
         }
     }
 
@@ -1937,11 +1962,12 @@ private string enumToString(E)(E v)
 {
     static assert(is(E == enum),
         "emumToString is only meant for enums");
-    final switch (v)
+    switch (v)
     {
         foreach(m; __traits(allMembers, E))
         {
             mixin("case E." ~ m ~ ": return \"" ~ m ~ "\";");
         }
+        default: assert(0, "case unhandled because it doesn't show up in __traits(allMembers)");
     }
 }
