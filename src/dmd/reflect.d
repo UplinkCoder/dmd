@@ -774,6 +774,19 @@ extern(C++) final class ReflectionVisitor : SemanticTimeTransitiveVisitor
     }
 
 
+    override void visit(TypeNull t)
+    {
+        assert(leaf);
+        cd = getCd("TypeBasic");
+
+        leaf = 0;
+        handleType(t);
+        leaf = 1;
+
+        if (leaf)
+            finalize();
+    }
+
     override void visit(TypeBasic t)
     {
         assert(leaf);
