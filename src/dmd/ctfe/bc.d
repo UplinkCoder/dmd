@@ -2314,9 +2314,6 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
             fnId = returnAddr.fnId;
             ip = returnAddr.ip;
 
-            debug { if (!__ctfe) writeln("Setting ip to = ", ip, "  Bytecode size = ", byteCode.length); }
-            debug { if (!__ctfe) writeln("returnAddrs: ", returnAddrs[0 .. n_return_addrs + 1]); }
-
             stackP = stackP - (returnAddr.stackSize / 4);
             callDepth--;
             if (cRetval.vType == BCValueType.Exception)
@@ -2347,7 +2344,6 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
     if ((*byteCode).length < 6 || (*byteCode).length <= ip)
         return typeof(return).init;
 
-    if (!__ctfe) debug printf("Interpreter started\n");
     while (true && ip <= (*byteCode).length - 1)
     {
 /+
@@ -3339,13 +3335,6 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
 
         case LongInst.Ret64:
             {
-                //debug (bc)
-                    if (!__ctfe)
-                    {
-                        import std.stdio;
-
-                        writeln("Ret64 SP[", lhsOffset, "] (", *opRef, ")\n");
-                    }
                 cRetval = BCValue(Imm64(*opRef, false));
                 if (Return()) return cRetval;
             }

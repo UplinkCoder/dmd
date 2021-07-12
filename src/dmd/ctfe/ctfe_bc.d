@@ -23,8 +23,8 @@ import core.stdc.stdio : printf;
 import std.string : fromStringz;
 
 enum perf = 0;
-enum bailoutMessages = 1;
-enum printResult = 1;
+enum bailoutMessages = 0;
+enum printResult = 0;
 enum cacheBC = 1;
 enum UseLLVMBackend = 0;
 enum UsePrinterBackend = 0;
@@ -2246,7 +2246,7 @@ extern (C++) final class BCTypeVisitor : Visitor
             else
                 st.addField(bcType, false, null);
         }
-        assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ "\n\t" ~ reason);
+        // assert(!died, "We died while generting Field  -- " ~ currentField.toString ~ " for struct -- " ~ sd.toString ~ "\n\t" ~ reason);
         _sharedCtfeState.endStruct(&st, died);
     }
 
@@ -2261,9 +2261,9 @@ struct BCScope
 // debug = abi;
 debug = nullPtrCheck;
 debug = nullAllocCheck;
-debug = ctfe;
+//debug = ctfe;
 //debug = MemCpyLocation;
-debug = SetLocation;
+//debug = SetLocation;
 //debug = LabelLocation;
 
 extern (C++) final class BCV(BCGenT) : Visitor
@@ -3187,7 +3187,7 @@ public:
         exprFlags = flags;
         if (!expr)
         {
-            import core.stdc.stdio; printf("Calling genExpr(null) from: %d\n", line); //DEBUGLINE
+            // import core.stdc.stdio; printf("Calling genExpr(null) from: %d\n", line); //DEBUGLINE
             return BCValue.init;
         }
 
@@ -3205,7 +3205,7 @@ public:
             {
                 import std.stdio;
 
-                //    writeln("Arguments ", arguments);
+                // writeln("Arguments ", arguments);
             }
             if (processedArgs != arguments.length)
             {
@@ -3596,7 +3596,6 @@ public:
             }
 
 
-            PrintString("Executng: " ~ me.ident.toString());
             me.fbody.accept(this);
 
             static if (is(BCGen))
@@ -4003,11 +4002,9 @@ static if (is(BCGen))
                 const oldDiscardValue = discardValue;
                 discardValue = false;
                 auto expr = genExpr(e.e1);
-                if (!canWorkWithType(expr.type) || !canWorkWithType(retval.type))
+                if ((!canWorkWithType(expr.type)) || (!canWorkWithType(retval.type)))
                 {
 
-                    import std.stdio; writeln("canWorkWithType(expr.type) :", canWorkWithType(expr.type));
-                    import std.stdio; writeln("canWorkWithType(retval.type) :", canWorkWithType(retval.type));
                     bailout("++ only i32 is supported not expr: " ~ enumToString(expr.type.type) ~ "retval: " ~ enumToString(retval.type.type) ~ " -- " ~ e.toString);
                     return ;
                 }
@@ -4864,12 +4861,13 @@ static if (is(BCGen))
 
     override void visit(TryCatchStatement tc)
     {
+/+
         PushCatch();
         pushCatches(tc.catches);
         genBlock(tc._body);
         PopCatch();
-
-        // bailout("We currently can't handle ExecptionHandling");
++/
+        bailout("We currently can't handle ExecptionHandling");
     }
 
     override void visit(TryFinallyStatement tcf)
@@ -4881,9 +4879,12 @@ static if (is(BCGen))
 
     override void visit(ThrowStatement s)
     {
+/+
         auto e = genExpr(s.exp);
         Store32(imm32(exceptionPointerAddr), e);
         Throw(e);
++/
+        bailout("We currently can't handle ExecptionHandling");
     }
 
     void pushCatches(Catches* catches)
@@ -5981,7 +5982,6 @@ static if (is(BCGen))
                     bailout("arrayIndex: " ~ itos(idx) ~ " is out of bounds");
                     return BCValue.init;
                 }
-                writeln("idx:", idx);
                 length = imm32(_sharedCtfeState.arrayTypes[idx - 1].length);
             }
             else
@@ -6315,8 +6315,13 @@ static if (is(BCGen))
         uint memberCount = type.memberCount;
         foreach(size_t i_, mt; type.memberTypes[0 .. memberCount])
         {
+            if (mt.type == BCTypeEnum.Undef)
+            {
+                bailout("Unsupported type in struct");
+                return ;
+            }
             uint i = cast(uint)i_;
-            printf("structInitForMember %.*s\n", cast(int)_sharedCtfeState.typeToString(mt).length, _sharedCtfeState.typeToString(mt).ptr);
+            // printf("structInitForMember %.*s\n", cast(int)_sharedCtfeState.typeToString(mt).length, _sharedCtfeState.typeToString(mt).ptr);
             Comment("StructInitForMember: " ~ _sharedCtfeState.typeToString(mt));
             auto pointerToMemberType = _sharedCtfeState.pointerOf(mt);
             if (mt.type == BCTypeEnum.Array)
@@ -6390,10 +6395,7 @@ static if (is(BCGen))
             else if (mt.type == BCTypeEnum.Struct)
             {
                 auto offset = genTemporary(pointerToMemberType);
-                writeln("structPtr: ", structPtr);
-                writeln("offset: ", offset);
                 Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
-                writeln("offset: ", offset);
                 initStruct(offset, &_sharedCtfeState.structTypes[mt.typeIndex - 1]);
             }
             else if (mt.type == BCTypeEnum.Class)

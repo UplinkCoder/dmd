@@ -716,7 +716,7 @@ struct BCValue
             && this.vType != vType.VoidValue;
     }
 
-    bool opEquals(const BCValue rhs) pure const
+    bool opEquals(const BCValue rhs) const
     {
         BCTypeEnum commonType = commonTypeEnum(this.type.type, rhs.type.type);
        
