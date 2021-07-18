@@ -836,7 +836,7 @@ pure:
             {
                 // TOOD there was
                 // assert (rhs.type.type == BCTypeEnum.f52)
-                // here before .... check of this is an invariant
+                // here before .... check if this is an invariant
                 rhs = castTo(rhs, BCTypeEnum.f52);
             }
 
@@ -892,7 +892,7 @@ pure:
     {
         assert(isStackValueOrParameter(lhs), "SetHigh lhs is has to be a StackValue");
         assert(rhs.vType == BCValueType.Immediate || isStackValueOrParameter(rhs), "SetHigh rhs is has to be a StackValue or Imm");
-
+        assert(0, "SetHigh is not implemented");
         //two cases :
         //    lhs.type.size == 4 && rhs.type.size == 8
         // OR

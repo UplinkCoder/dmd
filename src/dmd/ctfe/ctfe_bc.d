@@ -1667,7 +1667,7 @@ Expression toExpression(const BCValue value, Type expressionType,
 
     if (expressionType.isString)
     {
-        if (!value.imm32)
+        if (!value.imm32 || !heapPtr._heap[value.imm32 + SliceDescriptor.BaseOffset])
         {
             {
                 return new NullExp(lastLoc, expressionType);
