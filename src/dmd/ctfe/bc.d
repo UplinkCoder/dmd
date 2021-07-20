@@ -348,7 +348,7 @@ struct BCFunction
     ushort nArgs;
     ushort maxStackUsed;
 
-    int[] byteCode; // should be const but currently we need to assign ot this;
+    int[] byteCode; // should be const but currently we need to assign to this;
 
     //    this(void* fd, BCFunctionTypeEnum type, int nr, const int[] byteCode, uint nArgs) pure
     //    {
@@ -2194,44 +2194,39 @@ const(BCValue) interpret_(int fnId, const BCValue[] args,
     }
     auto stackP = Stack();
 +/
-    size_t argOffset = 4;
+    size_t argOffset = 1;
     foreach (arg; args)
     {
         switch (arg.type.type)
         {
             case BCTypeEnum.i32, BCTypeEnum.i16, BCTypeEnum.i8:
             {
-                *(&stackP[argOffset / 4]) = cast(int)arg.imm32;
-                argOffset += uint.sizeof;
+                (stackP[argOffset++]) = cast(int)arg.imm32;
             }
             break;
 
             case BCTypeEnum.u32, BCTypeEnum.f23, BCTypeEnum.c8, BCTypeEnum.u16, BCTypeEnum.u8, BCTypeEnum.c16, BCTypeEnum.c32:
             {
-                *(&stackP[argOffset / 4]) = cast(uint)arg.imm32;
-                argOffset += uint.sizeof;
+                (stackP[argOffset++]) = cast(uint)arg.imm32;
             }
             break;
 
         case BCTypeEnum.i64:
             {
-                *(&stackP[0] + argOffset / 4) = cast(long)arg.imm64;
-                argOffset += uint.sizeof;
+                (stackP[argOffset++]) = arg.imm64;
             }
             break;
 
         case BCTypeEnum.u64, BCTypeEnum.f52:
         {
-            *(&stackP[0] + argOffset / 4) = arg.imm64;
-            argOffset += uint.sizeof;    
+            (stackP[argOffset++]) = arg.imm64;
         }
         break;
 
         case BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8, BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Null:
             {
                 // This might need to be removed again?
-                *(&stackP[argOffset / 4]) = arg.heapAddr.addr;
-                argOffset += uint.sizeof;
+                (stackP[argOffset++]) = arg.heapAddr.addr;
             }
             break;
         default:

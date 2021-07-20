@@ -80,6 +80,7 @@ struct UncompiledFunction
                       to complile for ctfe this is
                       okay since we can not statically
                       proof if it is actually called */
+    string dummyErrorFunctionMessage = null;
 }
 
 struct UncompiledConstructor
@@ -387,9 +388,9 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
     static if (perf)
     {
         csw.stop;
-        writeln("Creating and Initializing bcGen took " ~ itos(cast(int)isw.peek.usecs)~ " usecs");
+        writeln("Creating and Initializing bcGen took " ~ itos(cast(int)isw.peek.total!"usecs")~ " usecs");
         writeln("Generating bc for ", fd.ident.toString ~ " took " ~
-            itos(cast(int)csw.peek.usecs) ~ " usecs");
+            itos(cast(int)csw.peek.total!"usecs") ~ " usecs");
     }
 
     debug (ctfe)
@@ -515,8 +516,8 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
 
         static if (perf)
         {
-            writeln("Executing bc for " ~ fd.ident.toString ~ " took " ~ itos(cast(int)sw.peek.usecs) ~ " us");
-            writeln(itos(cast(int)asw.peek.usecs) ~ " us were spent doing argument processing");
+            writeln("Executing bc for " ~ fd.ident.toString ~ " took " ~ itos(cast(int)sw.peek().total!"usecs") ~ " us");
+            writeln(itos(cast(int)asw.peek().total!"usecs") ~ " us were spent doing argument processing");
         }
         {
             static if (perf)
@@ -532,7 +533,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
                     esw.stop();
                     import dmd.asttypename;
                     writeln(astTypeName(exp));
-                    writeln("Converting to AST Expression took " ~ itos(cast(int)esw.peek.usecs) ~ "us");
+                    writeln("Converting to AST Expression took " ~ itos(cast(int)esw.peek().total!"usecs") ~ "us");
                 }
                 static if (printResult)
                 {
@@ -3313,15 +3314,11 @@ public:
             {
                 if (fd.isVirtualMethod() && fd.toParent2().isInterfaceDeclaration())
                 {
-                    // If this function is Virtual and the parent is an interface
-                    // then it is valid for this body to be empty
                     const fnIdx = ++_sharedCtfeState.functionCount;
                     _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd);
-                    beginFunction(fnIdx - 1, cast(void*)fd);
-                    {
-                        Assert(imm32(0), addError(lastLoc, "Non-overridden abstract interface method"));
-                    }
-                    endFunction();
+                    uncompiledFunctions[uncompiledFunctionCount] = UncompiledFunction(fd, fnIdx, true, "Calling Abstract Interface Method");
+                    uncompiledFunctions[uncompiledFunctionCount].mayFail = mayFail;
+                    ++uncompiledFunctionCount;
                     *fnIdxP = fnIdx;
                 }
                 else
@@ -3527,7 +3524,16 @@ public:
     LuncompiledFunctions :
         foreach (uf;uncompiledFunctions[lastUncompiledFunction .. uncompiledFunctionCount])
         {
-            if (uf.fd)
+            if (uf.dummyErrorFunctionMessage !is null)
+            {
+                auto loc = uf.fd ? uf.fd.loc : Loc.init;
+                beginFunction(uf.fn - 1, cast(void*)me);
+                {
+                    Assert(imm32(0), addError(loc, uf.dummyErrorFunctionMessage));
+                }
+                endFunction();
+            }
+            else if (uf.fd)
                 compileUncompiledFunction(uf.fd, uf.fn, uf.mayFail, null);
 
             lastUncompiledFunction++;
@@ -3966,6 +3972,8 @@ static if (is(BCGen))
                 }
             }
         }
+        else
+            assert(0, "fbody is null");
     }
 
     override void visit(BinExp e)
@@ -4100,7 +4108,6 @@ static if (is(BCGen))
             break;
         case TOK.identity:
             {
-         Comment("BeginIdentity");
                 auto lhs = genExpr(e.e1);
                 auto rhs = genExpr(e.e2);
                 if (!lhs || !rhs)
@@ -4110,7 +4117,6 @@ static if (is(BCGen))
                 }
 
                 Eq3(retval.i32, lhs.i32, rhs.i32);
-        Comment("EndIdenttity");
             }
             break;
         case TOK.notIdentity:
@@ -5248,16 +5254,24 @@ static if (is(BCGen))
 
     void getField(BCValue lhs, FieldInfo fInfo, BCValue* retvalp)
     {
+        import std.stdio;
+        writeln("lhs: ", lhs, " FieldInfo: ", fInfo, "retvalP:", retvalp);
         auto ptr = genTemporary(fInfo.type);
         Add3(ptr.i32, lhs.i32, imm32(fInfo.offset));
         //FIXME horrible hack to make slice members work
         // Systematize somehow!
         auto rv = *retvalp;
 
-        if (ptr.type.type.anyOf([BCTypeEnum.Array, BCTypeEnum.Ptr, BCTypeEnum.Slice, BCTypeEnum.Struct, BCTypeEnum.Class, BCTypeEnum.string8]))
+        if (ptr.type.type.anyOf([/*BCTypeEnum.Array,*/ BCTypeEnum.Ptr, BCTypeEnum.Class, BCTypeEnum.Slice, BCTypeEnum.Struct, /*BCTypeEnum.Class, BCTypeEnum.string8*/]))
+        {
+            Comment("getField");
             Set(rv.i32, ptr);
+        }
         else if (_sharedCtfeState.size(ptr.type) == 8)
+        {
+            Comment(_sharedCtfeState.typeToString(ptr.type));
             Load64(rv.i32, ptr);
+        }
         else
             Load32(rv.i32, ptr);
         if (!ptr)
@@ -5899,19 +5913,26 @@ static if (is(BCGen))
         {
             auto ctor = ne.member;
 
+            int cIdx;
+/+
             if (!ctor)
             {
-                bailout("default class initalizer not supported yet.");
-                return ;
+                cIdx = lookupDefaultConstructor(type);
+                if (!cIdx)
+                {
+                    addUncompiledDefaultConstructor(type, &cIdx);
+                }
             }
-
-            auto cIdx = lookupConstructor(ctor, type);
-            // printf("Ctor: %s\n", ctor ? ctor.fbody.toChars() : "default class initializer"); //debugline
-            if (!cIdx)
+            else
             {
-                addUncompiledConstructor(ctor, type, &cIdx);
-
-            }
++/
+                cIdx = lookupConstructor(ctor, type);
+                // printf("Ctor: %s\n", ctor ? ctor.fbody.toChars() : "default class initializer"); //debugline
+                if (!cIdx)
+                {
+                    addUncompiledConstructor(ctor, type, &cIdx);
+                }
+//            }
 
             BCValue[] cTorArgs;
             cTorArgs.length = ne.arguments.dim + 1;
@@ -6402,7 +6423,10 @@ static if (is(BCGen))
             {
                 auto offset = genTemporary(pointerToMemberType);
                 Add3(offset.u32, structPtr.u32, imm32(type.offset(i)));
-                Store32(offset.u32, imm32(0));
+                auto initExp = type.initializerExps[i];
+                BCValue initValue = initExp ? genExpr(type.initializerExps[i]) : imm32(0);
+                Store32(offset.u32, initValue);
+
             }
             else if (mt.type == BCTypeEnum.u32 || mt.type == BCTypeEnum.i32 || mt.type == BCTypeEnum.f23)
             {
@@ -8246,7 +8270,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             // We are not inside a function body hence we are expected to return the result of this call.
             // For that to work we construct a function which will look like this { return fn(); }
             beginFunction(_sharedCtfeState.functionCount++);
-            retval = genTemporary(i32Type);
+            retval = genTemporary(toBCType(ce.type));
             insideFunction = true;
             wrappingCallFn = true;
         }
@@ -8301,7 +8325,6 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             // Calling a member function
             ethis = dve.e1;
-            import std.stdio;
 
             if (!dve.var || !dve.var.isFuncDeclaration())
             {
@@ -8322,7 +8345,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 Comment("loadVtblPtr");
 
                 auto vtblPtr = genTemporary(i32Type);
-                // because of forward_referancing issues we need to assert
+                // because of forward_referencing issues we need to assert
                 // that we do indeed have a this pointer
                 // what a pain
                 Assert(thisPtr.i32, addError(lastLoc, "Calling virtual function on null class ... maybe forward-reference?"));
@@ -8914,19 +8937,30 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         else if (toType.type == BCTypeEnum.Class && fromType.type == BCTypeEnum.Class)
         {
-            // A dynamic cast needs to call a function since we may don't know the vtbl ptrs yet
-            Comment("DynamicCastBegin:");
+            ClassDeclaration cdTo = _sharedCtfeState.classDeclTypePointers[toType.typeIndex - 1];
+            ClassDeclaration cdFrom = _sharedCtfeState.classDeclTypePointers[fromType.typeIndex - 1]; 
 
-            int castFnIdx = getDynamicCastIndex(toType);
-            if (!castFnIdx)
+            if (cdTo.isBaseOf(cdFrom, null))
             {
-                addDynamicCast(toType, &castFnIdx);
+                // down cast we don't have to do anyting!
+                retval.type = toType;
             }
-            auto from = retval;
-            retval = genLocal(toType, "DynamicCastResult" ~ itos(uniqueCounter++));
-            Call(retval.i32, imm32(castFnIdx), [from]);
+            else
+            {
+                // A dynamic cast needs to call a function since we may don't know the vtbl ptrs yet
+                Comment("-- DynamicCastBegin --");
 
-            Comment("DynamicCastEnd");
+                int castFnIdx = getDynamicCastIndex(toType);
+                if (!castFnIdx)
+                {
+                    addDynamicCast(toType, &castFnIdx);
+                }
+                auto from = retval;
+                retval = genLocal(toType, "DynamicCastResult" ~ itos(uniqueCounter++));
+                Call(retval.i32, imm32(castFnIdx), [from]);
+
+                Comment("-- DynamicCastEnd --");
+            }
         }
         else
         {
