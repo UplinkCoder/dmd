@@ -7,7 +7,7 @@ import core.stdc.stdio;
 import core.thread.osthread;
 import core.atomic;
 import dmd.root.ticket;
-import dmd.root.perfcounter;
+// import dmd.root.perfcounter;
 
 @("tracy"):
 enum n_threads = 4;
@@ -146,7 +146,6 @@ extern (C) struct TaskQueue
         auto myTicket = queueLock.drawTicket();
         scope (exit)
         {
-            QueryPerformanceCounter(cast(long*)&task.enqueue_time);
             queueLock.releaseTicket(myTicket);
             assert(task);
         }
@@ -292,8 +291,6 @@ void initBackgroundThreads()
                         //printf("got no work \n");
                     continue;
                 }
-                if (!task.start_exec_time)
-                    QueryPerformanceCounter(cast(long*)&task.start_exec_time);
                 // printf("pulled task with queue_id %d and thread_id is: %d and myQueue is: %p\n", task.queueID, thread_idx + 1, myQueue);
                 assert(task.queueID == thread_idx + 1);
                 if (task.hasCompleted_)
@@ -313,7 +310,6 @@ void initBackgroundThreads()
                 task.callFiber();
                 if (task.hasCompleted())
                 {
-                    QueryPerformanceCounter(cast(long*)&task.end_exec_time);
                     // printf("task %p has completed myQueue.next_entry_to_write: %d\n", task, myQueue.next_entry_to_write);
                     // printf("myQueue.next_entry_to_write: %d\n", myQueue.next_entry_to_write);
                 }
@@ -445,11 +441,6 @@ shared struct Task
     align(16) shared bool hasFiber = false;
     align(16) shared bool fiberIsExecuting = false;
     align(16) shared TicketCounter taskLock;
-
-    timer_t creation_time;
-    timer_t enqueue_time;
-    timer_t start_exec_time;
-    timer_t end_exec_time;
 
 
     Ticket creation_ticket;
@@ -698,7 +689,6 @@ struct TaskGroup
         shared task = &tasks[atomicFetchAdd(n_used, 1)];
         *task = Task(fn, taskData, &this, background_task);
         task.creation_ticket = myTicket;
-        QueryPerformanceCounter(cast(long*)&task.creation_time);
 
 /+
         if (originator) // technically we need to take a lock here!
@@ -792,8 +782,6 @@ struct TaskGroup
             printf("Wating for groupLock .. lastAquire by: %s\n", groupLock.lastAquiredLoc.func.ptr);
         }
 
-        timer_t now;
-        QueryPerformanceCounter(&now);
 
         foreach(ref task; tasks[0 .. n_used])
         {
@@ -806,8 +794,6 @@ struct TaskGroup
             {
                 // uncompleted background task
                 import dmd.root.rootobject;
-                if (task.enqueue_time && task.enqueue_time > now - 10_000)
-                    printf("waiting on: %s\n", (cast(RootObject)task.taskData).toChars());
             }
         }
 /+
