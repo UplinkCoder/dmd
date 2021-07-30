@@ -3763,7 +3763,7 @@ class Parser(AST) : Lexer
             loc = token.loc;
             nextToken();
             if (token.value != TOK.leftParenthesis)
-                error("found `%s` when expecting `%s` following %s", token.toChars(), Token.toChars(TOK.leftParenthesis), "`mixin`".ptr);
+                error("found `%s` when expecting `%s` following `mixin`", token.toChars(), Token.toChars(TOK.leftParenthesis));
             auto exps = parseArguments();
             t = new AST.TypeMixin(loc, exps);
             break;
@@ -8301,7 +8301,7 @@ LagainStc:
                 // https://dlang.org/spec/expression.html#mixin_expressions
                 nextToken();
                 if (token.value != TOK.leftParenthesis)
-                    error("found `%s` when expecting `%s` following %s", token.toChars(), Token.toChars(TOK.leftParenthesis), "`mixin`".ptr);
+                    error("found `%s` when expecting `%s` following `mixin`", token.toChars(), Token.toChars(TOK.leftParenthesis));
                 auto exps = parseArguments();
                 e = new AST.MixinExp(loc, exps);
                 break;
