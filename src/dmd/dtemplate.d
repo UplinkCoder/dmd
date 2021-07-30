@@ -2403,7 +2403,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
         {
             // For constructors, emitting return type is necessary for
             // isReturnIsolated() in functionResolve.
-            scx.flags |= SCOPE.ctor;
+            tf.isctor = true;
 
             Dsymbol parent = toParentDecl();
             Type tret;

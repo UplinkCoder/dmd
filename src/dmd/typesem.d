@@ -1237,7 +1237,7 @@ extern(C++) Type typeSemantic(Type type, const ref Loc loc, Scope* sc)
             tf.next = tf.next.typeSemantic(loc, sc);
             sc = sc.pop();
             errors |= tf.checkRetType(loc);
-            if (tf.next.isscope() && !(sc.flags & SCOPE.ctor))
+            if (tf.next.isscope() && !tf.isctor)
             {
                 .error(loc, "functions cannot return `scope %s`", tf.next.toChars());
                 errors = true;
@@ -1481,9 +1481,8 @@ extern(C++) Type typeSemantic(Type type, const ref Loc loc, Scope* sc)
                  */
                 /* Constructors are treated as if they are being returned through the hidden parameter,
                  * which is by ref, and the ref there is ignored.
-                 * TODO: check buildScopeRef() inconsistent behavior on SCOPE.ctor
                  */
-                const returnByRef = tf.isref && !(sc.flags & SCOPE.ctor);
+                const returnByRef = tf.isref && !tf.isctor;
                 const sr = buildScopeRef(returnByRef, fparam.storageClass);
                 switch (sr)
                 {

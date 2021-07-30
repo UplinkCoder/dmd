@@ -5288,6 +5288,7 @@ private:
         incomplete = 512u,
         inoutParam = 1024u,
         inoutQual = 2048u,
+        isctor = 4096u,
     };
 
 public:
@@ -5333,6 +5334,8 @@ public:
     bool isInOutQual() const;
     void isInOutQual(bool v);
     bool iswild() const;
+    bool isctor() const;
+    void isctor(bool v);
     bool attributesEqual(const TypeFunction* const other) const;
     void accept(Visitor* v);
 };
