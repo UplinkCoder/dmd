@@ -1047,11 +1047,54 @@ public:
                 printf("  parent = %s %s", s.parent.kind(), s.parent.toChars());
             printf("\n");
         }
+        enum cacheMangle = true;
+        static if (cacheMangle)
+        {
+            if (s.mangle.length)
+            {
+                if (s.ident) // special case because we could be doing a backref.
+                {
+                    auto p = idents.getLvalue(s.ident);
+                    if (*p) // we need to go the backref route
+                    {
+                        const offset = *p - 1;
+                        writeBackRef(buf.length - offset);
+                        return ;
+                    }
+                }
+                // buf.write(s.mangle);
+                // return ;
+            }
+
+            auto prev_offset = buf.peekSlice().length;
+        }
+
         mangleParent(s);
         if (s.ident)
             mangleIdentifier(s.ident, s);
         else
             toBuffer(s.toString(), s);
+
+        // checking the cached mangle is what we would have produced if we have it
+        static if (cacheMangle)
+        {
+            if (s.mangle)
+            {
+                auto checkSlice = buf.peekSlice()[prev_offset .. $];
+                assert (checkSlice[] == s.mangle[], "mangle: '" ~ checkSlice ~ "' != cachedMangle: '" ~ s.mangle ~ "'");
+            }
+        }
+
+        static if (cacheMangle)
+        {
+            auto mangleSlice = buf.peekSlice()[prev_offset .. $];
+            auto len = mangleSlice.length;
+            import dmd.root.rmem;
+            auto mangleMem = cast(char*)allocmemoryNoFree(len + 1);
+            mangleMem[0 .. len] = mangleSlice[0 .. len];
+            mangleMem[len] = '\0';
+            s.mangle = cast(const(char)[])(mangleMem[0 .. len]);
+        }
         //printf("Dsymbol.mangle() %s = %s\n", s.toChars(), id);
     }
 

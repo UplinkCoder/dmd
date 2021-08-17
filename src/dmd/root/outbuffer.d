@@ -558,6 +558,11 @@ struct OutBuffer
         return extractData()[0 .. length];
     }
 
+    extern (D) char[] peekSlice()
+    {
+        return (cast(char*) data.ptr)[0 .. offset];
+    }
+
     // Append terminating null if necessary and get view of internal buffer
     extern (C++) char* peekChars() pure nothrow
     {
