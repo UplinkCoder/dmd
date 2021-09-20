@@ -189,6 +189,70 @@ void removeHdrFilesAndFail(ref Param params, ref Modules modules)
 
     fatal();
 }
+/**
+ * Given a fully qualified module name (e.g. "std.math") attempt to load
+ * and parse that module.
+ * This helper function is supposed to be used in places where
+ * the compiler and runtime intract.
+ * Such that you can for example ensure that a particular runtime function
+ * is at least declared before emitting a call to it.
+ */
+Module loadRuntimeModule(string module_fqn, const ref Loc loc = Loc.initial)
+{
+    __gshared Module[string] loadedModules;
+
+    if (auto mod = module_fqn in loadedModules)
+    {
+        return *mod;
+    }
+
+    scope Identifiers* module_path = new Identifiers();
+    // most core.modules we want to load have 3 segments or less
+    module_path.reserve(3);
+    size_t n_packages;
+
+    // split the fqn by dots to get the identifiers for the path
+    {
+        size_t lastDot = 0;
+        size_t i = 0;
+
+        for(char c; i < module_fqn.length; c = module_fqn[i++])
+        {
+            if (c == '.')
+            {
+                (*module_path).push(Identifier.idPool(module_fqn[lastDot .. i - 1]));
+                lastDot = i;
+                ++n_packages;
+            }
+        }
+        // after we are done with the loop we still need to insert last part
+        (*module_path).push(Identifier.idPool(module_fqn[lastDot .. i]));
+    }
+
+    scope Import imp = new Import(loc,
+        (*module_path)[0 .. n_packages],
+        (*module_path)[     n_packages],
+        null, false
+    );
+
+    // Module.load will call fatal() if there the runtime module is not available.
+    // Gag the error here, pushing the error handling to the caller.
+    uint errors = global.startGagging();
+    imp.load(null);
+    if (imp.mod)
+    {
+        imp.mod.importAll(null);
+        imp.mod.dsymbolSemantic(null);
+    }
+    global.endGagging(errors);
+    bool hadErrors = global.endGagging(errors);
+    if (hadErrors)
+    {
+        return null;
+    }
+
+    return loadedModules[module_fqn] = imp.mod;
+}
 
 /**
  * Converts a chain of identifiers to the filename of the module
