@@ -1770,6 +1770,7 @@ extern (C++) abstract class Expression : ASTNode
         inout(IdentityExp) isIdentityExp() { return (op == EXP.identity || op == EXP.notIdentity) ? cast(typeof(return))this : null; }
         inout(CondExp)     isCondExp() { return op == EXP.question ? cast(typeof(return))this : null; }
         inout(GenericExp)  isGenericExp() { return op == EXP._Generic ? cast(typeof(return))this : null; }
+        inout(InferenceExp)      isInferenceExp() { return op == EXP.inference ? cast(typeof(return))this : null; }
         inout(DefaultInitExp)    isDefaultInitExp() { return isDefaultInitOp(op) ? cast(typeof(return))this: null; }
         inout(FileInitExp)       isFileInitExp() { return (op == EXP.file || op == EXP.fileFullPath) ? cast(typeof(return))this : null; }
         inout(LineInitExp)       isLineInitExp() { return op == EXP.line ? cast(typeof(return))this : null; }
@@ -2293,6 +2294,25 @@ extern (C++) final class DollarExp : IdentifierExp
     extern (D) this(const ref Loc loc)
     {
         super(loc, Id.dollar);
+    }
+
+    override void accept(Visitor v)
+    {
+        v.visit(this);
+    }
+}
+
+/***********************************************************
+ * The Inference Expression $exp used when infering member access
+ */
+extern (C++) final class InferenceExp : Expression
+{
+    Expression e1;
+
+    extern (D) this(const ref Loc loc, Expression e1)
+    {
+        super(loc, EXP.inference, __traits(classInstanceSize, InferenceExp));
+        this.e1 = e1;
     }
 
     override void accept(Visitor v)

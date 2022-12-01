@@ -8835,7 +8835,18 @@ LagainStc:
                 e = new AST.ThrowExp(loc, exp);
                 break;
             }
-
+        case TOK.dollar:
+            {
+                TOK peek = peekNext();
+                if (peek == TOK.identifier || peek == TOK.leftParenthesis)
+                {
+                    nextToken();
+                    AST.Expression e1 = parseUnaryExp();
+                    e = new AST.InferenceExp(loc, e1);
+                    break;
+                }
+                goto default;
+            }
         default:
             e = parsePrimaryExp();
             e = parsePostExp(e);
@@ -9629,6 +9640,8 @@ immutable PREC[EXP.max + 1] precedence =
     EXP.declaration : PREC.expr,
 
     EXP.interval : PREC.assign,
+
+    EXP.inference : PREC.primary,
 ];
 
 enum ParseStatementFlags : int
