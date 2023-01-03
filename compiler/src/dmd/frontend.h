@@ -216,6 +216,7 @@ class EqualExp;
 class IdentityExp;
 class CondExp;
 class GenericExp;
+class InferenceExp;
 class DefaultInitExp;
 class FileInitExp;
 class LineInitExp;
@@ -1404,6 +1405,7 @@ enum class EXP : uint8_t
     compoundLiteral = 132u,
     _Generic = 133u,
     interval = 134u,
+    inference = 135u,
 };
 
 typedef uint64_t dinteger_t;
@@ -1585,6 +1587,7 @@ public:
     IdentityExp* isIdentityExp();
     CondExp* isCondExp();
     GenericExp* isGenericExp();
+    InferenceExp* isInferenceExp();
     DefaultInitExp* isDefaultInitExp();
     FileInitExp* isFileInitExp();
     LineInitExp* isLineInitExp();
@@ -4838,6 +4841,7 @@ struct ASTCodegen final
     using ImportExp = ::ImportExp;
     using InExp = ::InExp;
     using IndexExp = ::IndexExp;
+    using InferenceExp = ::InferenceExp;
     using IntegerExp = ::IntegerExp;
     using IntervalExp = ::IntervalExp;
     using IsExp = ::IsExp;
@@ -5103,6 +5107,7 @@ public:
     virtual void visit(ClassReferenceExp* e);
     virtual void visit(VoidInitExp* e);
     virtual void visit(ThrownExceptionExp* e);
+    virtual void visit(InferenceExp* e);
 };
 
 class StoppableVisitor : public Visitor
@@ -6819,6 +6824,13 @@ public:
 class DollarExp final : public IdentifierExp
 {
 public:
+    void accept(Visitor* v) override;
+};
+
+class InferenceExp final : public Expression
+{
+public:
+    Expression* e1;
     void accept(Visitor* v) override;
 };
 
