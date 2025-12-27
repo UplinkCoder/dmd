@@ -1,7 +1,10 @@
 module dmd.ctfe.ctfe_bc;
-import dmd.ctfe.bc_limits;
 
+import dmd.ctfe.bc_limits;
+import dmd.astcodegen;
+import dmd.astenums;
 import dmd.expression;
+import dmd.expressionsem;
 import dmd.declaration;
 import dmd.dsymbol;
 import dmd.dstruct;
@@ -195,7 +198,7 @@ struct BlackList
 Expression evaluateFunction(FuncDeclaration fd, Expressions* args)
 {
 //    pragma(msg, __traits(allMembers, typeof(*args)));
-    return evaluateFunction(fd, args ? (*args)[0 .. args.dim] : []);
+    return evaluateFunction(fd, args ? (*args)[0 .. args.length] : []);
 }
 
 import dmd.ctfe.bc_common;
@@ -214,7 +217,7 @@ ClosureVariableDescriptor* searchInParent(FuncDeclaration fd, VarDeclaration vd)
     int offset;
     // if we don't have closureVars ourselfs then we don't need to load our ptr
     // therefore we then start at level -2 rather then -1
-    int depth = (fd.closureVars.dim ? -1 : -2);
+    int depth = (fd.closureVars.length ? -1 : -2);
 
     while(fd)
     {
@@ -361,7 +364,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
                 writeln("top-level function arguments are not supported");
             return null;
         }
-        if (arg.type.ty == Tpointer && (cast(TypePointer) arg.type).nextOf.ty == Tfunction)
+        if (arg.type.ty == TY.Tpointer && (cast(TypePointer) arg.type).nextOf.ty == Tfunction)
         {
             import dmd.tokens;
             if (arg.op == TOK.symbolOffset)
@@ -1104,7 +1107,7 @@ struct SharedCtfeState(BCGenT)
         // if it's impossible to get the elemType return 0
         if (!elemType.type)
             return 0;
-        auto arraySize = evaluateUlong(tsa.dim);
+        auto arraySize = evaluateUlong(tsa.length);
         assert(arraySize < uint.max);
         if (arrayCount == arrayTypes.length)
             return 0;
@@ -1440,7 +1443,6 @@ Expression toExpression(const BCValue value, Type expressionType,
     const BCHeap* heapPtr = &_sharedExecutionState.heap,
     const BCValue[4]* errorValues = null, const RetainedError* errors = null)
 {
-    import dmd.ctfeexpr : ThrownExceptionExp, ClassReferenceExp, CTFEExp;
     debug (abi)
     {
             import std.stdio;
@@ -1453,7 +1455,7 @@ Expression toExpression(const BCValue value, Type expressionType,
     static if (printResult)
     {
         import std.stdio;
-        writeln("Calling toExpression with Type:", (cast(ENUMTY)(expressionType.ty)).enumToString, " Value:", value);
+        writeln("Calling toExpression with Type:", (cast(TY)(expressionType.ty)).enumToString, " Value:", value);
     }
     Expression result;
     if (value.vType == BCValueType.Unknown)
@@ -1544,7 +1546,6 @@ Expression toExpression(const BCValue value, Type expressionType,
     {
         assert(value.type.type == BCTypeEnum.u32, "Error.type is: " ~ _sharedCtfeState.typeToString(value.type));
         assert(value.imm32, "Errors are 1 based indexes");
-        import dmd.ctfeexpr : CTFEExp;
 
         auto err = _sharedCtfeState.errors[value.imm32 - 1];
         import dmd.errors;
@@ -1873,9 +1874,9 @@ Expression toExpression(const BCValue value, Type expressionType,
     case Tsarray:
         {
             auto tsa = cast(TypeSArray) expressionType;
-            assert(heapPtr._heap[value.heapAddr.addr + SliceDescriptor.LengthOffset] == evaluateUlong(tsa.dim),
+            assert(heapPtr._heap[value.heapAddr.addr + SliceDescriptor.LengthOffset] == evaluateUlong(tsa.length),
                 "static arrayLength mismatch: &" ~ itos(value.heapAddr.addr + SliceDescriptor.LengthOffset) ~ " (" ~ itos(heapPtr._heap[value.heapAddr.addr + SliceDescriptor.LengthOffset]) ~ ") != " ~ itos(
-                    cast(int)evaluateUlong(tsa.dim)));
+                    cast(int)evaluateUlong(tsa.length)));
             result = createArray(value, tsa);
         } break;
     case Tarray:
@@ -1940,7 +1941,7 @@ Expression toExpression(const BCValue value, Type expressionType,
         if (!result)
         {
             import core.stdc.stdio;
-            printf("could not create expression of type: %s\n", enumToString(cast(ENUMTY)expressionType.ty).ptr);
+            printf("could not create expression of type: %s\n", enumToString(cast(TY)expressionType.ty).ptr);
         }
     }
     if (value.vType == BCValueType.Exception)
@@ -1964,51 +1965,51 @@ extern (C++) final class BCTypeVisitor : Visitor
         assert(t !is null, "t is null when called from: " ~ itos(line));
         switch (t.ty)
         {
-        case ENUMTY.Tbool:
+        case TY.Tbool:
             //return BCType(BCTypeEnum.i1);
             return BCType(BCTypeEnum.i32);
-        case ENUMTY.Tchar:
+        case TY.Tchar:
             return BCType(BCTypeEnum.c8);
-        case ENUMTY.Twchar:
+        case TY.Twchar:
             //return BCType(BCTypeEnum.c16);
-        case ENUMTY.Tdchar:
+        case TY.Tdchar:
             return BCType(BCTypeEnum.c32);
-        case ENUMTY.Tuns8:
+        case TY.Tuns8:
             return BCType(BCTypeEnum.u8);
-        case ENUMTY.Tint8:
+        case TY.Tint8:
             return BCType(BCTypeEnum.i8);
-        case ENUMTY.Tuns16:
+        case TY.Tuns16:
             return BCType(BCTypeEnum.u16);
-        case ENUMTY.Tint16:
+        case TY.Tint16:
             return BCType(BCTypeEnum.i16);
-        case ENUMTY.Tuns32:
+        case TY.Tuns32:
             return BCType(BCTypeEnum.u32);
-        case ENUMTY.Tint32:
+        case TY.Tint32:
             return BCType(BCTypeEnum.i32);
-        case ENUMTY.Tuns64:
+        case TY.Tuns64:
             return BCType(BCTypeEnum.u64);
-        case ENUMTY.Tint64:
+        case TY.Tint64:
             return BCType(BCTypeEnum.i64);
-        case ENUMTY.Tfloat32:
+        case TY.Tfloat32:
             return BCType(BCTypeEnum.f23);
-        case ENUMTY.Tfloat64:
+        case TY.Tfloat64:
             return BCType(BCTypeEnum.f52);
-        case ENUMTY.Tfloat80:
+        case TY.Tfloat80:
             return BCType(BCTypeEnum.f52);
-        case ENUMTY.Timaginary32:
-        case ENUMTY.Timaginary64:
-        case ENUMTY.Timaginary80:
-        case ENUMTY.Tcomplex32:
-        case ENUMTY.Tcomplex64:
-        case ENUMTY.Tcomplex80:
+        case TY.Timaginary32:
+        case TY.Timaginary64:
+        case TY.Timaginary80:
+        case TY.Tcomplex32:
+        case TY.Tcomplex64:
+        case TY.Tcomplex80:
             return BCType.init;
-        case ENUMTY.Tvoid:
+        case TY.Tvoid:
             return BCType(BCTypeEnum.Void);
         default:
             break;
         }
         // If we get here it's not a basic type;
-        assert(!t.isTypeBasic(), "Is a basicType: " ~ (cast(ENUMTY) t.ty).enumToString);
+        assert(!t.isTypeBasic(), "Is a basicType: " ~ (cast(TY) t.ty).enumToString);
         if (t.isString)
         {
             auto sz = t.nextOf().size;
@@ -3363,7 +3364,7 @@ public:
 
     void allocateAndLinkClosure(FuncDeclaration fd)
     {
-        assert(fd.closureVars.dim);
+        assert(fd.closureVars.length);
 
         uint closureChainSize = 4;
 
@@ -3567,7 +3568,7 @@ public:
 
             beginFunction(fnIdx - 1, cast(void*)me);
 
-            if (me.closureVars.dim)
+            if (me.closureVars.length)
                 allocateAndLinkClosure(me);
 
 
@@ -3617,7 +3618,7 @@ public:
             {
                 _sharedCtfeState.functions[fnIdx - 1] = BCFunction(cast(void*) fd,
                     fnIdx, BCFunctionTypeEnum.Bytecode,
-                    cast(ushort) (parameters ? parameters.dim : 0), osp.addr);
+                    cast(ushort) (parameters ? parameters.length : 0), osp.addr);
                 _sharedCtfeState.functions[fnIdx - 1].byteCode.length = ip;
                 _sharedCtfeState.functions[fnIdx - 1].byteCode[0 .. ip]
                     = byteCodeArray[0 .. ip];
@@ -3725,7 +3726,7 @@ public:
             {
                 for(cd = cd.baseClass;cd;cd = cd.baseClass)
                 {
-                    fieldsBefore += cd.fields.dim;
+                    fieldsBefore += cd.fields.length;
                 }
                 result = fieldsBefore + relativeFieldIndex;
                 break;
@@ -3860,7 +3861,7 @@ public:
             beginFunction(fnIdx - 1, cast(void*)fd);
 
             //TODO it seems that hasNstedFrameRefs does not work transitively!
-            if (fd.closureVars.dim)
+            if (fd.closureVars.length)
                 allocateAndLinkClosure(fd);
 
             visit(fbody);
@@ -4478,7 +4479,7 @@ static if (is(BCGen))
                     else
                     {
                         bailout("Cannot handle SymOffsetExp of type: " ~
-                            enumToString(cast(ENUMTY)var.type.ty)
+                            enumToString(cast(TY)var.type.ty)
                         );
                     }
                     return ;
@@ -5290,7 +5291,7 @@ static if (is(BCGen))
             return ;
         }
 */
-        auto arrayLength = cast(uint) ale.elements.dim;
+        auto arrayLength = cast(uint) ale.elements.length;
         //_sharedCtfeState.getArrayIndex(ale.type);
         auto arrayType = BCArray(elemType, arrayLength);
         debug (ctfe)
@@ -5835,10 +5836,10 @@ static if (is(BCGen))
 
         if (type.type == BCTypeEnum.Slice || type.type == BCTypeEnum.string8)
         {
-            assert(ne.arguments.dim  == 1 || ne.arguments.dim == 0,
+            assert(ne.arguments.length  == 1 || ne.arguments.length == 0,
                 "new Slice is only expected to have one or zero arguments");
 
-            const hasLength = (ne.arguments.dim == 1);
+            const hasLength = (ne.arguments.length == 1);
 
             const elemSize =
                 _sharedCtfeState.size(_sharedCtfeState.elementType(type), true);
@@ -5884,7 +5885,7 @@ static if (is(BCGen))
 
         if (isBasicBCType(type) && typeSize <= 4)
         {
-            auto value = ne.arguments && ne.arguments.dim == 1 ? genExpr((*ne.arguments)[0]) : imm32(0);
+            auto value = ne.arguments && ne.arguments.length == 1 ? genExpr((*ne.arguments)[0]) : imm32(0);
             Store32(ptr, value.i32);
         }
         else if (type.type == BCTypeEnum.Class)
@@ -5913,14 +5914,14 @@ static if (is(BCGen))
 //            }
 
             BCValue[] cTorArgs;
-            cTorArgs.length = ne.arguments.dim + 1;
-            foreach(idx; 0 .. ne.arguments.dim)
+            cTorArgs.length = ne.arguments.length + 1;
+            foreach(idx; 0 .. ne.arguments.length)
             {
                 cTorArgs[idx] = genExpr((*ne.arguments)[idx]);
             }
             // ptr  = this; which should already point
             // to freshly allocated memory.
-            cTorArgs[ne.arguments.dim] = ptr.u32;
+            cTorArgs[ne.arguments.length] = ptr.u32;
 
             Comment("ConstructorCall");
             Call(ptr, imm32(cIdx), cTorArgs);
@@ -6935,7 +6936,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             retval.type.type = BCTypeEnum.f52;
         }
         else
-            bailout("RealExp of type " ~ enumToString(cast(ENUMTY)re.type.ty)
+            bailout("RealExp of type " ~ enumToString(cast(TY)re.type.ty)
                 ~ " unsupported");
     }
 
@@ -7823,7 +7824,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         auto _uls = UnrolledLoopState();
         unrolledLoopState = &_uls;
-        uint end = cast(uint) uls.statements.dim - 1;
+        uint end = cast(uint) uls.statements.length - 1;
 
         foreach (stmt; *uls.statements)
         {
@@ -7968,7 +7969,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             bool stringSwitch = lhs.type.type == BCTypeEnum.string8;
 
-            if (ss.cases.dim > beginCaseStatements.length)
+            if (ss.cases.length > beginCaseStatements.length)
                 assert(0, "We will not have enough array space to store all cases for gotos");
 
             foreach (size_t i_, caseStmt; *(ss.cases))
@@ -7994,7 +7995,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     //If the block returns regardless there is no need for a fixup
                     if (!blockReturns)
                     {
-                        assert(!falltrough || i < ss.cases.dim); // hope this works :)
+                        assert(!falltrough || i < ss.cases.length); // hope this works :)
 
                         switchFixupTable[switchFixupTableCount++] = SwitchFixupEntry(beginJmp(), falltrough ? i + 2 : 0);
                         switchFixup = &switchFixupTable[switchFixupTableCount];
@@ -8278,7 +8279,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         else
         {
-            bailout("CallExp.e1.type.ty expected to be Tfunction, but got: " ~ enumToString(cast(ENUMTY) ce.e1.type.ty));
+            bailout("CallExp.e1.type.ty expected to be Tfunction, but got: " ~ enumToString(cast(TY) ce.e1.type.ty));
             return ;
         }
         TypeDelegate td = cast (TypeDelegate) ce.e1.type;
@@ -8401,16 +8402,16 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         // investigate if there are circumstances in which this can happen.
         // Also destructor calls are most likely broken
         // TODO confirm if they work
-        uint nParameters = tf.parameterList.parameters ? cast(uint)tf.parameterList.parameters.dim : 0;
+        uint nParameters = tf.parameterList.parameters ? cast(uint)tf.parameterList.parameters.length : 0;
 
-        if (ce.arguments.dim > nParameters)
+        if (ce.arguments.length > nParameters)
         {
-            nParameters = cast(uint) Parameter.dim(tf.parameterList.parameters);
+            nParameters = cast(uint) Parameter.length(tf.parameterList.parameters);
         }
 
-        assert(ce.arguments.dim <= nParameters);
+        assert(ce.arguments.length <= nParameters);
 
-        uint lastArgIdx = cast(uint)(ce.arguments.dim > nParameters ? ce.arguments.dim : nParameters);
+        uint lastArgIdx = cast(uint)(ce.arguments.length > nParameters ? ce.arguments.length : nParameters);
         bc_args.length = lastArgIdx + !!(thisPtr) + (fd ? fd.isNested() : 0);
 
         foreach (i, arg; *ce.arguments)
@@ -8452,7 +8453,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             bc_args[lastArgIdx] = thisPtr;
         }
 
-        if (fd ? fd.isNested() && me.closureVars.dim : false)
+        if (fd ? fd.isNested() && me.closureVars.length : false)
         {
             bc_args[lastArgIdx + !!thisPtr] = closureChain;
             // now we need to store back into the closure
@@ -8502,11 +8503,11 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             }
 
             Call(retval, fnValue, bc_args, ce.loc);
-            uint arguments_dim = cast(uint) ce.arguments.dim;
+            uint arguments_dim = cast(uint) ce.arguments.length;
             //FIXME figure out what we do in the case where we have more arguments than parameters
             //TEMPORARY: for now it seems to be enough to only iterate the min of args and params
 
-            if (fd ? fd.isNested() && me.closureVars.dim : false)
+            if (fd ? fd.isNested() && me.closureVars.length : false)
             {
                 bc_args[lastArgIdx + !!thisPtr] = closureChain;
                 // now we need to load the the closure bak into our localsc
