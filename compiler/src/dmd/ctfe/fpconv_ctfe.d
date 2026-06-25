@@ -472,7 +472,7 @@ static int emit_digits(char* digits, int ndigits, char* dest, int K, bool neg)
 
     return idx;
 }
-/+
+
 static int filter_special(double fp, char* dest)
 {
     ulong bits = get_dbits(fp);
@@ -585,7 +585,7 @@ static assert (fpconv_dtoa(double.max) == "1.7976931348623157e+308");
 // printf can't handle this one ;)
 static assert (fpconv_dtoa(0.3049589) == "0.3049589");
 
-/+
+
 pragma(msg, () {
     string[] result;
     result.length = npowers * 2;
@@ -611,4 +611,4 @@ pragma(msg, () {
     }
     return result;
 } ());
-+/
+

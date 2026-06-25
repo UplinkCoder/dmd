@@ -353,7 +353,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
     foreach(arg;args)
     {
         import dmd.tokens;
-        if (arg.op == TOK.call)
+        if (arg.op == EXP.call)
         {
             bcv.bailout("Cannot handle calls in arguments");
         }
@@ -367,7 +367,7 @@ Expression evaluateFunction(FuncDeclaration fd, Expression[] args)
         if (arg.type.ty == TY.Tpointer && (cast(TypePointer) arg.type).nextOf.ty == Tfunction)
         {
             import dmd.tokens;
-            if (arg.op == TOK.symbolOffset)
+            if (arg.op == EXP.symbolOffset)
             {
                 auto se = cast(SymOffExp) arg;
                 auto _fd = se.var.isFuncDeclaration;
@@ -589,7 +589,7 @@ private int is__ctfe(const Expression _e)
 switch_head:
     switch (e.op)
     {
-    case TOK.variable:
+    case EXP.variable:
         {
             if ((cast(VarExp) e).var.ident == Id.ctfe)
                 return retval;
@@ -597,14 +597,14 @@ switch_head:
                 goto default;
         }
 
-    case TOK.not:
+    case EXP.not:
         {
             e = (cast(NotExp) e).e1;
             retval = (retval == -1 ? 1 : -1);
             goto switch_head;
         }
 
-    case TOK.identifier:
+    case EXP.identifier:
         {
             if ((cast(IdentifierExp) e).ident == Id.ctfe)
                 return retval;
@@ -3153,7 +3153,7 @@ public:
 
     bool isBoolExp(Expression e)
     {
-        return (e && (e.op == TOK.andAnd || e.op == TOK.orOr));
+        return (e && (e.op == EXP.andAnd || e.op == EXP.orOr));
     }
 
     extern (D) BCValue genExpr(Expression expr, string debugMessage = null, uint line = __LINE__)
@@ -3219,7 +3219,7 @@ public:
                     retval = boolres = boolres ? boolres : genTemporary(i32Type);
                 }
 
-                if (expr.op == TOK.andAnd)
+                if (expr.op == EXP.andAnd)
                 {
                     auto Ltrue = genLabel();
                     Set(retval, imm32(1));
@@ -3984,7 +3984,7 @@ static if (is(BCGen))
         switch (e.op)
         {
 
-        case TOK.plusPlus:
+        case EXP.plusPlus:
             {
                 const oldDiscardValue = discardValue;
                 discardValue = false;
@@ -4026,7 +4026,7 @@ static if (is(BCGen))
                 }
             }
             break;
-        case TOK.minusMinus:
+        case EXP.minusMinus:
             {
                 const oldDiscardValue = discardValue;
                 discardValue = false;
@@ -4064,7 +4064,7 @@ static if (is(BCGen))
                 }
             }
             break;
-        case TOK.equal, TOK.notEqual:
+        case EXP.equal, EXP.notEqual:
             {
                 if (e.e1.type.isString && e.e2.type.isString)
                 {
@@ -4076,16 +4076,16 @@ static if (is(BCGen))
                         return ;
                     }
                     StringEq(retval, lhs, rhs);
-                    if (e.op == TOK.notEqual)
+                    if (e.op == EXP.notEqual)
                         Eq3(retval.i32, retval.i32, imm32(0));
                 }
                 else if (canHandleBinExpTypes(toBCType(e.e1.type).type, toBCType(e.e2.type).type))
                 {
-                    goto case TOK.add;
+                    goto case EXP.add;
                 }
             }
             break;
-        case TOK.identity:
+        case EXP.identity:
             {
                 auto lhs = genExpr(e.e1);
                 auto rhs = genExpr(e.e2);
@@ -4098,7 +4098,7 @@ static if (is(BCGen))
                 Eq3(retval.i32, lhs.i32, rhs.i32);
             }
             break;
-        case TOK.notIdentity:
+        case EXP.notIdentity:
             {
                 auto lhs = genExpr(e.e1);
                 auto rhs = genExpr(e.e2);
@@ -4111,7 +4111,7 @@ static if (is(BCGen))
                 Neq3(retval.i32, lhs.i32, rhs.i32);
             }
             break;
-        case TOK.question:
+        case EXP.question:
             {
         Comment(": ? begin ");
                 auto ce = cast(CondExp) e;
@@ -4139,7 +4139,7 @@ static if (is(BCGen))
                 endJmp(toend, genLabel());
             }
             break;
-        case TOK.concatenate:
+        case EXP.concatenate:
             {
                 auto lhs = genExpr(e.e1, "Cat lhs");
                 auto rhs = genExpr(e.e2, "Cat rhs");
@@ -4189,8 +4189,8 @@ static if (is(BCGen))
             }
             break;
 
-        case TOK.add, TOK.min, TOK.mul, TOK.div, TOK.mod,
-                TOK.and, TOK.or, TOK.xor, TOK.rightShift, TOK.leftShift:
+        case EXP.add, EXP.min, EXP.mul, EXP.div, EXP.mod,
+                EXP.and, EXP.or, EXP.xor, EXP.rightShift, EXP.leftShift:
             auto lhs = genExpr(e.e1, "BinExp lhs: " ~ enumToString(e.op));
             auto rhs = genExpr(e.e2, "BinExp rhs: " ~ enumToString(e.op));
             //FIXME IMPORRANT
@@ -4222,8 +4222,8 @@ static if (is(BCGen))
             //TODO we should handle sign extension before bin-ops of coercing types
             if ((isFloat(lhs.type) && isFloat(rhs.type) && lhs.type.type == rhs.type.type) ||
                 (canHandleBinExpTypes(retval.type.type, lhs.type.type) && canHandleBinExpTypes(retval.type.type, rhs.type.type)) ||
-                (e.op == TOK.mod && canHandleBinExpTypes(rhs.type.type, retval.type.type)) ||
-                ((e.op == TOK.equal || e.op == TOK.notEqual) && canHandleBinExpTypes(lhs.type.type, rhs.type.type)))
+                (e.op == EXP.mod && canHandleBinExpTypes(rhs.type.type, retval.type.type)) ||
+                ((e.op == EXP.equal || e.op == EXP.notEqual) && canHandleBinExpTypes(lhs.type.type, rhs.type.type)))
             {
                 const oldDiscardValue = discardValue;
                 discardValue = false;
@@ -4232,63 +4232,63 @@ static if (is(BCGen))
                     */
                 switch (cast(int) e.op)
                 {
-                case TOK.equal:
+                case EXP.equal:
                     {
                         Eq3(retval, lhs, rhs);
                     }
                     break;
 
-                case TOK.notEqual:
+                case EXP.notEqual:
                     {
                         Neq3(retval, lhs, rhs);
                     }
                     break;
-                case TOK.mod:
+                case EXP.mod:
                     {
                         Mod3(retval, lhs, rhs);
                     }
                     break;
 
-                case TOK.add:
+                case EXP.add:
                     {
                         Add3(retval, lhs, rhs);
                     }
                     break;
-                case TOK.min:
+                case EXP.min:
                     {
                         Sub3(retval, lhs, rhs);
                     }
                     break;
-                case TOK.mul:
+                case EXP.mul:
                     {
                         Mul3(retval, lhs, rhs);
                     }
                     break;
-                case TOK.div:
+                case EXP.div:
                     {
                         Div3(retval, lhs, rhs);
                     }
                     break;
 
-                case TOK.and:
+                case EXP.and:
                     {
                         And3(retval, lhs, rhs);
                     }
                     break;
 
-                case TOK.or:
+                case EXP.or:
                     {
                         Or3(retval, lhs, rhs);
                     }
                     break;
 
-                case TOK.xor:
+                case EXP.xor:
                     {
                         Xor3(retval, lhs, rhs);
                     }
                     break;
 
-                case TOK.rightShift:
+                case EXP.rightShift:
                     {
                         auto maxShift = imm32(basicTypeSize(lhs.type.type) * 8 - 1);
                         auto v = genTemporary(i32Type);
@@ -4304,7 +4304,7 @@ static if (is(BCGen))
                     }
                     break;
 
-                case TOK.leftShift:
+                case EXP.leftShift:
                     {
                         auto maxShift = imm32(basicTypeSize(lhs.type.type) * 8 - 1);
                         if (rhs.vType != BCValueType.Immediate || rhs.imm32 > maxShift.imm32)
@@ -4336,7 +4336,7 @@ static if (is(BCGen))
 
             break;
 
-        case TOK.orOr:
+        case EXP.orOr:
             {
                     const oldFixupTableCount = fixupTableCount;
                         {
@@ -4376,7 +4376,7 @@ static if (is(BCGen))
             }
             break;
 
-        case TOK.andAnd:
+        case EXP.andAnd:
                 {
                    // noRetval = true;
                    //     import std.stdio;
@@ -4417,7 +4417,7 @@ static if (is(BCGen))
 
                 break;
             }
-        case TOK.comma:
+        case EXP.comma:
             {
                 genExpr(e.e1);
                 retval = genExpr(e.e2);
@@ -4580,7 +4580,7 @@ static if (is(BCGen))
         //Everything has to be made up of immediates
         if (insideArgumentProcessing)
         {
-            if (ie.e1.op == TOK.variable && ie.e2.op == TOK.int64)
+            if (ie.e1.op == EXP.variable && ie.e2.op == EXP.int64)
             {
                 auto idx = cast(uint)(cast(IntegerExp) ie.e2).toInteger;
                 if (auto vd = (cast(VarExp) ie.e1).var.isVarDeclaration)
@@ -4588,7 +4588,7 @@ static if (is(BCGen))
                     if ((vd.isDataseg() || vd.storage_class & STC.manifest) && !vd.isCTFE())
                     {
                         auto ci = vd.getConstInitializer();
-                        if (ci && ci.op == TOK.arrayLiteral)
+                        if (ci && ci.op == EXP.arrayLiteral)
                         {
                             auto al = cast(ArrayLiteralExp) ci;
                             //auto galp = _sharedCtfeState.getGlobalArrayLiteralPointer(al);
@@ -6735,7 +6735,7 @@ static if (is(BCGen))
             return ;
         }
 
-        if (e.op == TOK.concatenateAssign && _sharedCtfeState.elementType(lhs.type) == _sharedCtfeState.elementType(rhs.type))
+        if (e.op == EXP.concatenateAssign && _sharedCtfeState.elementType(lhs.type) == _sharedCtfeState.elementType(rhs.type))
         {
             {
                 if ((lhs.type.type == BCTypeEnum.Slice && lhs.type.typeIndex < _sharedCtfeState.sliceTypes.length) || lhs.type.type == BCTypeEnum.string8)
@@ -6764,20 +6764,20 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         }
         else switch (e.op)
         {
-        case TOK.addAssign:
+        case EXP.addAssign:
             {
                 Add3(lhs, lhs, rhs);
                 retval = lhs;
             }
             break;
-        case TOK.minAssign:
+        case EXP.minAssign:
             {
                 Sub3(lhs, lhs, rhs);
                 retval = lhs;
             }
             break;
 
-        case TOK.orAssign:
+        case EXP.orAssign:
             {
                  static if (is(BCGen))
                      if (lhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.i32)
@@ -6787,19 +6787,19 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 retval = lhs;
             }
             break;
-        case TOK.andAssign:
+        case EXP.andAssign:
             {
                 And3(lhs, lhs, rhs);
                 retval = lhs;
             }
             break;
-        case TOK.xorAssign:
+        case EXP.xorAssign:
             {
                 Xor3(lhs, lhs, rhs);
                 retval = lhs;
             }
             break;
-        case TOK.rightShiftAssign:
+        case EXP.rightShiftAssign:
             {
                 static if (is(BCGen))
                     if (lhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.i32)
@@ -6809,7 +6809,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 retval = lhs;
             }
             break;
-        case TOK.leftShiftAssign:
+        case EXP.leftShiftAssign:
             {
 //                static if (is(BCGen))
 //                    if (lhs.type.type == BCTypeEnum.i32 || rhs.type.type == BCTypeEnum.i32)
@@ -6819,19 +6819,19 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 retval = lhs;
             }
             break;
-        case TOK.mulAssign:
+        case EXP.mulAssign:
             {
                 Mul3(lhs, lhs, rhs);
                 retval = lhs;
             }
             break;
-        case TOK.divAssign:
+        case EXP.divAssign:
             {
                 Div3(lhs, lhs, rhs);
                 retval = lhs;
             }
             break;
-        case TOK.modAssign:
+        case EXP.modAssign:
             {
                 Mod3(lhs, lhs, rhs);
                 retval = lhs;
@@ -7060,28 +7060,28 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         {
             switch (ce.op)
             {
-            case TOK.lessThan:
+            case EXP.lessThan:
                 {
                     uns ? Ult3(oldAssignTo, lhs, rhs) : Lt3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
                 break;
 
-            case TOK.greaterThan:
+            case EXP.greaterThan:
                 {
                     uns ? Ugt3(oldAssignTo, lhs, rhs) : Gt3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
                 break;
 
-            case TOK.lessOrEqual:
+            case EXP.lessOrEqual:
                 {
                     uns ? Ule3(oldAssignTo, lhs, rhs) : Le3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
                 }
                 break;
 
-            case TOK.greaterOrEqual:
+            case EXP.greaterOrEqual:
                 {
                     uns ? Uge3(oldAssignTo, lhs, rhs) : Ge3(oldAssignTo, lhs, rhs);
                     retval = oldAssignTo;
@@ -7194,7 +7194,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         const oldDiscardValue = discardValue;
         discardValue = false;
 
-        if (ae.e1.op == TOK.slice && ae.e2.op == TOK.slice)
+        if (ae.e1.op == EXP.slice && ae.e2.op == EXP.slice)
         {
             SliceExp e1 = cast(SliceExp)ae.e1;
             SliceExp e2 = cast(SliceExp)ae.e2;
@@ -7275,7 +7275,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             writeln("ae.e1.op ", enumToString(ae.e1.op));
         }
 
-        if (ae.e1.op == TOK.dotVariable)
+        if (ae.e1.op == EXP.dotVariable)
         {
             // Assignment to a struct or class member
             // needs to be handled differently
@@ -7405,7 +7405,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             retval = rhs;
         }
-        else if (ae.e1.op == TOK.arrayLength)
+        else if (ae.e1.op == EXP.arrayLength)
         {
             auto ale = cast(ArrayLengthExp) ae.e1;
 
@@ -7427,7 +7427,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             BCValue newLength = genExpr(ae.e2, "ArrayExpansion newLength");
             expandSliceTo(arrayPtr, newLength);
         }
-        else if (ae.e1.op == TOK.index)
+        else if (ae.e1.op == EXP.index)
         {
             auto ie1 = cast(IndexExp) ae.e1;
 
@@ -7531,7 +7531,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
 
             if (lhs.vType == BCValueType.VoidValue)
             {
-                if (ae.e2.op == TOK.variable)
+                if (ae.e2.op == EXP.variable)
                 {
                     auto ve = cast(VarExp) ae.e2;
                     if (auto vd = ve.var.isVarDeclaration)
@@ -7602,7 +7602,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                     (lhs.type.type == BCTypeEnum.Slice && rhs.type.type == BCTypeEnum.Slice))
                 {
 /+ This is probably not needed ....
-                    if (ae.op == TOK.construct)
+                    if (ae.op == EXP.construct)
                     {
                         auto CJLhsIsNull = beginCndJmp(lhs.i32, true);
                         Alloc(lhs.i32, imm32(SliceDescriptor.Size));
@@ -7702,7 +7702,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                         return ;
                     }
 /+
-                    if (ae.op == TOK.construct)
+                    if (ae.op == EXP.construct)
                     {
                         auto CJLhsIsNull = beginCndJmp(lhs.i32, true);
                         Alloc(lhs.i32, imm32(allocSize), lhs.type);
@@ -7903,7 +7903,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             else
             {
 
-                if (ae.msg.op != TOK.string_)
+                if (ae.msg.op != EXP.string_)
                 {
                     BCValue errorMessage = genExpr(ae.msg);
                     Assert(lhs.i32, addErrorWithMessage(ae.loc, errorMessage));
@@ -8285,7 +8285,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
         TypeDelegate td = cast (TypeDelegate) ce.e1.type;
         import dmd.asttypename;
 
-        if (ce.e1.op == TOK.variable)
+        if (ce.e1.op == EXP.variable)
         {
             auto ve = (cast(VarExp) ce.e1);
             fd = ve.var.isFuncDeclaration();
@@ -8297,7 +8297,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 return ;
             }
         }
-        else if (ce.e1.op == TOK.dotVariable)
+        else if (ce.e1.op == EXP.dotVariable)
         {
             Expression ethis;
             DotVarExp dve = cast(DotVarExp)ce.e1;
@@ -8343,20 +8343,20 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
                 // non-virtual so the function
             }
             /*
-            if (ethis.op == TOK.dotType)
+            if (ethis.op == EXP.dotType)
                 ethis = (cast(DotTypeExp)dve.e1).e1;
             }
             */
 
         }
         // functionPtr
-        else if (ce.e1.op == TOK.star)
+        else if (ce.e1.op == EXP.star)
         {
             isFunctionPtr = true;
             fnValue = genExpr(ce.e1);
         }
         // functionLiteral
-        else if (ce.e1.op == TOK.function_)
+        else if (ce.e1.op == EXP.function_)
         {
             //auto fnValue = genExpr(ce.e1);
             fd = (cast(FuncExp)ce.e1).fd;
@@ -9041,7 +9041,7 @@ _sharedCtfeState.typeToString(_sharedCtfeState.elementType(rhs.type)) ~ " -- " ~
             writefln("WithStatement.exp.op %s", ws.exp.op);
             if (ws.wthis) writefln("WithStatement.wthis %s", ws.wthis.toString);
         }
-        if (!ws.wthis && ws.exp.op == TOK.type)
+        if (!ws.wthis && ws.exp.op == EXP.type)
         {
             genBlock(ws._body);
             return ;
